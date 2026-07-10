@@ -20,33 +20,45 @@ import { hashPassword } from "../src/lib/password";
 const prisma = new PrismaClient();
 
 const DEMO_PASSWORD = "dentia-demo-2026";
+const PRIMARY_TENANT = {
+  name: "Clinica Dental Murcia-Elche",
+  slug: "clinica-murcia-elche",
+  legalName: "Clinica Dental Murcia-Elche S.L.",
+  phone: "+34 968 000 111",
+  address: "Sedes en Murcia y Elche",
+  pmsProvider: "Klinikare API",
+  assistantName: "Clara",
+  assistantEnabled: true,
+  retentionDays: 90
+};
+const PRIMARY_SETTINGS = {
+  tone: "Cercano, profesional y empatico",
+  escalationRules:
+    "Urgencia real, enfado, pagos/reclamaciones, peticion explicita de humano, dos fallos de comprension o sintomas fuera de protocolo.",
+  rgpdNotes:
+    "Locucion previa, consentimiento explicito, retencion 90 dias, residencia UE y minima PII al LLM.",
+  voiceEnabled: true,
+  whatsappEnabled: true,
+  smsEnabled: true,
+  webEnabled: true
+};
 
 async function main() {
   const tenant = await prisma.tenant.upsert({
-    where: { slug: "clinica-murcia-elche" },
-    update: {},
-    create: {
-      name: "Clinica Murcia Elche",
-      slug: "clinica-murcia-elche",
-      legalName: "Clinica Murcia Elche S.L.",
-      phone: "+34 968 000 111",
-      address: "Murcia y Elche",
-      pmsProvider: "Klinikare API",
-      assistantName: "Clara",
-      assistantEnabled: true,
-      retentionDays: 90,
+    where: { slug: PRIMARY_TENANT.slug },
+    update: {
+      ...PRIMARY_TENANT,
       settings: {
-        create: {
-          tone: "Cercano, profesional y empatico",
-          escalationRules:
-            "Urgencia real, enfado, pagos/reclamaciones, peticion explicita de humano, dos fallos de comprension o sintomas fuera de protocolo.",
-          rgpdNotes:
-            "Locucion previa, consentimiento explicito, retencion 90 dias, residencia UE y minima PII al LLM.",
-          voiceEnabled: true,
-          whatsappEnabled: true,
-          smsEnabled: true,
-          webEnabled: true
+        upsert: {
+          update: PRIMARY_SETTINGS,
+          create: PRIMARY_SETTINGS
         }
+      }
+    },
+    create: {
+      ...PRIMARY_TENANT,
+      settings: {
+        create: PRIMARY_SETTINGS
       }
     }
   });
@@ -60,7 +72,7 @@ async function main() {
 
   await prisma.user.upsert({
     where: { tenantId_email: { tenantId: tenant.id, email: "alejandro@dentia.ai" } },
-    update: { passwordHash: hashPassword(DEMO_PASSWORD) },
+    update: { name: "Alejandro Marti", passwordHash: hashPassword(DEMO_PASSWORD), role: UserRole.OWNER },
     create: {
       tenantId: tenant.id,
       name: "Alejandro Marti",
@@ -72,10 +84,10 @@ async function main() {
 
   await prisma.user.upsert({
     where: { tenantId_email: { tenantId: tenant.id, email: "recepcion@dentia.ai" } },
-    update: { passwordHash: hashPassword(DEMO_PASSWORD) },
+    update: { name: "Recepcion Murcia-Elche", passwordHash: hashPassword(DEMO_PASSWORD), role: UserRole.RECEPTION },
     create: {
       tenantId: tenant.id,
-      name: "Marta Recepcion",
+      name: "Recepcion Murcia-Elche",
       email: "recepcion@dentia.ai",
       passwordHash: hashPassword(DEMO_PASSWORD),
       role: UserRole.RECEPTION
@@ -84,11 +96,18 @@ async function main() {
 
   const secondTenant = await prisma.tenant.upsert({
     where: { slug: "clinica-elche-demo" },
-    update: {},
+    update: {
+      name: "Clinica Elche Demo",
+      phone: "+34 965 000 111",
+      address: "Sede Elche",
+      pmsProvider: "standalone",
+      assistantName: "Iris"
+    },
     create: {
       name: "Clinica Elche Demo",
       slug: "clinica-elche-demo",
       phone: "+34 965 000 111",
+      address: "Sede Elche",
       pmsProvider: "standalone",
       assistantName: "Iris",
       apiKey: `dentia_${randomBytes(24).toString("hex")}`,
@@ -198,9 +217,9 @@ async function main() {
   });
 
   const ana = await upsertPatient(tenant.id, {
-    name: "Ana Serrano Prieto",
+    name: "Ana Molina Prieto",
     phone: "+34 600 331 987",
-    email: "ana.serrano@mail.com",
+    email: "ana.molina@mail.com",
     status: PatientStatus.OPEN_BUDGET,
     source: "WhatsApp",
     preferredChannel: ConversationChannel.WHATSAPP,
@@ -303,7 +322,7 @@ async function main() {
 
   await createConversation(tenant.id, ana.id, ConversationChannel.WHATSAPP, "Presupuesto", ConversationStatus.ACTIVE, false, [
     [MessageDirection.OUTBOUND, "Clara IA", "Hola Ana, soy Clara. Te escribo por si quieres resolver alguna duda del presupuesto del implante."],
-    [MessageDirection.INBOUND, "Ana Serrano", "Queria saber si puedo financiarlo y cuanto tardaria."],
+    [MessageDirection.INBOUND, "Ana Molina", "Queria saber si puedo financiarlo y cuanto tardaria."],
     [MessageDirection.OUTBOUND, "Clara IA", "Tenemos financiacion hasta 12 meses. Puedo reservarte una cita corta para resolverlo con el doctor."]
   ]);
 
@@ -523,16 +542,16 @@ async function seedBilling(
   await prisma.expense.createMany({
     data: [
       { tenantId, supplier: "Laboratorio Dentalab", category: ExpenseCategory.LABORATORIO, amountCents: 38000, status: ExpenseStatus.PENDING, incurredAt: daysFromNow(-4), dueAt: daysFromNow(11) },
-      { tenantId, supplier: "Ilustre Colegio Odontologos Madrid", category: ExpenseCategory.OTROS, amountCents: 18000, status: ExpenseStatus.PENDING, incurredAt: daysFromNow(-6), dueAt: daysFromNow(9) },
-      { tenantId, supplier: "Notaria Ramirez y Asociados", category: ExpenseCategory.OTROS, amountCents: 38000, status: ExpenseStatus.PENDING, incurredAt: daysFromNow(-9), dueAt: daysFromNow(2) },
+      { tenantId, supplier: "Colegio Oficial de Dentistas Region de Murcia", category: ExpenseCategory.OTROS, amountCents: 18000, status: ExpenseStatus.PENDING, incurredAt: daysFromNow(-6), dueAt: daysFromNow(9) },
+      { tenantId, supplier: "Asesoria clinica Murcia-Elche", category: ExpenseCategory.OTROS, amountCents: 38000, status: ExpenseStatus.PENDING, incurredAt: daysFromNow(-9), dueAt: daysFromNow(2) },
       { tenantId, supplier: "Suministros Dentales Iberia", category: ExpenseCategory.SUMINISTROS, amountCents: 42500, status: ExpenseStatus.PAID, incurredAt: daysFromNow(-12), dueAt: daysFromNow(-2), paidAt: daysFromNow(-3) },
       { tenantId, supplier: "Nominas equipo clinico", category: ExpenseCategory.NOMINAS, amountCents: 620000, status: ExpenseStatus.PAID, incurredAt: monthsAgo(0, 1), dueAt: monthsAgo(0, 1), paidAt: monthsAgo(0, 1) },
-      { tenantId, supplier: "Alquiler local Calle Serrano", category: ExpenseCategory.ALQUILER, amountCents: 280000, status: ExpenseStatus.PAID, incurredAt: monthsAgo(0, 1), dueAt: monthsAgo(0, 1), paidAt: monthsAgo(0, 1) },
+      { tenantId, supplier: "Alquiler sedes Murcia y Elche", category: ExpenseCategory.ALQUILER, amountCents: 280000, status: ExpenseStatus.PAID, incurredAt: monthsAgo(0, 1), dueAt: monthsAgo(0, 1), paidAt: monthsAgo(0, 1) },
       { tenantId, supplier: "Google Ads Clinica", category: ExpenseCategory.MARKETING, amountCents: 32000, status: ExpenseStatus.PAID, incurredAt: daysFromNow(-15), dueAt: daysFromNow(-10), paidAt: daysFromNow(-10) },
       { tenantId, supplier: "Mantenimiento autoclave", category: ExpenseCategory.MANTENIMIENTO, amountCents: 15000, status: ExpenseStatus.PAID, incurredAt: monthsAgo(1, 8), dueAt: monthsAgo(1, 8), paidAt: monthsAgo(1, 8) },
       { tenantId, supplier: "Curso formacion implantologia", category: ExpenseCategory.FORMACION, amountCents: 45000, status: ExpenseStatus.PAID, incurredAt: monthsAgo(2, 5), dueAt: monthsAgo(2, 5), paidAt: monthsAgo(2, 5) },
       { tenantId, supplier: "Nominas equipo clinico", category: ExpenseCategory.NOMINAS, amountCents: 620000, status: ExpenseStatus.PAID, incurredAt: monthsAgo(1, 1), dueAt: monthsAgo(1, 1), paidAt: monthsAgo(1, 1) },
-      { tenantId, supplier: "Alquiler local Calle Serrano", category: ExpenseCategory.ALQUILER, amountCents: 280000, status: ExpenseStatus.PAID, incurredAt: monthsAgo(1, 1), dueAt: monthsAgo(1, 1), paidAt: monthsAgo(1, 1) },
+      { tenantId, supplier: "Alquiler sedes Murcia y Elche", category: ExpenseCategory.ALQUILER, amountCents: 280000, status: ExpenseStatus.PAID, incurredAt: monthsAgo(1, 1), dueAt: monthsAgo(1, 1), paidAt: monthsAgo(1, 1) },
       { tenantId, supplier: "Laboratorio Dentalab", category: ExpenseCategory.LABORATORIO, amountCents: 52000, status: ExpenseStatus.PAID, incurredAt: monthsAgo(2, 14), dueAt: monthsAgo(2, 29), paidAt: monthsAgo(2, 25) }
     ]
   });

@@ -407,12 +407,12 @@ Casos probables donde debo avisar:
 
 - Auth propia sin dependencias: scrypt (`src/lib/password.ts`) + sesiones en BD con cookie httpOnly (`src/lib/auth.ts`, modelo `Session`).
 - `/login`, `/signup` (onboarding de clinica: crea tenant + settings + owner + API key) y logout en sidebar.
-- Multi-tenant real por sesion: `getCurrentTenant`/`getCurrentContext` derivan del usuario logueado; `DEFAULT_TENANT_SLUG` ya no gobierna la app. Aislamiento verificado en navegador: tenant Elche ve 0 datos de Madrid.
+- Multi-tenant real por sesion: `getCurrentTenant`/`getCurrentContext` derivan del usuario logueado; `DEFAULT_TENANT_SLUG` ya no gobierna la app. Aislamiento verificado en navegador: cada tenant ve solo sus propios datos.
 - Roles con jerarquia (OWNER > MANAGER > RECEPTION/DOCTOR > READ_ONLY): configuracion e invitaciones solo MANAGER+; verificado que RECEPTION recibe error visible al guardar settings.
 - Auditoria con actor (`actorUserId`) en todas las acciones + vista de ultimos eventos en Configuracion.
 - Consentimientos RGPD accionables desde la tabla de pacientes (toggle Firmado/Pendiente).
 - Equipo: alta de usuarios con rol desde Configuracion.
-- Seed: 2 tenants (`clinica-sonrisa-madrid`, `clinica-elche-demo`), usuarios `alejandro@dentia.ai` (OWNER), `recepcion@dentia.ai` (RECEPTION), `demo@elche.dentia.ai` (OWNER). Password demo local: `dentia-demo-2026`.
+- Seed: 2 tenants (`clinica-murcia-elche`, `clinica-elche-demo`), usuarios `alejandro@dentia.ai` (OWNER), `recepcion@dentia.ai` (RECEPTION), `demo@elche.dentia.ai` (OWNER). Password demo local: `dentia-demo-2026`.
 
 ### Fase 3 — CERRADA en local (canales reales pendientes de credenciales)
 

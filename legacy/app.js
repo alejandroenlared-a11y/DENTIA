@@ -17,20 +17,20 @@ const today = "2026-07-08";
 const seed = {
   view: "home",
   clinic: {
-    name: "Clinica Sonrisa Madrid",
+    name: "Clinica Dental Murcia-Elche",
     user: "Alejandro Marti",
     email: "alejandro@dentia.ai",
     assistantName: "Clara",
     assistantEnabled: true,
     pms: "Klinikare API",
-    phone: "+34 910 245 880",
-    address: "Calle Serrano 84, Madrid",
+    phone: "+34 968 000 111",
+    address: "Sedes en Murcia y Elche",
     retentionDays: 90
   },
   patients: [
     { id: "p1", name: "Maria Lopez Gonzalez", phone: "+34 612 456 890", email: "maria.lopez@mail.com", status: "Nuevo lead", treatment: "Ortodoncia invisible", source: "WhatsApp", value: 1800, consent: false, lastVisit: "Sin visita", risk: "Alta intencion" },
     { id: "p2", name: "Javier Ruiz Moreno", phone: "+34 666 102 488", email: "javier.ruiz@mail.com", status: "Urgencia", treatment: "Dolor agudo", source: "Llamada", value: 220, consent: true, lastVisit: "2026-03-14", risk: "Prioritario" },
-    { id: "p3", name: "Ana Serrano Prieto", phone: "+34 600 331 987", email: "ana.serrano@mail.com", status: "Presupuesto abierto", treatment: "Implante unitario", source: "WhatsApp", value: 1200, consent: true, lastVisit: "2026-05-28", risk: "Financiacion" },
+    { id: "p3", name: "Ana Molina Prieto", phone: "+34 600 331 987", email: "ana.molina@mail.com", status: "Presupuesto abierto", treatment: "Implante unitario", source: "WhatsApp", value: 1200, consent: true, lastVisit: "2026-05-28", risk: "Financiacion" },
     { id: "p4", name: "Carlos Vega Martin", phone: "+34 689 220 187", email: "carlos.vega@mail.com", status: "Activo", treatment: "Higiene", source: "SMS", value: 55, consent: true, lastVisit: "2025-02-10", risk: "Lista espera" },
     { id: "p5", name: "Lucia Rivas Fernandez", phone: "+34 622 109 823", email: "lucia.rivas@mail.com", status: "Inactivo +12m", treatment: "Revision anual", source: "Campana", value: 350, consent: true, lastVisit: "2025-01-09", risk: "Reactivacion" }
   ],

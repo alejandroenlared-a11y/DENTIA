@@ -3,8 +3,8 @@ import { buildReply, detectIntent, shouldEscalate, type ReplyContext } from "@/l
 
 const ctx: ReplyContext = {
   assistantName: "Clara",
-  clinicName: "Clinica Sonrisa Madrid",
-  clinicPhone: "+34 910 245 880",
+  clinicName: "Clinica Dental Murcia-Elche",
+  clinicPhone: "+34 968 000 111",
   treatments: [
     { name: "Higiene dental", priceCents: 6000 },
     { name: "Implante unitario", priceCents: null }
@@ -58,7 +58,7 @@ describe("buildReply", () => {
   it("urgencia deriva a humano y no diagnostica", () => {
     const reply = buildReply("URGENCIA", ctx);
     expect(reply).toContain("no puedo valorar sintomas");
-    expect(reply).toContain("+34 910 245 880");
+    expect(reply).toContain("+34 968 000 111");
   });
 
   it("cita ofrece primera visita a coste cero", () => {
@@ -75,6 +75,6 @@ describe("buildReply", () => {
   it("saludo se presenta como asistente virtual", () => {
     const reply = buildReply("SALUDO", ctx);
     expect(reply).toContain("Clara");
-    expect(reply).toContain("Clinica Sonrisa Madrid");
+    expect(reply).toContain("Clinica Dental Murcia-Elche");
   });
 });

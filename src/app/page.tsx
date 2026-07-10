@@ -112,6 +112,17 @@ export default async function Page({ searchParams }: PageProps) {
           </form>
         </div>
       </aside>
+      <nav className="mobile-switch" aria-label="Navegacion principal">
+        {nav.map(item => (
+          <a key={item.id} className={`mobile-nav-item ${view === item.id ? "active" : ""}`} href={`/?view=${item.id}`}>
+            <Icon name={item.icon} />
+            <span>{item.label}</span>
+            {item.id === "inbox" && data.metrics.unreadConversations > 0 ? (
+              <span className="count">{data.metrics.unreadConversations}</span>
+            ) : null}
+          </a>
+        ))}
+      </nav>
       <main className="main">
         <header className="topbar">
           <div className="page-kicker">{viewLabels[view]}</div>

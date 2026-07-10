@@ -138,7 +138,7 @@ describe("treatmentInputSchema", () => {
 
 describe("settingsInputSchema", () => {
   const base = {
-    name: "Clinica Sonrisa",
+    name: "Clinica Dental Murcia-Elche",
     assistantName: "Clara",
     pmsProvider: "Gesden",
     tone: "Cercano",
