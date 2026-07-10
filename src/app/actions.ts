@@ -1,12 +1,17 @@
 "use server";
 
 import {
+  AgentSessionOutcome,
+  AppointmentStatus,
   ConsentKind,
   ConversationChannel,
+  ConversationStatus,
   PatientStatus,
   MessageDirection,
+  TaskPriority,
   TaskStatus,
-  UserRole
+  UserRole,
+  type Prisma
 } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -22,6 +27,7 @@ import {
   conversationReplySchema,
   firstErrorMessage,
   inviteUserSchema,
+  interactiveDemoSchema,
   patientInputSchema,
   settingsInputSchema,
   taskFromConversationSchema,
@@ -454,6 +460,180 @@ export async function runAgentDemoAction(formData: FormData) {
   });
 }
 
+export async function saveInteractiveDemoAction(formData: FormData) {
+  const parsed = interactiveDemoSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) {
+    backTo("agent", { error: firstErrorMessage(parsed.error) });
+  }
+
+  const { user, tenant } = await getCurrentContext();
+  const escalated = parsed.data.escalated === "true";
+  let transcript: Array<{ role: "patient" | "assistant"; body: string }>;
+  try {
+    transcript = parseInteractiveTranscript(parsed.data.transcript);
+  } catch (error) {
+    console.error("saveInteractiveDemoAction transcript failed", error);
+    backTo("agent", { error: "No se pudo leer la conversacion interactiva." });
+  }
+
+  let conversationId: string;
+  try {
+    const patient = await prisma.patient.upsert({
+      where: { tenantId_phone: { tenantId: tenant.id, phone: parsed.data.phone } },
+      update: {
+        name: parsed.data.patientName,
+        status: escalated ? PatientStatus.URGENT : PatientStatus.NEW_LEAD,
+        source: "Demo interactiva IA",
+        preferredChannel: ConversationChannel.WHATSAPP,
+        treatmentNeed: parsed.data.treatmentNeed,
+        estimatedValue: parsed.data.estimatedValue,
+        notes: [
+          "Demo interactiva de recepcionista IA.",
+          `Presupuesto orientativo: ${parsed.data.budget || "pendiente"}.`,
+          `Sede: ${parsed.data.location || "pendiente"}.`,
+          `Disponibilidad: ${parsed.data.availability || "pendiente"}.`
+        ].join(" ")
+      },
+      create: {
+        tenantId: tenant.id,
+        name: parsed.data.patientName,
+        phone: parsed.data.phone,
+        status: escalated ? PatientStatus.URGENT : PatientStatus.NEW_LEAD,
+        source: "Demo interactiva IA",
+        preferredChannel: ConversationChannel.WHATSAPP,
+        treatmentNeed: parsed.data.treatmentNeed,
+        estimatedValue: parsed.data.estimatedValue,
+        notes: [
+          "Demo interactiva de recepcionista IA.",
+          `Presupuesto orientativo: ${parsed.data.budget || "pendiente"}.`,
+          `Sede: ${parsed.data.location || "pendiente"}.`,
+          `Disponibilidad: ${parsed.data.availability || "pendiente"}.`
+        ].join(" ")
+      }
+    });
+
+    await prisma.consent.upsert({
+      where: {
+        tenantId_patientId_kind: {
+          tenantId: tenant.id,
+          patientId: patient.id,
+          kind: ConsentKind.DATA_PROCESSING
+        }
+      },
+      create: {
+        tenantId: tenant.id,
+        patientId: patient.id,
+        kind: ConsentKind.DATA_PROCESSING,
+        granted: true,
+        grantedAt: new Date(),
+        source: "demo-interactiva"
+      },
+      update: { granted: true, grantedAt: new Date(), source: "demo-interactiva" }
+    });
+
+    const conversation = await prisma.conversation.create({
+      data: {
+        tenantId: tenant.id,
+        patientId: patient.id,
+        channel: ConversationChannel.WHATSAPP,
+        status: escalated ? ConversationStatus.HUMAN_REQUIRED : ConversationStatus.AI_HANDLING,
+        intent: parsed.data.intent,
+        result: escalated ? "Urgencia escalada desde demo interactiva" : "Pre-reserva preparada desde demo interactiva",
+        unread: true,
+        messages: {
+          create: [
+            ...transcript.map(message => ({
+              direction: message.role === "patient" ? MessageDirection.INBOUND : MessageDirection.OUTBOUND,
+              senderName: message.role === "patient" ? parsed.data.patientName : tenant.assistantName,
+              body: message.body,
+              metadata: { demo: true, interactive: true }
+            })),
+            {
+              direction: MessageDirection.SYSTEM,
+              senderName: "Resumen operativo",
+              body: parsed.data.summary || "Demo interactiva registrada.",
+              metadata: {
+                demo: true,
+                interactive: true,
+                budget: parsed.data.budget,
+                location: parsed.data.location,
+                availability: parsed.data.availability
+              }
+            }
+          ]
+        }
+      }
+    });
+    conversationId = conversation.id;
+
+    if (escalated) {
+      await prisma.task.create({
+        data: {
+          tenantId: tenant.id,
+          patientId: patient.id,
+          title: `Demo IA: revisar urgencia de ${parsed.data.patientName}`,
+          type: "Urgencia",
+          priority: TaskPriority.CRITICAL,
+          status: TaskStatus.PENDING,
+          dueAt: new Date(),
+          linkedType: "Conversation",
+          linkedId: conversation.id
+        }
+      });
+    } else {
+      const treatment = await prisma.treatment.findFirst({
+        where: { tenantId: tenant.id, name: { contains: parsed.data.treatmentNeed.split(" ")[0] } }
+      });
+      const provider = await prisma.provider.findFirst({ where: { tenantId: tenant.id, active: true }, orderBy: { name: "asc" } });
+      const operatory = await prisma.operatory.findFirst({ where: { tenantId: tenant.id, active: true }, orderBy: { name: "asc" } });
+      await prisma.appointment.create({
+        data: {
+          tenantId: tenant.id,
+          patientId: patient.id,
+          treatmentId: treatment?.id ?? null,
+          providerId: provider?.id ?? null,
+          operatoryId: operatory?.id ?? null,
+          title: `Demo IA interactiva: ${parsed.data.treatmentNeed}`,
+          startsAt: new Date(Date.now() + 36 * 60 * 60 * 1000),
+          durationMinutes: treatment?.durationMinutes ?? 30,
+          status: AppointmentStatus.PROPOSED,
+          channel: ConversationChannel.WHATSAPP,
+          createdByAi: true
+        }
+      });
+    }
+
+    await prisma.agentSession.create({
+      data: {
+        tenantId: tenant.id,
+        patientId: patient.id,
+        conversationId: conversation.id,
+        intent: parsed.data.intent,
+        outcome: escalated ? AgentSessionOutcome.ESCALATED : AgentSessionOutcome.APPOINTMENT_CREATED,
+        escalated,
+        costCents: escalated ? 26 : 20,
+        latencyMs: 1200 + transcript.length * 80
+      }
+    });
+
+    await audit(tenant.id, user.id, "agent.interactive_demo_saved", "Conversation", conversation.id, {
+      intent: parsed.data.intent,
+      budget: parsed.data.budget,
+      location: parsed.data.location,
+      availability: parsed.data.availability
+    });
+  } catch (error) {
+    console.error("saveInteractiveDemoAction failed", error);
+    backTo("agent", { error: "No se pudo guardar la demo interactiva." });
+  }
+
+  succeed(
+    "inbox",
+    escalated ? "Demo interactiva guardada como urgencia para recepcion." : "Demo interactiva guardada como conversacion y cita propuesta.",
+    { conversation: conversationId }
+  );
+}
+
 export async function inviteUserAction(formData: FormData) {
   const parsed = inviteUserSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) {
@@ -540,7 +720,8 @@ async function audit(
   actorUserId: string | null,
   action: string,
   entityType: string,
-  entityId: string
+  entityId: string,
+  metadata?: Prisma.InputJsonValue
 ) {
   await prisma.auditLog.create({
     data: {
@@ -548,7 +729,35 @@ async function audit(
       actorUserId,
       action,
       entityType,
-      entityId
+      entityId,
+      metadata
     }
   });
+}
+
+function parseInteractiveTranscript(raw: string) {
+  const parsed = JSON.parse(raw);
+  if (!Array.isArray(parsed)) {
+    throw new Error("Transcript is not an array");
+  }
+  const messages = parsed
+    .slice(0, 30)
+    .map((item: unknown) => {
+      if (!item || typeof item !== "object") {
+        return null;
+      }
+      const role = "role" in item ? item.role : null;
+      const body = "body" in item ? item.body : null;
+      if ((role !== "patient" && role !== "assistant") || typeof body !== "string") {
+        return null;
+      }
+      const cleanBody = body.trim().slice(0, 1200);
+      return cleanBody ? { role, body: cleanBody } : null;
+    })
+    .filter((message): message is { role: "patient" | "assistant"; body: string } => Boolean(message));
+
+  if (messages.length < 2) {
+    throw new Error("Transcript does not include enough messages");
+  }
+  return messages;
 }

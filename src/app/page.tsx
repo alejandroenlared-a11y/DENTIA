@@ -12,13 +12,15 @@ import {
   markConversationReadAction,
   replyConversationAction,
   runAgentDemoAction,
+  saveInteractiveDemoAction,
   toggleAssistantAction,
   toggleConsentAction,
   updateSettingsAction
 } from "@/app/actions";
 import { logoutAction } from "@/app/auth-actions";
 import { Icon, type IconName } from "@/components/icon";
-import { demoKnowledge, demoScenarios } from "@/lib/agent/demo";
+import { InteractiveAgentDemo } from "@/components/interactive-agent-demo";
+import { demoKnowledge, demoScenarios } from "@/lib/agent/demo-data";
 import { formatLongDate, formatWeekRange, getGreeting, getWeekDays } from "@/lib/calendar";
 import { type AppView, getDashboardData } from "@/lib/dashboard";
 import { formatDate, formatDateTime, formatMoney, formatTime, getInitials } from "@/lib/format";
@@ -601,7 +603,8 @@ function AgentView({ data }: { data: Awaited<ReturnType<typeof getDashboardData>
           title="Demo de recepcionista entrenada"
           subtitle="Simula WhatsApp con conocimiento de sedes, tratamientos, precios, financiacion, RGPD y escalado clinico."
         />
-        <div className="agent-demo-grid">
+        <InteractiveAgentDemo saveAction={saveInteractiveDemoAction} />
+        <div className="agent-demo-grid agent-demo-reference">
           <div className="knowledge-panel">
             <h3>Base de conocimiento cargada</h3>
             <div className="knowledge-list">
@@ -632,6 +635,10 @@ function AgentView({ data }: { data: Awaited<ReturnType<typeof getDashboardData>
             </div>
           </div>
           <div className="scenario-grid">
+            <div className="scenario-grid-title">
+              <h3>Demos cerradas para CRM</h3>
+              <p>Crean directamente conversacion, cita propuesta o tarea de urgencia.</p>
+            </div>
             {demoScenarios.map(scenario => (
               <form action={runAgentDemoAction} className="scenario-card" key={scenario.id}>
                 <input type="hidden" name="scenario" value={scenario.id} />
@@ -646,7 +653,7 @@ function AgentView({ data }: { data: Awaited<ReturnType<typeof getDashboardData>
                 </div>
                 <button className="button primary" type="submit">
                   <Icon name="bot" />
-                  Ejecutar demo
+                  Registrar caso
                 </button>
               </form>
             ))}

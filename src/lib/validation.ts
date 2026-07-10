@@ -47,6 +47,20 @@ export const taskFromConversationSchema = z.object({
   priority: z.nativeEnum(TaskPriority).default(TaskPriority.HIGH)
 });
 
+export const interactiveDemoSchema = z.object({
+  transcript: z.string().trim().min(2, "es obligatorio").max(12000, "es demasiado largo"),
+  intent: requiredString,
+  patientName: requiredString,
+  phone: requiredString,
+  treatmentNeed: requiredString,
+  estimatedValue: z.coerce.number().int("debe ser un numero entero").min(0, "no puede ser negativo").default(0),
+  budget: z.string().trim().optional(),
+  location: z.string().trim().optional(),
+  availability: z.string().trim().optional(),
+  summary: z.string().trim().optional(),
+  escalated: z.string().optional()
+});
+
 export const treatmentInputSchema = z.object({
   name: requiredString,
   durationMinutes: z.coerce.number().int("debe ser un numero entero").min(5, "minimo 5 minutos"),
@@ -131,6 +145,14 @@ const fieldLabels: Record<string, string> = {
   durationMinutes: "Duracion",
   price: "Precio",
   rules: "Reglas",
+  transcript: "Conversacion",
+  intent: "Intencion",
+  patientName: "Paciente",
+  budget: "Presupuesto",
+  location: "Sede",
+  availability: "Disponibilidad",
+  summary: "Resumen",
+  escalated: "Escalado",
   assistantName: "Nombre del asistente",
   pmsProvider: "PMS conectado",
   retentionDays: "Retencion",
