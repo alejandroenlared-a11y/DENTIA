@@ -11,6 +11,7 @@ import {
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { hasRole } from "@/lib/auth";
+import { runDemoScenario } from "@/lib/agent/demo";
 import { hashPassword } from "@/lib/password";
 import { prisma } from "@/lib/prisma";
 import { getCurrentContext } from "@/lib/tenant";
@@ -434,6 +435,21 @@ export async function toggleAssistantAction(formData: FormData) {
   }
 
   succeed(view, enabled ? "Asistente activado." : "Asistente pausado.");
+}
+
+export async function runAgentDemoAction(formData: FormData) {
+  const { user, tenant } = await getCurrentContext();
+  try {
+    const result = await runDemoScenario(tenant.id, user.id, formData.get("scenario"));
+    revalidatePath("/");
+    backTo("inbox", {
+      ok: `Demo creada: ${result.title}. Revisa la conversacion y el resultado operativo.`,
+      conversation: result.conversationId
+    });
+  } catch (error) {
+    console.error("runAgentDemoAction failed", error);
+    backTo("agent", { error: "No se pudo ejecutar la demo de la recepcionista IA." });
+  }
 }
 
 export async function inviteUserAction(formData: FormData) {

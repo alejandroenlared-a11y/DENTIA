@@ -11,12 +11,14 @@ import {
   inviteUserAction,
   markConversationReadAction,
   replyConversationAction,
+  runAgentDemoAction,
   toggleAssistantAction,
   toggleConsentAction,
   updateSettingsAction
 } from "@/app/actions";
 import { logoutAction } from "@/app/auth-actions";
 import { Icon, type IconName } from "@/components/icon";
+import { demoKnowledge, demoScenarios } from "@/lib/agent/demo";
 import { formatLongDate, formatWeekRange, getGreeting, getWeekDays } from "@/lib/calendar";
 import { type AppView, getDashboardData } from "@/lib/dashboard";
 import { formatDate, formatDateTime, formatMoney, formatTime, getInitials } from "@/lib/format";
@@ -593,6 +595,64 @@ function AgentView({ data }: { data: Awaited<ReturnType<typeof getDashboardData>
           accent="accent-orange"
         />
       </div>
+      <section className="card pad agent-demo" style={{ marginTop: 14 }}>
+        <PanelHead
+          icon="bot"
+          title="Demo de recepcionista entrenada"
+          subtitle="Simula WhatsApp con conocimiento de sedes, tratamientos, precios, financiacion, RGPD y escalado clinico."
+        />
+        <div className="agent-demo-grid">
+          <div className="knowledge-panel">
+            <h3>Base de conocimiento cargada</h3>
+            <div className="knowledge-list">
+              <div>
+                <strong>Sedes</strong>
+                <span>{demoKnowledge.clinic.locations.join(" · ")}</span>
+              </div>
+              <div>
+                <strong>Horario</strong>
+                <span>{demoKnowledge.clinic.hours}</span>
+              </div>
+              <div>
+                <strong>Financiacion</strong>
+                <span>{demoKnowledge.financing.join(" ")}</span>
+              </div>
+              <div>
+                <strong>Guardrails</strong>
+                <span>{demoKnowledge.guardrails.join(" ")}</span>
+              </div>
+            </div>
+            <div className="treatment-chips" aria-label="Tratamientos de demo">
+              {demoKnowledge.treatments.map(treatment => (
+                <span key={treatment.name}>
+                  <strong>{treatment.name}</strong>
+                  {treatment.price}
+                </span>
+              ))}
+            </div>
+          </div>
+          <div className="scenario-grid">
+            {demoScenarios.map(scenario => (
+              <form action={runAgentDemoAction} className="scenario-card" key={scenario.id}>
+                <input type="hidden" name="scenario" value={scenario.id} />
+                <div>
+                  <span className={scenario.escalated ? "scenario-badge urgent" : "scenario-badge"}>{scenario.intent}</span>
+                  <h3>{scenario.title}</h3>
+                  <p>{scenario.prompt}</p>
+                </div>
+                <div className="scenario-result">
+                  <strong>{scenario.outcome}</strong>
+                  <span>{scenario.impact}</span>
+                </div>
+                <button className="button primary" type="submit">
+                  <Icon name="bot" />
+                  Ejecutar demo
+                </button>
+              </form>
+            ))}
+          </div>
+        </div>
+      </section>
       <section className="card pad" style={{ marginTop: 14 }}>
         <PanelHead icon="inbox" title="Canal web en vivo" subtitle="Widget publico conectado al agente. Compartelo o incrustalo en la web de la clinica." />
         <p>
