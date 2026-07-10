@@ -2,10 +2,15 @@
 
 import { useMemo, useState, type FormEvent } from "react";
 import { Icon } from "@/components/icon";
-import { demoKnowledge, demoScenarios, type DemoScenarioId } from "@/lib/agent/demo-data";
+import { demoKnowledge, demoScenarios } from "@/lib/agent/demo-data";
+import {
+  buildDentalSummary,
+  initialDentalAgentState,
+  runDentalSeniorTurn,
+  type DentalAgentState
+} from "@/lib/agent/dental-senior-agent";
 
 type ServerAction = (formData: FormData) => void | Promise<void>;
-type DemoIntentId = DemoScenarioId | "orthodontics";
 type ChatRole = "patient" | "assistant";
 
 type ChatMessage = {
@@ -14,126 +19,54 @@ type ChatMessage = {
   body: string;
 };
 
-type IntakeState = {
-  intent?: DemoIntentId;
-  intentCode: string;
-  treatmentNeed: string;
-  budget: string;
-  estimatedValue: number;
-  escalated: boolean;
-  consent: boolean;
-  name: string;
-  phone: string;
-  location: string;
-  availability: string;
-  ready: boolean;
-};
-
-const initialIntake: IntakeState = {
-  intentCode: "INTENCION_PENDIENTE",
-  treatmentNeed: "Pendiente de clasificar",
-  budget: "Pendiente",
-  estimatedValue: 0,
-  escalated: false,
-  consent: false,
-  name: "",
-  phone: "",
-  location: "",
-  availability: "",
-  ready: false
-};
-
-const intentCatalog: Record<DemoIntentId, {
-  title: string;
-  intentCode: string;
-  treatmentNeed: string;
-  budget: string;
-  estimatedValue: number;
-  escalated: boolean;
-  advice: string;
-}> = {
-  first_visit: {
-    title: "Primera visita",
-    intentCode: "CITA_PRIMERA_VISITA",
-    treatmentNeed: "Primera visita y diagnostico digital",
-    budget: "0 EUR",
-    estimatedValue: 35000,
-    escalated: false,
-    advice:
-      "La primera visita y diagnostico digital es sin coste. Sirve para revisar el caso y que el doctor confirme el plan."
-  },
-  urgent_pain: {
-    title: "Urgencia dental",
-    intentCode: "URGENCIA_DOLOR_INFLAMACION",
-    treatmentNeed: "Urgencia dental",
-    budget: "desde 70 EUR",
-    estimatedValue: 22000,
-    escalated: true,
-    advice:
-      "Por dolor intenso, inflamacion, sangrado o traumatismo lo marco como urgencia. No diagnostico sintomas: lo escalo a recepcion/doctor."
-  },
-  implant_price: {
-    title: "Implante",
-    intentCode: "PRECIO_IMPLANTE_FINANCIACION",
-    treatmentNeed: "Implante unitario",
-    budget: "desde 1.200 EUR",
-    estimatedValue: 120000,
-    escalated: false,
-    advice:
-      "Un implante unitario parte desde 1.200 EUR. El presupuesto exacto requiere valoracion y normalmente TAC."
-  },
-  whitening: {
-    title: "Blanqueamiento",
-    intentCode: "PRECIO_BLANQUEAMIENTO",
-    treatmentNeed: "Blanqueamiento",
-    budget: "desde 280 EUR",
-    estimatedValue: 28000,
-    escalated: false,
-    advice:
-      "El blanqueamiento empieza desde 280 EUR. Antes se revisa encia, sensibilidad y color inicial para hacerlo con seguridad."
-  },
-  reactivation: {
-    title: "Higiene dental",
-    intentCode: "REACTIVACION_HIGIENE",
-    treatmentNeed: "Higiene dental",
-    budget: "55 EUR",
-    estimatedValue: 5500,
-    escalated: false,
-    advice:
-      "La higiene dental dura unos 45 minutos y tiene precio orientativo de 55 EUR. Puede activarse recordatorio automatico."
-  },
-  orthodontics: {
-    title: "Ortodoncia invisible",
-    intentCode: "VALORACION_ORTODONCIA_INVISIBLE",
-    treatmentNeed: "Ortodoncia invisible",
-    budget: "desde 1.800 EUR",
-    estimatedValue: 180000,
-    escalated: false,
-    advice:
-      "La ortodoncia invisible parte desde 1.800 EUR. Siempre necesita estudio digital para confirmar viabilidad y precio final."
-  }
-};
-
 const starterMessages: ChatMessage[] = [
   {
     id: "assistant-start",
     role: "assistant",
     body:
-      "Hola, soy Clara, recepcionista IA de Clinica Dental Murcia-Elche. Puedo orientarte sobre tratamientos, precios aproximados, financiacion y ayudarte a preparar una cita. Cuentame que necesitas."
+      "Hola, soy Clara, recepcionista IA de Clinica Dental Murcia-Elche. Cuentame que notas: dolor, sensibilidad, encias, pieza rota, implante, ortodoncia o estetica. Te hare unas preguntas para priorizarte, orientar el presupuesto y preparar una cita si encaja."
+  }
+];
+
+const expertPrompts = [
+  {
+    label: "Dolor al frio",
+    prompt:
+      "Me duele una muela cuando tomo algo frio y tambien un poco al morder. No tengo fiebre ni hinchazon."
+  },
+  {
+    label: "Encias",
+    prompt:
+      "Me sangran las encias al cepillarme y noto mal aliento. Hace mas de un ano que no hago limpieza."
+  },
+  {
+    label: "Funda caida",
+    prompt:
+      "Se me ha caido una funda de una muela. La guardo, no sangra, pero noto sensibilidad."
+  },
+  {
+    label: "Muela juicio",
+    prompt:
+      "Me duele la zona de atras del todo y me cuesta abrir bien la boca desde ayer."
+  },
+  {
+    label: "Bruxismo",
+    prompt:
+      "Me levanto con dolor de mandibula y creo que aprieto los dientes por la noche."
   }
 ];
 
 export function InteractiveAgentDemo({ saveAction }: { saveAction: ServerAction }) {
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>(starterMessages);
-  const [intake, setIntake] = useState<IntakeState>(initialIntake);
+  const [dentalState, setDentalState] = useState<DentalAgentState>(initialDentalAgentState);
 
   const transcript = useMemo(
     () => JSON.stringify(messages.map(message => ({ role: message.role, body: message.body }))),
     [messages]
   );
-  const summary = useMemo(() => buildSummary(intake), [intake]);
-  const canSave = messages.length > 2 && intake.ready;
+  const summary = useMemo(() => buildDentalSummary(dentalState), [dentalState]);
+  const canSave = messages.length > 2 && dentalState.ready;
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -145,21 +78,21 @@ export function InteractiveAgentDemo({ saveAction }: { saveAction: ServerAction 
     if (!text) {
       return;
     }
+    const turn = runDentalSeniorTurn(dentalState, text);
     setInput("");
+    setDentalState(turn.state);
     setMessages(currentMessages => {
-      const nextIntake = completeIntake(readPatientMessage(intake, text));
-      setIntake(nextIntake);
       return [
         ...currentMessages,
         { id: makeId("patient"), role: "patient", body: text },
-        { id: makeId("assistant"), role: "assistant", body: buildAssistantReply(nextIntake) }
+        { id: makeId("assistant"), role: "assistant", body: turn.reply }
       ];
     });
   }
 
   function resetDemo() {
     setInput("");
-    setIntake(initialIntake);
+    setDentalState(initialDentalAgentState);
     setMessages(starterMessages);
   }
 
@@ -179,9 +112,11 @@ export function InteractiveAgentDemo({ saveAction }: { saveAction: ServerAction 
               {scenario.title}
             </button>
           ))}
-          <button type="button" onClick={() => sendPatientMessage("Estoy pensando en ortodoncia invisible. Me gustaria saber precio y financiacion.")}>
-            Ortodoncia
-          </button>
+          {expertPrompts.map(prompt => (
+            <button key={prompt.label} type="button" onClick={() => sendPatientMessage(prompt.prompt)}>
+              {prompt.label}
+            </button>
+          ))}
         </div>
         <div className="chat-window" aria-live="polite">
           {messages.map(message => (
@@ -197,7 +132,7 @@ export function InteractiveAgentDemo({ saveAction }: { saveAction: ServerAction 
             id="agent-demo-input"
             value={input}
             onChange={event => setInput(event.target.value)}
-            placeholder="Ej: Quiero un implante, soy Marta y puedo ir a Elche por la tarde..."
+            placeholder="Ej: me duele al morder desde ayer, sin fiebre, acepto. Soy Marta y prefiero Elche por la tarde..."
           />
           <button className="button primary" type="submit">Enviar</button>
         </form>
@@ -212,27 +147,31 @@ export function InteractiveAgentDemo({ saveAction }: { saveAction: ServerAction 
           </div>
         </div>
         <div className="intake-grid">
-          <StatusChip label="Intencion" value={intake.intentCode.replaceAll("_", " ")} ready={Boolean(intake.intent)} />
-          <StatusChip label="Tratamiento" value={intake.treatmentNeed} ready={Boolean(intake.intent)} />
-          <StatusChip label="Presupuesto" value={intake.budget} ready={intake.budget !== "Pendiente"} />
-          <StatusChip label="Consentimiento" value={intake.consent ? "Aceptado" : "Pendiente"} ready={intake.consent} />
-          <StatusChip label="Nombre" value={intake.name || "Pendiente"} ready={Boolean(intake.name)} />
-          <StatusChip label="Telefono" value={intake.phone || "Pendiente"} ready={Boolean(intake.phone)} />
-          <StatusChip label="Sede" value={intake.location || "Pendiente"} ready={Boolean(intake.location) || intake.escalated} />
-          <StatusChip label="Horario" value={intake.availability || "Pendiente"} ready={Boolean(intake.availability) || intake.escalated} />
+          <StatusChip label="Prioridad" value={dentalState.triageLabel} ready={Boolean(dentalState.intent)} tone={dentalState.escalated ? "warning" : "normal"} />
+          <StatusChip label="Intencion" value={dentalState.intentCode.replaceAll("_", " ")} ready={Boolean(dentalState.intent)} />
+          <StatusChip label="Hipotesis" value={dentalState.likelyCauses.slice(0, 2).join(" / ") || "Pendiente"} ready={dentalState.likelyCauses.length > 0} />
+          <StatusChip label="Senales" value={dentalState.detectedSignals.slice(0, 3).join(", ") || "Pendiente"} ready={dentalState.detectedSignals.length > 0} />
+          <StatusChip label="Tratamiento" value={dentalState.treatmentNeed} ready={Boolean(dentalState.intent)} />
+          <StatusChip label="Presupuesto" value={dentalState.budget} ready={dentalState.budget !== "Pendiente"} />
+          <StatusChip label="Confianza" value={dentalState.confidence} ready={dentalState.confidence !== "Baja"} />
+          <StatusChip label="Consentimiento" value={dentalState.consent ? "Aceptado" : "Pendiente"} ready={dentalState.consent} />
+          <StatusChip label="Nombre" value={dentalState.name || "Pendiente"} ready={Boolean(dentalState.name)} />
+          <StatusChip label="Telefono" value={dentalState.phone || "Pendiente"} ready={Boolean(dentalState.phone)} />
+          <StatusChip label="Sede" value={dentalState.location || "Pendiente"} ready={Boolean(dentalState.location) || dentalState.escalated} />
+          <StatusChip label="Horario" value={dentalState.availability || "Pendiente"} ready={Boolean(dentalState.availability) || dentalState.escalated} />
         </div>
         <form action={saveAction} className="interactive-save-form">
           <input type="hidden" name="transcript" value={transcript} />
-          <input type="hidden" name="intent" value={intake.intentCode} />
-          <input type="hidden" name="patientName" value={intake.name || "Paciente demo"} />
-          <input type="hidden" name="phone" value={intake.phone} />
-          <input type="hidden" name="treatmentNeed" value={intake.treatmentNeed} />
-          <input type="hidden" name="estimatedValue" value={intake.estimatedValue} />
-          <input type="hidden" name="budget" value={intake.budget} />
-          <input type="hidden" name="location" value={intake.location} />
-          <input type="hidden" name="availability" value={intake.availability} />
+          <input type="hidden" name="intent" value={dentalState.intentCode} />
+          <input type="hidden" name="patientName" value={dentalState.name || "Paciente demo"} />
+          <input type="hidden" name="phone" value={dentalState.phone} />
+          <input type="hidden" name="treatmentNeed" value={dentalState.treatmentNeed} />
+          <input type="hidden" name="estimatedValue" value={dentalState.estimatedValue} />
+          <input type="hidden" name="budget" value={dentalState.budget} />
+          <input type="hidden" name="location" value={dentalState.location} />
+          <input type="hidden" name="availability" value={dentalState.availability} />
           <input type="hidden" name="summary" value={summary} />
-          <input type="hidden" name="escalated" value={intake.escalated ? "true" : "false"} />
+          <input type="hidden" name="escalated" value={dentalState.escalated ? "true" : "false"} />
           <button className="button primary" type="submit" disabled={!canSave}>
             Registrar conversacion en CRM
           </button>
@@ -243,171 +182,13 @@ export function InteractiveAgentDemo({ saveAction }: { saveAction: ServerAction 
   );
 }
 
-function StatusChip({ label, value, ready }: { label: string; value: string; ready: boolean }) {
+function StatusChip({ label, value, ready, tone = "normal" }: { label: string; value: string; ready: boolean; tone?: "normal" | "warning" }) {
   return (
-    <div className={`status-chip ${ready ? "ready" : ""}`}>
+    <div className={`status-chip ${ready ? "ready" : ""} ${tone === "warning" ? "warning" : ""}`}>
       <span>{label}</span>
       <strong>{value}</strong>
     </div>
   );
-}
-
-function readPatientMessage(current: IntakeState, text: string): IntakeState {
-  const normalized = normalize(text);
-  const intent = current.intent ?? detectDemoIntent(normalized);
-  const catalog = intent ? intentCatalog[intent] : null;
-
-  const name = current.name || extractName(text);
-  const phone = current.phone || extractPhone(text);
-  const location = current.location || extractLocation(normalized);
-  const availability = current.availability || extractAvailability(normalized, text);
-  const consent = current.consent || acceptsConsent(normalized);
-
-  return {
-    ...current,
-    ...(catalog
-      ? {
-          intent,
-          intentCode: catalog.intentCode,
-          treatmentNeed: catalog.treatmentNeed,
-          budget: catalog.budget,
-          estimatedValue: catalog.estimatedValue,
-          escalated: catalog.escalated
-        }
-      : {}),
-    name,
-    phone,
-    location,
-    availability,
-    consent
-  };
-}
-
-function completeIntake(state: IntakeState): IntakeState {
-  const ready = state.escalated
-    ? Boolean(state.intent && state.consent && state.name && state.phone)
-    : Boolean(state.intent && state.consent && state.name && state.phone && state.location && state.availability);
-  return { ...state, ready };
-}
-
-function buildAssistantReply(state: IntakeState): string {
-  if (!state.intent) {
-    return "Te puedo ayudar con primera visita, higiene, blanqueamiento, ortodoncia invisible, implantes o urgencias. Dime que tratamiento te interesa y te doy una orientacion con los limites de la clinica.";
-  }
-
-  const catalog = intentCatalog[state.intent];
-  const intro = `${catalog.advice} El importe es orientativo y queda pendiente de valoracion del doctor.`;
-  const financing = state.intent === "implant_price" || state.intent === "orthodontics"
-    ? " Tambien puedo explicar financiacion hasta 24 meses segun importe y aprobacion."
-    : "";
-
-  if (state.escalated) {
-    if (!state.consent) {
-      return `${intro} Para registrar tus datos y que recepcion te llame con prioridad necesito que confirmes si aceptas el tratamiento de datos. Si hay fiebre, sangrado abundante o empeora rapido, llama a la clinica o acude a urgencias.`;
-    }
-    if (!state.name) {
-      return `${intro} Para escalarlo ahora, dime tu nombre. Si hay fiebre, sangrado abundante o empeora rapido, llama a la clinica o acude a urgencias.`;
-    }
-    if (!state.phone) {
-      return `${state.name}, necesito un telefono para que recepcion te contacte con prioridad.`;
-    }
-    return `${state.name}, dejo registrada la urgencia para llamada prioritaria en ${state.phone}. No cierro diagnostico por chat; recepcion lo pasa a humano y el doctor valorara el caso.`;
-  }
-
-  if (!state.consent) {
-    return `${intro}${financing} Antes de tomar datos para pre-reservar cita, necesito que me confirmes si aceptas que guardemos tus datos para gestionar la solicitud.`;
-  }
-  if (!state.name) {
-    return `${intro}${financing} Perfecto, con tu consentimiento puedo preparar la cita. Dime tu nombre y apellidos.`;
-  }
-  if (!state.phone) {
-    return `${state.name}, dime un telefono de contacto para confirmar la cita y enviarte recordatorio.`;
-  }
-  if (!state.location) {
-    return `${state.name}, trabajamos en ${demoKnowledge.clinic.locations.join(" y ")}. Que sede prefieres para esta valoracion?`;
-  }
-  if (!state.availability) {
-    return `Para ${state.treatmentNeed} en ${state.location}, puedo dejar una pre-reserva. Que franja te va mejor: manana, tarde o un dia concreto esta semana?`;
-  }
-
-  return `${state.name}, pre-reserva lista para ${state.treatmentNeed} en ${state.location}, franja ${state.availability}. Presupuesto aproximado: ${state.budget}, siempre pendiente de valoracion del doctor. Te llamaremos en ${state.phone} para confirmar el hueco exacto.`;
-}
-
-function detectDemoIntent(normalized: string): DemoIntentId | undefined {
-  if (/(dolor|duele|inflamad|hinchad|urgenc|sangr|trauma|golpe|roto)/.test(normalized)) {
-    return "urgent_pain";
-  }
-  if (/(implante|tornillo|pieza perdida|muela perdida)/.test(normalized)) {
-    return "implant_price";
-  }
-  if (/(blanque|boda|dientes blancos|estetic)/.test(normalized)) {
-    return "whitening";
-  }
-  if (/(limpieza|higiene|sarro|revisar encia)/.test(normalized)) {
-    return "reactivation";
-  }
-  if (/(ortodoncia|alineador|invisible|brackets)/.test(normalized)) {
-    return "orthodontics";
-  }
-  if (/(primera visita|revision|revisar|cita|valoracion)/.test(normalized)) {
-    return "first_visit";
-  }
-  return undefined;
-}
-
-function extractName(text: string) {
-  const match = text.match(/\b(?:me llamo|mi nombre es)\s+([^,.;]+)/i) ?? text.match(/\bsoy\s+(?!de\b)([^,.;]+)/i);
-  if (!match?.[1]) {
-    return "";
-  }
-  return match[1].replace(/\s+y\s+.*/i, "").trim().slice(0, 48);
-}
-
-function extractPhone(text: string) {
-  const match = text.match(/(?:\+?34[\s.-]?)?[6789](?:[\s.-]?\d){8}/);
-  return match ? match[0].replace(/[^\d+]/g, "") : "";
-}
-
-function extractLocation(normalized: string) {
-  if (normalized.includes("elche")) {
-    return "Elche - Altabix";
-  }
-  if (normalized.includes("murcia")) {
-    return "Murcia centro";
-  }
-  return "";
-}
-
-function extractAvailability(normalized: string, raw: string) {
-  const dayMatch = normalized.match(/\b(lunes|martes|miercoles|jueves|viernes|manana|tarde|esta semana|proxima semana)\b/);
-  const timeMatch = raw.match(/\b([01]?\d|2[0-3])[:.][0-5]\d\b/);
-  const parts = [dayMatch?.[0], timeMatch?.[0]].filter(Boolean);
-  return parts.join(" ").trim();
-}
-
-function acceptsConsent(normalized: string) {
-  const value = normalized.trim();
-  return /(\bacepto\b|\bautorizo\b|\bconsiento\b|de acuerdo|\bok\b|\bvale\b)/.test(value) || /^si[,.! ]?$/.test(value);
-}
-
-function buildSummary(state: IntakeState) {
-  if (!state.intent) {
-    return "Esperando intencion del paciente.";
-  }
-  if (state.escalated) {
-    return state.ready ? "Urgencia escalada con datos minimos." : "Urgencia detectada. Faltan datos de contacto.";
-  }
-  if (state.ready) {
-    return "Pre-reserva lista con presupuesto orientativo y cita pendiente de confirmacion.";
-  }
-  return "Asesorando y recogiendo consentimiento, contacto, sede y disponibilidad.";
-}
-
-function normalize(value: string) {
-  return value
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
 }
 
 function makeId(prefix: string) {

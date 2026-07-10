@@ -1346,6 +1346,11 @@ a:hover {
   background: #f2fbf7;
 }
 
+.status-chip.warning {
+  border-color: #fed7aa;
+  background: #fff7ed;
+}
+
 .status-chip span {
   display: block;
   color: var(--muted);

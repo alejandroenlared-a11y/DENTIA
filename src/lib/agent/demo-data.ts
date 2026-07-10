@@ -9,9 +9,15 @@ export const demoKnowledge = {
   treatments: [
     { name: "Primera visita y diagnostico digital", price: "0 EUR", rule: "Sin coste, incluye orientacion y plan inicial." },
     { name: "Higiene dental", price: "55 EUR", rule: "45 minutos. Recordatorio automatico cada 6-12 meses." },
+    { name: "Empaste / conservadora", price: "desde 65 EUR", rule: "Requiere valorar caries, fractura o filtracion." },
+    { name: "Endodoncia", price: "desde 220 EUR", rule: "Dolor pulsatil, nocturno o sensibilidad persistente requiere valoracion." },
+    { name: "Periodoncia", price: "desde 90 EUR", rule: "Sangrado, movilidad o inflamacion de encias requiere sondaje periodontal." },
     { name: "Blanqueamiento", price: "desde 280 EUR", rule: "Requiere valorar sensibilidad y estado de encia." },
     { name: "Ortodoncia invisible", price: "desde 1.800 EUR", rule: "Siempre con valoracion previa y estudio digital." },
     { name: "Implante unitario", price: "desde 1.200 EUR", rule: "No se cierra presupuesto sin TAC/valoracion." },
+    { name: "Corona / protesis fija", price: "desde 450 EUR", rule: "Valorar munon, ajuste, fractura o descementado." },
+    { name: "Extraccion muela del juicio", price: "desde 120 EUR", rule: "Dolor posterior, inflamacion o dificultad al abrir requiere triaje." },
+    { name: "Ferula de descarga", price: "desde 180 EUR", rule: "Bruxismo, dolor mandibular o desgaste requiere exploracion." },
     { name: "Urgencia dental", price: "desde 70 EUR", rule: "Dolor intenso, inflamacion o traumatismo se escala a humano." }
   ],
   financing: [
