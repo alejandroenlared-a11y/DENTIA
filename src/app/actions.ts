@@ -439,17 +439,19 @@ export async function toggleAssistantAction(formData: FormData) {
 
 export async function runAgentDemoAction(formData: FormData) {
   const { user, tenant } = await getCurrentContext();
+  let result: Awaited<ReturnType<typeof runDemoScenario>>;
   try {
-    const result = await runDemoScenario(tenant.id, user.id, formData.get("scenario"));
-    revalidatePath("/");
-    backTo("inbox", {
-      ok: `Demo creada: ${result.title}. Revisa la conversacion y el resultado operativo.`,
-      conversation: result.conversationId
-    });
+    result = await runDemoScenario(tenant.id, user.id, formData.get("scenario"));
   } catch (error) {
     console.error("runAgentDemoAction failed", error);
     backTo("agent", { error: "No se pudo ejecutar la demo de la recepcionista IA." });
   }
+
+  revalidatePath("/");
+  backTo("inbox", {
+    ok: `Demo creada: ${result.title}. Revisa la conversacion y el resultado operativo.`,
+    conversation: result.conversationId
+  });
 }
 
 export async function inviteUserAction(formData: FormData) {
