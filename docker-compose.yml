@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: dentia-ai-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: dentia
+      POSTGRES_PASSWORD: dentia
+      POSTGRES_DB: dentia_ai
+    ports:
+      - "56321:5432"
+    volumes:
+      - dentia_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dentia -d dentia_ai"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  dentia_postgres_data:
