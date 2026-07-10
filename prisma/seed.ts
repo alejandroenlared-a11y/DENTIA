@@ -23,14 +23,14 @@ const DEMO_PASSWORD = "dentia-demo-2026";
 
 async function main() {
   const tenant = await prisma.tenant.upsert({
-    where: { slug: "clinica-sonrisa-madrid" },
+    where: { slug: "clinica-murcia-elche" },
     update: {},
     create: {
-      name: "Clinica Sonrisa Madrid",
-      slug: "clinica-sonrisa-madrid",
-      legalName: "Clinica Sonrisa Madrid S.L.",
-      phone: "+34 910 245 880",
-      address: "Calle Serrano 84, Madrid",
+      name: "Clinica Murcia Elche",
+      slug: "clinica-murcia-elche",
+      legalName: "Clinica Murcia Elche S.L.",
+      phone: "+34 968 000 111",
+      address: "Murcia y Elche",
       pmsProvider: "Klinikare API",
       assistantName: "Clara",
       assistantEnabled: true,
