@@ -1248,6 +1248,11 @@ a:hover {
   font-weight: 800;
 }
 
+.quick-prompts button:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+}
+
 .chat-window {
   height: 390px;
   overflow-y: auto;
@@ -1276,6 +1281,11 @@ a:hover {
 
 .chat-bubble.assistant {
   align-self: flex-start;
+}
+
+.chat-bubble.thinking {
+  border-style: dashed;
+  color: var(--muted);
 }
 
 .chat-bubble span {
@@ -1314,6 +1324,11 @@ a:hover {
   font: inherit;
 }
 
+.chat-input-row input:disabled {
+  background: #f8fafc;
+  color: var(--muted);
+}
+
 .interactive-intake {
   padding: 12px;
   display: grid;
@@ -1325,6 +1340,43 @@ a:hover {
   grid-template-columns: auto minmax(0, 1fr);
   gap: 10px;
   align-items: flex-start;
+}
+
+.agent-runtime-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.agent-runtime-badge {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 3px 7px;
+  background: #f8fafc;
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 850;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  white-space: nowrap;
+}
+
+.agent-runtime-badge.openai {
+  border-color: #bbf7d0;
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.agent-runtime-badge.local {
+  border-color: #fed7aa;
+  background: #fff7ed;
+  color: #c2410c;
+}
+
+.agent-api-notice {
+  color: var(--muted);
+  font-size: 10.5px;
 }
 
 .intake-grid {

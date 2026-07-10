@@ -12,6 +12,7 @@ import {
 
 type ServerAction = (formData: FormData) => void | Promise<void>;
 type ChatRole = "patient" | "assistant";
+type AgentRuntime = "openai" | "local" | "idle";
 
 type ChatMessage = {
   id: string;
@@ -60,6 +61,9 @@ export function InteractiveAgentDemo({ saveAction }: { saveAction: ServerAction 
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>(starterMessages);
   const [dentalState, setDentalState] = useState<DentalAgentState>(initialDentalAgentState);
+  const [isThinking, setIsThinking] = useState(false);
+  const [agentRuntime, setAgentRuntime] = useState<AgentRuntime>("idle");
+  const [apiNotice, setApiNotice] = useState("");
 
   const transcript = useMemo(
     () => JSON.stringify(messages.map(message => ({ role: message.role, body: message.body }))),
@@ -73,27 +77,65 @@ export function InteractiveAgentDemo({ saveAction }: { saveAction: ServerAction 
     sendPatientMessage(input);
   }
 
-  function sendPatientMessage(rawText: string) {
+  async function sendPatientMessage(rawText: string) {
     const text = rawText.trim();
-    if (!text) {
+    if (!text || isThinking) {
       return;
     }
-    const turn = runDentalSeniorTurn(dentalState, text);
+    const patientMessage: ChatMessage = { id: makeId("patient"), role: "patient", body: text };
+    const nextMessages = [...messages, patientMessage];
+    const fallbackTurn = runDentalSeniorTurn(dentalState, text);
     setInput("");
-    setDentalState(turn.state);
-    setMessages(currentMessages => {
-      return [
-        ...currentMessages,
-        { id: makeId("patient"), role: "patient", body: text },
-        { id: makeId("assistant"), role: "assistant", body: turn.reply }
-      ];
-    });
+    setIsThinking(true);
+    setApiNotice("");
+    setMessages(nextMessages);
+
+    try {
+      const response = await fetch("/api/agent/dental-demo", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          message: text,
+          messages: nextMessages.map(message => ({ role: message.role, body: message.body })),
+          state: dentalState
+        })
+      });
+      const payload = await response.json() as {
+        success?: boolean;
+        error?: string | null;
+        data?: {
+          reply: string;
+          state: DentalAgentState;
+          runtime: AgentRuntime;
+          model: string;
+          fallbackReason?: string;
+        };
+      };
+      if (!response.ok || !payload.success || !payload.data) {
+        throw new Error(payload.error || "No se pudo consultar la IA.");
+      }
+      setDentalState(payload.data.state);
+      setAgentRuntime(payload.data.runtime);
+      setApiNotice(payload.data.fallbackReason ? `Fallback local: ${payload.data.fallbackReason}` : `IA API activa: ${payload.data.model}`);
+      setMessages([...nextMessages, { id: makeId("assistant"), role: "assistant", body: payload.data.reply }]);
+    } catch (error) {
+      console.error("sendPatientMessage failed", error);
+      setDentalState(fallbackTurn.state);
+      setAgentRuntime("local");
+      setApiNotice("Fallback local: no se pudo consultar la IA.");
+      setMessages([...nextMessages, { id: makeId("assistant"), role: "assistant", body: fallbackTurn.reply }]);
+    } finally {
+      setIsThinking(false);
+    }
   }
 
   function resetDemo() {
     setInput("");
     setDentalState(initialDentalAgentState);
     setMessages(starterMessages);
+    setAgentRuntime("idle");
+    setApiNotice("");
+    setIsThinking(false);
   }
 
   return (
@@ -108,12 +150,12 @@ export function InteractiveAgentDemo({ saveAction }: { saveAction: ServerAction 
         </div>
         <div className="quick-prompts" aria-label="Casos de prueba">
           {demoScenarios.map(scenario => (
-            <button key={scenario.id} type="button" onClick={() => sendPatientMessage(scenario.prompt)}>
+            <button key={scenario.id} type="button" onClick={() => sendPatientMessage(scenario.prompt)} disabled={isThinking}>
               {scenario.title}
             </button>
           ))}
           {expertPrompts.map(prompt => (
-            <button key={prompt.label} type="button" onClick={() => sendPatientMessage(prompt.prompt)}>
+            <button key={prompt.label} type="button" onClick={() => sendPatientMessage(prompt.prompt)} disabled={isThinking}>
               {prompt.label}
             </button>
           ))}
@@ -125,6 +167,12 @@ export function InteractiveAgentDemo({ saveAction }: { saveAction: ServerAction 
               <p>{message.body}</p>
             </div>
           ))}
+          {isThinking ? (
+            <div className="chat-bubble assistant thinking">
+              <span>{demoKnowledge.clinic.assistant}</span>
+              <p>Consultando la base de conocimiento y preparando una respuesta...</p>
+            </div>
+          ) : null}
         </div>
         <form className="chat-input-row" onSubmit={handleSubmit}>
           <label className="sr-only" htmlFor="agent-demo-input">Mensaje del paciente</label>
@@ -133,8 +181,11 @@ export function InteractiveAgentDemo({ saveAction }: { saveAction: ServerAction 
             value={input}
             onChange={event => setInput(event.target.value)}
             placeholder="Ej: me duele al morder desde ayer, sin fiebre, acepto. Soy Marta y prefiero Elche por la tarde..."
+            disabled={isThinking}
           />
-          <button className="button primary" type="submit">Enviar</button>
+          <button className="button primary" type="submit" disabled={isThinking}>
+            {isThinking ? "Pensando" : "Enviar"}
+          </button>
         </form>
       </div>
 
@@ -142,8 +193,14 @@ export function InteractiveAgentDemo({ saveAction }: { saveAction: ServerAction 
         <div className="intake-card">
           <span className="tile-icon accent-blue"><Icon name="bot" /></span>
           <div>
-            <h3>Lectura del agente</h3>
+            <div className="agent-runtime-row">
+              <h3>Lectura del agente</h3>
+              <span className={`agent-runtime-badge ${agentRuntime}`}>
+                {agentRuntime === "openai" ? "IA API" : agentRuntime === "local" ? "Fallback local" : "Preparada"}
+              </span>
+            </div>
             <p>{summary}</p>
+            {apiNotice ? <p className="agent-api-notice">{apiNotice}</p> : null}
           </div>
         </div>
         <div className="intake-grid">
