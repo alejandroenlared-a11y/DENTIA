@@ -460,3 +460,33 @@ Casos probables donde debo avisar:
 No seguir puliendo solo la maqueta si el objetivo es vender SaaS real.
 
 La interfaz ya tiene una direccion valida. El siguiente salto de valor esta en backend, base de datos, auth, multi-tenant y persistencia real.
+
+## Memoria operativa - Piloto WhatsApp real (11 julio 2026)
+
+Objetivo solicitado por Alejandro: construir una version piloto impecable donde un cliente pueda escribir un WhatsApp real al telefono `+34 629179640` y conteste Clara, la recepcionista IA, con conocimiento de la clinica, tratamientos, precios, financiacion, RGPD, triaje dental y agenda.
+
+Decision tecnica:
+
+- Un numero personal de WhatsApp no se puede automatizar de forma fiable ni conforme usando scraping/web WhatsApp. Para hacerlo real hay que usar WhatsApp Business Cloud API de Meta o un proveedor compatible.
+- El numero `+34 629179640` debe registrarse o migrarse en Meta Business/WhatsApp Cloud API como numero de WhatsApp Business. Hasta tener credenciales, el SaaS solo puede dejar el canal preparado.
+- Webhook publico preparado para Meta: `https://dentia.avelkia.es/api/whatsapp/meta`.
+- El webhook verifica Meta por GET con `WHATSAPP_VERIFY_TOKEN`, recibe mensajes POST de WhatsApp Cloud, los convierte a mensajes internos, llama al agente dental senior y responde por WhatsApp Cloud API.
+- El agente guarda conversacion, mensajes, paciente, consentimiento RGPD, AgentSession y, si ya tiene datos suficientes, crea cita propuesta. Si detecta urgencia o senales de alarma, crea tarea critica para recepcion.
+- Tenant demo esperado: `clinica-murcia-elche`.
+
+Variables necesarias en Vercel para activar el piloto real:
+
+- `WHATSAPP_VERIFY_TOKEN`: secreto libre, debe coincidir con el token que se ponga en Meta al verificar el webhook.
+- `WHATSAPP_ACCESS_TOKEN`: token de WhatsApp Cloud API.
+- `WHATSAPP_PHONE_NUMBER_ID`: ID del numero emisor en Meta, no el numero de telefono visible.
+- `WHATSAPP_GRAPH_API_VERSION`: opcional, por defecto `v20.0`.
+- `WHATSAPP_DEMO_TENANT_SLUG=clinica-murcia-elche`.
+- `LLM_PROVIDER=gemini`, `GEMINI_API_KEY`, `GEMINI_MODEL=gemini-2.5-pro` o el modelo disponible en la cuenta.
+
+Flujo de prueba esperado:
+
+1. En Meta Developers, configurar callback URL `https://dentia.avelkia.es/api/whatsapp/meta`.
+2. Poner el mismo `WHATSAPP_VERIFY_TOKEN` en Meta y Vercel.
+3. Suscribir el webhook al evento `messages`.
+4. Escribir al numero `+34 629179640` desde otro movil.
+5. Clara debe contestar de forma natural, pedir consentimiento antes de guardar datos, orientar sin diagnosticar, pedir nombre/telefono/sede/disponibilidad y crear cita propuesta o tarea urgente en el CRM.

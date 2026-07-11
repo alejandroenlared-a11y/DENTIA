@@ -670,6 +670,10 @@ function AgentView({ data }: { data: Awaited<ReturnType<typeof getDashboardData>
         <p style={{ color: "var(--muted)" }}>
           Webhooks entrantes por canal: /api/webhooks/{data.tenant.slug}/whatsapp · sms · voice · web
         </p>
+        <p style={{ color: "var(--muted)" }}>
+          WhatsApp Cloud API real: /api/whatsapp/meta · usa WHATSAPP_VERIFY_TOKEN, WHATSAPP_ACCESS_TOKEN,
+          WHATSAPP_PHONE_NUMBER_ID y WHATSAPP_DEMO_TENANT_SLUG.
+        </p>
       </section>
       {sessions.length > 0 ? (
         <section className="card pad" style={{ marginTop: 14 }}>
