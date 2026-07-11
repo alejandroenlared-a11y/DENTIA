@@ -238,7 +238,12 @@ async function runGeminiDentalAgentTurn(input: {
 
     console.error("runGeminiDentalAgentTurn Gemini error", primaryResult.status, primaryResult.errorText.slice(0, 500));
 
-    if (primaryResult.status === 429 && fallbackModel && fallbackModel !== model) {
+    if (
+      primaryResult.status &&
+      [400, 404, 429].includes(primaryResult.status) &&
+      fallbackModel &&
+      fallbackModel !== model
+    ) {
       const secondaryResult = await requestGeminiTurn({ apiKey, model: fallbackModel, prompt });
       if (secondaryResult.ok) {
         const state = mergeAiState(localTurn.state, secondaryResult.output);
