@@ -194,4 +194,30 @@ describe("runDentalAgentTurn", () => {
     expect(result.reply).toContain("Murcia");
     expect(result.state.ready).toBe(true);
   });
+
+  it("uses Gemini freeform text when structured JSON is not returned", async () => {
+    process.env.LLM_PROVIDER = "gemini";
+    process.env.GEMINI_API_KEY = "gemini-test-key";
+    process.env.GEMINI_MODEL = "gemini-freeform";
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        output_text:
+          "Parece una molestia compatible con una revision conservadora. Si te va bien, te puedo dejar orientada una visita en Murcia por la tarde y alli el doctor confirmara el tratamiento."
+      })
+    } as Response);
+
+    const result = await runDentalAgentTurn({
+      latestPatientMessage:
+        "Acepto guardar mis datos. Soy Marta Demo, telefono 600111222. Me duele una muela al frio y prefiero Murcia por la tarde.",
+      history: [],
+      state: initialDentalAgentState
+    });
+
+    expect(result.runtime).toBe("gemini");
+    expect(result.model).toContain("texto libre");
+    expect(result.reply).toContain("Murcia");
+    expect(result.state.intent).toBe("caries_restoration");
+  });
 });

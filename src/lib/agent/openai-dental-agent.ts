@@ -227,6 +227,15 @@ async function runGeminiDentalAgentTurn(input: {
       return { reply: primaryResult.output.reply, state, runtime: "gemini", model };
     }
 
+    if (primaryResult.fallbackReason === "Gemini devolvio texto libre") {
+      return {
+        reply: buildGeminiFreeformReply(primaryResult.errorText, localTurn.reply),
+        state: localTurn.state,
+        runtime: "gemini",
+        model: `${model} (texto libre)`
+      };
+    }
+
     console.error("runGeminiDentalAgentTurn Gemini error", primaryResult.status, primaryResult.errorText.slice(0, 500));
 
     if (primaryResult.status === 429 && fallbackModel && fallbackModel !== model) {
@@ -238,6 +247,14 @@ async function runGeminiDentalAgentTurn(input: {
           state,
           runtime: "gemini",
           model: `${fallbackModel} (fallback)`
+        };
+      }
+      if (secondaryResult.fallbackReason === "Gemini devolvio texto libre") {
+        return {
+          reply: buildGeminiFreeformReply(secondaryResult.errorText, localTurn.reply),
+          state: localTurn.state,
+          runtime: "gemini",
+          model: `${fallbackModel} (texto libre fallback)`
         };
       }
       console.error("runGeminiDentalAgentTurn Gemini fallback error", secondaryResult.status, secondaryResult.errorText.slice(0, 500));
@@ -311,10 +328,18 @@ async function requestGeminiTurn(input: {
     };
   }
 
-  return {
-    ok: true,
-    output: parseDentalAgentOutput(rawText)
-  };
+  try {
+    return {
+      ok: true,
+      output: parseDentalAgentOutput(rawText)
+    };
+  } catch {
+    return {
+      ok: false,
+      errorText: rawText,
+      fallbackReason: "Gemini devolvio texto libre"
+    };
+  }
 }
 
 function resolveProvider(): LlmProvider {
@@ -483,6 +508,24 @@ function normalizeJsonText(rawText: string) {
     }
     throw new Error("Salida Gemini no se pudo interpretar como JSON");
   }
+}
+
+function buildGeminiFreeformReply(rawText: string, fallbackReply: string) {
+  const cleaned = rawText
+    .replace(/^```json\s*/i, "")
+    .replace(/^```\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim();
+
+  if (!cleaned) {
+    return fallbackReply;
+  }
+
+  if (cleaned.length > 1200) {
+    return `${cleaned.slice(0, 1197).trim()}...`;
+  }
+
+  return cleaned;
 }
 
 function buildLocalFallback(
