@@ -119,7 +119,7 @@ describe("runDentalAgentTurn", () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue({
       ok: true,
       json: async () => ({
-        candidates: [{ content: { parts: [{ text: `\`\`\`json\n${JSON.stringify(output)}\n\`\`\`` }] } }]
+        output_text: `\`\`\`json\n${JSON.stringify(output)}\n\`\`\``
       })
     } as Response);
 
@@ -178,7 +178,7 @@ describe("runDentalAgentTurn", () => {
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({
-          candidates: [{ content: { parts: [{ text: JSON.stringify(output) }] } }]
+          output_text: JSON.stringify(output)
         })
       } as Response);
 

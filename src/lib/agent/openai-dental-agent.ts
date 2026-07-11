@@ -9,7 +9,7 @@ import {
 } from "@/lib/agent/dental-senior-agent";
 
 const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
-const GEMINI_URL_PREFIX = "https://generativelanguage.googleapis.com/v1beta/models";
+const GEMINI_INTERACTIONS_URL = "https://generativelanguage.googleapis.com/v1beta/interactions";
 const DEFAULT_OPENAI_MODEL = "gpt-5.6-terra";
 const DEFAULT_GEMINI_MODEL = "gemini-2.5-pro";
 const DEFAULT_GEMINI_FALLBACK_MODEL = "gemini-3.5-flash";
@@ -113,79 +113,6 @@ const dentalAgentAiOutputSchema = z.object({
 
 type DentalAgentAiOutput = z.infer<typeof dentalAgentAiOutputSchema>;
 
-const dentalAgentJsonSchema = {
-  type: "OBJECT",
-  properties: {
-    reply: { type: "STRING" },
-    intent: { type: "STRING", enum: dentalIntentValues },
-    intentCode: { type: "STRING" },
-    treatmentNeed: { type: "STRING" },
-    budget: { type: "STRING" },
-    estimatedValue: { type: "INTEGER" },
-    escalated: { type: "BOOLEAN" },
-    consent: { type: "BOOLEAN" },
-    name: { type: "STRING" },
-    phone: { type: "STRING" },
-    location: { type: "STRING" },
-    availability: { type: "STRING" },
-    triageLevel: { type: "STRING", enum: triageValues },
-    triageLabel: { type: "STRING" },
-    clinicalReading: { type: "STRING" },
-    likelyCauses: { type: "ARRAY", items: { type: "STRING" } },
-    detectedSignals: { type: "ARRAY", items: { type: "STRING" } },
-    redFlags: { type: "ARRAY", items: { type: "STRING" } },
-    missingClinicalData: { type: "ARRAY", items: { type: "STRING" } },
-    confidence: { type: "STRING", enum: confidenceValues },
-    safetyScreened: { type: "BOOLEAN" }
-  },
-  required: [
-    "reply",
-    "intent",
-    "intentCode",
-    "treatmentNeed",
-    "budget",
-    "estimatedValue",
-    "escalated",
-    "consent",
-    "name",
-    "phone",
-    "location",
-    "availability",
-    "triageLevel",
-    "triageLabel",
-    "clinicalReading",
-    "likelyCauses",
-    "detectedSignals",
-    "redFlags",
-    "missingClinicalData",
-    "confidence",
-    "safetyScreened"
-  ],
-  propertyOrdering: [
-    "reply",
-    "intent",
-    "intentCode",
-    "treatmentNeed",
-    "budget",
-    "estimatedValue",
-    "escalated",
-    "consent",
-    "name",
-    "phone",
-    "location",
-    "availability",
-    "triageLevel",
-    "triageLabel",
-    "clinicalReading",
-    "likelyCauses",
-    "detectedSignals",
-    "redFlags",
-    "missingClinicalData",
-    "confidence",
-    "safetyScreened"
-  ]
-} as const;
-
 type OpenAiResponsePayload = {
   output_text?: string;
   output?: Array<{
@@ -199,13 +126,7 @@ type OpenAiResponsePayload = {
 };
 
 type GeminiResponsePayload = {
-  candidates?: Array<{
-    content?: {
-      parts?: Array<{
-        text?: string;
-      }>;
-    };
-  }>;
+  output_text?: string;
   error?: {
     code?: number;
     message?: string;
@@ -256,7 +177,7 @@ export async function runOpenAiDentalAgentTurn(input: {
             type: "json_schema",
             name: "dentia_dental_agent_turn",
             strict: true,
-            schema: mapSchemaToOpenAi()
+            schema: dentalAgentJsonSchema
           }
         }
       })
@@ -299,7 +220,7 @@ async function runGeminiDentalAgentTurn(input: {
   }
 
   try {
-    const prompt = buildGeminiPrompt(input.history, input.latestPatientMessage, localTurn.state, input.clinicContext);
+    const prompt = buildGeminiInput(input.history, input.latestPatientMessage, localTurn.state, input.clinicContext);
     const primaryResult = await requestGeminiTurn({ apiKey, model, prompt });
     if (primaryResult.ok) {
       const state = mergeAiState(localTurn.state, primaryResult.output);
@@ -348,23 +269,26 @@ async function requestGeminiTurn(input: {
   | { ok: true; output: DentalAgentAiOutput }
   | { ok: false; status?: number; errorText: string; fallbackReason?: string }
 > {
-  const response = await fetch(`${GEMINI_URL_PREFIX}/${input.model}:generateContent?key=${encodeURIComponent(input.apiKey)}`, {
+  const response = await fetch(GEMINI_INTERACTIONS_URL, {
     method: "POST",
     headers: {
-      "content-type": "application/json"
+      "content-type": "application/json",
+      "x-goog-api-key": input.apiKey
     },
     body: JSON.stringify({
-      contents: [
+      model: input.model,
+      input: [
         {
           role: "user",
-          parts: [{ text: input.prompt }]
+          content: [{ type: "input_text", text: input.prompt }]
         }
       ],
-      generationConfig: {
-        temperature: 0.5,
-        maxOutputTokens: 1400,
-        responseMimeType: "application/json",
-        responseSchema: dentalAgentJsonSchema
+      temperature: 0.5,
+      max_output_tokens: 1400,
+      response_format: {
+        type: "text",
+        mime_type: "application/json",
+        schema: dentalAgentJsonSchema
       }
     })
   });
@@ -450,73 +374,69 @@ function buildDentalUserInput(history: DentalChatMessage[], latestPatientMessage
   ].join("\n");
 }
 
-function buildGeminiPrompt(
+function buildGeminiInput(
   history: DentalChatMessage[],
   latestPatientMessage: string,
   localState: DentalAgentState,
   clinicContext?: string
 ) {
   return [
-    "SISTEMA:",
     buildDentalSystemPrompt(clinicContext),
     "",
-    "USUARIO:",
     buildDentalUserInput(history, latestPatientMessage, localState)
   ].join("\n");
 }
 
-function mapSchemaToOpenAi() {
-  return {
-    type: "object",
-    additionalProperties: false,
-    required: [
-      "reply",
-      "intent",
-      "intentCode",
-      "treatmentNeed",
-      "budget",
-      "estimatedValue",
-      "escalated",
-      "consent",
-      "name",
-      "phone",
-      "location",
-      "availability",
-      "triageLevel",
-      "triageLabel",
-      "clinicalReading",
-      "likelyCauses",
-      "detectedSignals",
-      "redFlags",
-      "missingClinicalData",
-      "confidence",
-      "safetyScreened"
-    ],
-    properties: {
-      reply: { type: "string", maxLength: 1500 },
-      intent: { type: "string", enum: dentalIntentValues },
-      intentCode: { type: "string" },
-      treatmentNeed: { type: "string" },
-      budget: { type: "string" },
-      estimatedValue: { type: "integer", minimum: 0 },
-      escalated: { type: "boolean" },
-      consent: { type: "boolean" },
-      name: { type: "string" },
-      phone: { type: "string" },
-      location: { type: "string" },
-      availability: { type: "string" },
-      triageLevel: { type: "string", enum: triageValues },
-      triageLabel: { type: "string" },
-      clinicalReading: { type: "string" },
-      likelyCauses: { type: "array", items: { type: "string" }, maxItems: 5 },
-      detectedSignals: { type: "array", items: { type: "string" }, maxItems: 8 },
-      redFlags: { type: "array", items: { type: "string" }, maxItems: 8 },
-      missingClinicalData: { type: "array", items: { type: "string" }, maxItems: 5 },
-      confidence: { type: "string", enum: confidenceValues },
-      safetyScreened: { type: "boolean" }
-    }
-  } as const;
-}
+const dentalAgentJsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "reply",
+    "intent",
+    "intentCode",
+    "treatmentNeed",
+    "budget",
+    "estimatedValue",
+    "escalated",
+    "consent",
+    "name",
+    "phone",
+    "location",
+    "availability",
+    "triageLevel",
+    "triageLabel",
+    "clinicalReading",
+    "likelyCauses",
+    "detectedSignals",
+    "redFlags",
+    "missingClinicalData",
+    "confidence",
+    "safetyScreened"
+  ],
+  properties: {
+    reply: { type: "string", maxLength: 1500 },
+    intent: { type: "string", enum: dentalIntentValues },
+    intentCode: { type: "string" },
+    treatmentNeed: { type: "string" },
+    budget: { type: "string" },
+    estimatedValue: { type: "integer", minimum: 0 },
+    escalated: { type: "boolean" },
+    consent: { type: "boolean" },
+    name: { type: "string" },
+    phone: { type: "string" },
+    location: { type: "string" },
+    availability: { type: "string" },
+    triageLevel: { type: "string", enum: triageValues },
+    triageLabel: { type: "string" },
+    clinicalReading: { type: "string" },
+    likelyCauses: { type: "array", items: { type: "string" }, maxItems: 5 },
+    detectedSignals: { type: "array", items: { type: "string" }, maxItems: 8 },
+    redFlags: { type: "array", items: { type: "string" }, maxItems: 8 },
+    missingClinicalData: { type: "array", items: { type: "string" }, maxItems: 5 },
+    confidence: { type: "string", enum: confidenceValues },
+    safetyScreened: { type: "boolean" }
+  }
+} as const;
 
 function extractOpenAiText(payload: OpenAiResponsePayload) {
   if (typeof payload.output_text === "string" && payload.output_text.trim()) {
@@ -530,7 +450,7 @@ function extractOpenAiText(payload: OpenAiResponsePayload) {
 }
 
 function extractGeminiText(payload: GeminiResponsePayload) {
-  return payload.candidates?.[0]?.content?.parts?.map(part => part.text ?? "").join("").trim() || "";
+  return payload.output_text?.trim() || "";
 }
 
 function parseDentalAgentOutput(rawText: string) {
