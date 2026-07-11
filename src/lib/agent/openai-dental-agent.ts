@@ -127,6 +127,17 @@ type OpenAiResponsePayload = {
 
 type GeminiResponsePayload = {
   output_text?: string;
+  outputs?: Array<{
+    type?: string;
+    text?: string;
+  }>;
+  steps?: Array<{
+    type?: string;
+    content?: Array<{
+      type?: string;
+      text?: string;
+    }>;
+  }>;
   error?: {
     code?: number;
     message?: string;
@@ -478,7 +489,29 @@ function extractOpenAiText(payload: OpenAiResponsePayload) {
 }
 
 function extractGeminiText(payload: GeminiResponsePayload) {
-  return payload.output_text?.trim() || "";
+  if (payload.output_text?.trim()) {
+    return payload.output_text.trim();
+  }
+
+  const stepText = payload.steps
+    ?.filter(step => step.type === "model_output")
+    .flatMap(step => step.content ?? [])
+    .filter(content => content.type === "text" && typeof content.text === "string")
+    .map(content => content.text?.trim() ?? "")
+    .filter(Boolean)
+    .join("\n")
+    .trim();
+
+  if (stepText) {
+    return stepText;
+  }
+
+  return payload.outputs
+    ?.filter(output => output.type === "text" && typeof output.text === "string")
+    .map(output => output.text?.trim() ?? "")
+    .filter(Boolean)
+    .join("\n")
+    .trim() || "";
 }
 
 function parseDentalAgentOutput(rawText: string) {
