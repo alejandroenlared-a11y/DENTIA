@@ -7,6 +7,7 @@ const originalOpenAiApiKey = process.env.OPENAI_API_KEY;
 const originalOpenAiModel = process.env.OPENAI_MODEL;
 const originalGeminiApiKey = process.env.GEMINI_API_KEY;
 const originalGeminiModel = process.env.GEMINI_MODEL;
+const originalGeminiFallbackModel = process.env.GEMINI_FALLBACK_MODEL;
 
 afterEach(() => {
   process.env.LLM_PROVIDER = originalProvider;
@@ -14,6 +15,7 @@ afterEach(() => {
   process.env.OPENAI_MODEL = originalOpenAiModel;
   process.env.GEMINI_API_KEY = originalGeminiApiKey;
   process.env.GEMINI_MODEL = originalGeminiModel;
+  process.env.GEMINI_FALLBACK_MODEL = originalGeminiFallbackModel;
   vi.restoreAllMocks();
 });
 
@@ -134,5 +136,62 @@ describe("runDentalAgentTurn", () => {
     expect(result.state.ready).toBe(true);
     expect(result.state.intent).toBe("first_visit");
     expect(result.state.location).toBe("Elche - Altabix");
+  });
+
+  it("falls back from Gemini Pro to Gemini Flash on 429", async () => {
+    process.env.LLM_PROVIDER = "gemini";
+    process.env.GEMINI_API_KEY = "gemini-test-key";
+    process.env.GEMINI_MODEL = "gemini-pro-test";
+    process.env.GEMINI_FALLBACK_MODEL = "gemini-flash-test";
+
+    const output = {
+      reply:
+        "Por lo que cuentas, podemos orientarte hacia una visita de revision y dejarla preparada en Murcia por la tarde.",
+      intent: "first_visit",
+      intentCode: "CITA_PRIMERA_VISITA",
+      treatmentNeed: "Primera visita",
+      budget: "0 EUR",
+      estimatedValue: 0,
+      escalated: false,
+      consent: true,
+      name: "Pedro Test",
+      phone: "612000111",
+      location: "Murcia centro",
+      availability: "tarde",
+      triageLevel: "ROUTINE",
+      triageLabel: "Rutina",
+      clinicalReading: "Consulta programable sin senales de alarma.",
+      likelyCauses: ["revision general"],
+      detectedSignals: ["molestia puntual"],
+      redFlags: [],
+      missingClinicalData: [],
+      confidence: "Media",
+      safetyScreened: true
+    };
+
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 429,
+        text: async () => "quota exceeded"
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          candidates: [{ content: { parts: [{ text: JSON.stringify(output) }] } }]
+        })
+      } as Response);
+
+    const result = await runDentalAgentTurn({
+      latestPatientMessage:
+        "Acepto guardar mis datos. Soy Pedro Test, telefono 612000111, prefiero Murcia por la tarde y quiero una revision.",
+      history: [],
+      state: initialDentalAgentState
+    });
+
+    expect(result.runtime).toBe("gemini");
+    expect(result.model).toContain("fallback");
+    expect(result.reply).toContain("Murcia");
+    expect(result.state.ready).toBe(true);
   });
 });

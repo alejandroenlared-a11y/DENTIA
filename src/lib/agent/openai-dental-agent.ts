@@ -12,6 +12,7 @@ const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
 const GEMINI_URL_PREFIX = "https://generativelanguage.googleapis.com/v1beta/models";
 const DEFAULT_OPENAI_MODEL = "gpt-5.6-terra";
 const DEFAULT_GEMINI_MODEL = "gemini-2.5-pro";
+const DEFAULT_GEMINI_FALLBACK_MODEL = "gemini-2.5-flash";
 const PENDING_INTENT = "INTENCION_PENDIENTE";
 
 const dentalIntentValues = [
@@ -291,56 +292,105 @@ async function runGeminiDentalAgentTurn(input: {
   const localTurn = runDentalSeniorTurn(input.state, input.latestPatientMessage);
   const apiKey = process.env.GEMINI_API_KEY;
   const model = process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL;
+  const fallbackModel = process.env.GEMINI_FALLBACK_MODEL || DEFAULT_GEMINI_FALLBACK_MODEL;
 
   if (!apiKey) {
     return buildLocalFallback(localTurn, model, "GEMINI_API_KEY no configurada");
   }
 
   try {
-    const response = await fetch(`${GEMINI_URL_PREFIX}/${model}:generateContent?key=${encodeURIComponent(apiKey)}`, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json"
-      },
-      body: JSON.stringify({
-        contents: [
-          {
-            role: "user",
-            parts: [
-              {
-                text: buildGeminiPrompt(input.history, input.latestPatientMessage, localTurn.state, input.clinicContext)
-              }
-            ]
-          }
-        ],
-        generationConfig: {
-          temperature: 0.5,
-          maxOutputTokens: 1400,
-          responseMimeType: "application/json",
-          responseSchema: dentalAgentJsonSchema
-        }
-      })
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text().catch(() => "");
-      console.error("runGeminiDentalAgentTurn Gemini error", response.status, errorText.slice(0, 500));
-      return buildLocalFallback(localTurn, model, `Gemini API ${response.status}`);
+    const prompt = buildGeminiPrompt(input.history, input.latestPatientMessage, localTurn.state, input.clinicContext);
+    const primaryResult = await requestGeminiTurn({ apiKey, model, prompt });
+    if (primaryResult.ok) {
+      const state = mergeAiState(localTurn.state, primaryResult.output);
+      return { reply: primaryResult.output.reply, state, runtime: "gemini", model };
     }
 
-    const payload = (await response.json()) as GeminiResponsePayload;
-    const rawText = extractGeminiText(payload);
-    if (!rawText) {
-      return buildLocalFallback(localTurn, model, payload.error?.message || "Gemini no devolvio texto");
+    console.error("runGeminiDentalAgentTurn Gemini error", primaryResult.status, primaryResult.errorText.slice(0, 500));
+
+    if (primaryResult.status === 429 && fallbackModel && fallbackModel !== model) {
+      const secondaryResult = await requestGeminiTurn({ apiKey, model: fallbackModel, prompt });
+      if (secondaryResult.ok) {
+        const state = mergeAiState(localTurn.state, secondaryResult.output);
+        return {
+          reply: secondaryResult.output.reply,
+          state,
+          runtime: "gemini",
+          model: `${fallbackModel} (fallback)`
+        };
+      }
+      console.error("runGeminiDentalAgentTurn Gemini fallback error", secondaryResult.status, secondaryResult.errorText.slice(0, 500));
+      return buildLocalFallback(
+        localTurn,
+        model,
+        secondaryResult.status
+          ? `Gemini API ${primaryResult.status}; fallback ${fallbackModel} -> ${secondaryResult.status}`
+          : secondaryResult.fallbackReason || `Gemini API ${primaryResult.status}`
+      );
     }
 
-    const aiOutput = dentalAgentAiOutputSchema.parse(JSON.parse(rawText));
-    const state = mergeAiState(localTurn.state, aiOutput);
-    return { reply: aiOutput.reply, state, runtime: "gemini", model };
+    return buildLocalFallback(
+      localTurn,
+      model,
+      primaryResult.status ? `Gemini API ${primaryResult.status}` : primaryResult.fallbackReason || "Gemini no devolvio texto"
+    );
   } catch (error) {
     console.error("runGeminiDentalAgentTurn failed", error);
     return buildLocalFallback(localTurn, model, "Respuesta Gemini no valida");
   }
+}
+
+async function requestGeminiTurn(input: {
+  apiKey: string;
+  model: string;
+  prompt: string;
+}): Promise<
+  | { ok: true; output: DentalAgentAiOutput }
+  | { ok: false; status?: number; errorText: string; fallbackReason?: string }
+> {
+  const response = await fetch(`${GEMINI_URL_PREFIX}/${input.model}:generateContent?key=${encodeURIComponent(input.apiKey)}`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json"
+    },
+    body: JSON.stringify({
+      contents: [
+        {
+          role: "user",
+          parts: [{ text: input.prompt }]
+        }
+      ],
+      generationConfig: {
+        temperature: 0.5,
+        maxOutputTokens: 1400,
+        responseMimeType: "application/json",
+        responseSchema: dentalAgentJsonSchema
+      }
+    })
+  });
+
+  if (!response.ok) {
+    return {
+      ok: false,
+      status: response.status,
+      errorText: await response.text().catch(() => "")
+    };
+  }
+
+  const payload = (await response.json()) as GeminiResponsePayload;
+  const rawText = extractGeminiText(payload);
+  if (!rawText) {
+    return {
+      ok: false,
+      errorText: "",
+      fallbackReason: payload.error?.message || "Gemini no devolvio texto"
+    };
+  }
+
+  return {
+    ok: true,
+    output: dentalAgentAiOutputSchema.parse(JSON.parse(rawText))
+  };
 }
 
 function resolveProvider(): LlmProvider {
