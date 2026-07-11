@@ -1,4 +1,4 @@
-import { AppointmentStatus, ConversationChannel, TaskPriority } from "@prisma/client";
+import { AppointmentStatus, CalendarEventType, ConversationChannel, TaskPriority } from "@prisma/client";
 import { z } from "zod";
 
 const requiredString = z.string().trim().min(1, "es obligatorio");
@@ -22,6 +22,31 @@ export const appointmentInputSchema = z.object({
   time: requiredString,
   status: z.nativeEnum(AppointmentStatus).default(AppointmentStatus.REQUESTED),
   channel: z.nativeEnum(ConversationChannel).default(ConversationChannel.WHATSAPP)
+});
+
+export const calendarEventInputSchema = z.object({
+  providerId: z.string().trim().optional(),
+  operatoryId: z.string().trim().optional(),
+  title: requiredString,
+  type: z.nativeEnum(CalendarEventType).default(CalendarEventType.MEETING),
+  date: requiredString,
+  time: requiredString,
+  durationMinutes: z.coerce.number().int().min(15).max(480).default(30),
+  notes: z.string().trim().optional()
+});
+
+export const calendarEventIdSchema = z.object({
+  eventId: requiredString
+});
+
+export const appointmentIdSchema = z.object({
+  appointmentId: requiredString
+});
+
+export const appointmentRescheduleSchema = z.object({
+  appointmentId: requiredString,
+  date: requiredString,
+  time: requiredString
 });
 
 export const taskInputSchema = z.object({

@@ -17,12 +17,7 @@ export default async function WhatsAppDemoPage({ params }: WhatsAppDemoPageProps
       slug: true,
       assistantName: true,
       assistantEnabled: true,
-      phone: true,
-      settings: {
-        select: {
-          rgpdNotes: true
-        }
-      }
+      phone: true
     }
   });
 
@@ -38,7 +33,6 @@ export default async function WhatsAppDemoPage({ params }: WhatsAppDemoPageProps
         assistantName={tenant.assistantName}
         clinicPhone={tenant.phone ?? "+34 629 179 640"}
         assistantEnabled={tenant.assistantEnabled}
-        rgpdNotes={tenant.settings?.rgpdNotes}
       />
     </main>
   );

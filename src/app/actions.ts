@@ -21,7 +21,18 @@ import { hashPassword } from "@/lib/password";
 import { prisma } from "@/lib/prisma";
 import { getCurrentContext } from "@/lib/tenant";
 import {
+  cancelAppointment,
+  cancelCalendarEvent,
+  createCalendarEvent,
+  rescheduleAppointment,
+  SchedulingConflictError
+} from "@/lib/scheduling";
+import {
+  appointmentIdSchema,
   appointmentInputSchema,
+  appointmentRescheduleSchema,
+  calendarEventIdSchema,
+  calendarEventInputSchema,
   consentToggleSchema,
   conversationIdSchema,
   conversationReplySchema,
@@ -178,6 +189,104 @@ export async function createAppointmentAction(formData: FormData) {
   }
 
   succeed("calendar", "Cita creada correctamente.");
+}
+
+export async function cancelAppointmentAction(formData: FormData) {
+  const parsed = appointmentIdSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) {
+    backTo("calendar", { error: firstErrorMessage(parsed.error) });
+  }
+
+  const { user, tenant } = await getCurrentContext();
+
+  try {
+    await cancelAppointment(tenant.id, parsed.data.appointmentId, { type: "staff", userId: user.id });
+  } catch (error) {
+    console.error("cancelAppointmentAction failed", error);
+    backTo("calendar", { error: "No se pudo cancelar la cita." });
+  }
+
+  succeed("calendar", "Cita cancelada.");
+}
+
+export async function rescheduleAppointmentAction(formData: FormData) {
+  const parsed = appointmentRescheduleSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) {
+    backTo("calendar", { error: firstErrorMessage(parsed.error) });
+  }
+
+  const { user, tenant } = await getCurrentContext();
+  const newStartsAt = new Date(`${parsed.data.date}T${parsed.data.time}:00.000Z`);
+  if (Number.isNaN(newStartsAt.getTime())) {
+    backTo("calendar", { error: "Fecha u hora no validas." });
+  }
+
+  try {
+    await rescheduleAppointment(tenant.id, parsed.data.appointmentId, newStartsAt, { type: "staff", userId: user.id });
+  } catch (error) {
+    if (error instanceof SchedulingConflictError) {
+      backTo("calendar", { error: "Ese hueco ya esta ocupado para este profesional." });
+    }
+    console.error("rescheduleAppointmentAction failed", error);
+    backTo("calendar", { error: "No se pudo reprogramar la cita." });
+  }
+
+  succeed("calendar", "Cita reprogramada.");
+}
+
+export async function createCalendarEventAction(formData: FormData) {
+  const parsed = calendarEventInputSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) {
+    backTo("calendar", { error: firstErrorMessage(parsed.error) });
+  }
+
+  const { user, tenant } = await getCurrentContext();
+  const startsAt = new Date(`${parsed.data.date}T${parsed.data.time}:00.000Z`);
+  if (Number.isNaN(startsAt.getTime())) {
+    backTo("calendar", { error: "Fecha u hora no validas." });
+  }
+
+  try {
+    await createCalendarEvent(
+      tenant.id,
+      {
+        providerId: parsed.data.providerId || null,
+        operatoryId: parsed.data.operatoryId || null,
+        title: parsed.data.title,
+        type: parsed.data.type,
+        startsAt,
+        durationMinutes: parsed.data.durationMinutes,
+        notes: parsed.data.notes || null
+      },
+      { type: "staff", userId: user.id }
+    );
+  } catch (error) {
+    if (error instanceof SchedulingConflictError) {
+      backTo("calendar", { error: "Ese profesional ya tiene algo en ese horario." });
+    }
+    console.error("createCalendarEventAction failed", error);
+    backTo("calendar", { error: "No se pudo crear el evento." });
+  }
+
+  succeed("calendar", "Evento creado correctamente.");
+}
+
+export async function cancelCalendarEventAction(formData: FormData) {
+  const parsed = calendarEventIdSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) {
+    backTo("calendar", { error: firstErrorMessage(parsed.error) });
+  }
+
+  const { user, tenant } = await getCurrentContext();
+
+  try {
+    await cancelCalendarEvent(tenant.id, parsed.data.eventId, { type: "staff", userId: user.id });
+  } catch (error) {
+    console.error("cancelCalendarEventAction failed", error);
+    backTo("calendar", { error: "No se pudo eliminar el evento." });
+  }
+
+  succeed("calendar", "Evento eliminado.");
 }
 
 export async function generateRemindersAction() {

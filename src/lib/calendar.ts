@@ -6,8 +6,10 @@ export interface WeekDay {
 
 const dayLabels = ["Dom", "Lun", "Mar", "Mie", "Jue", "Vie", "Sab"];
 
-export function getWeekDays(reference: Date = new Date()): WeekDay[] {
-  const base = Date.UTC(reference.getUTCFullYear(), reference.getUTCMonth(), reference.getUTCDate());
+export function getWeekDays(reference: Date = new Date(), weekOffset = 0): WeekDay[] {
+  const base =
+    Date.UTC(reference.getUTCFullYear(), reference.getUTCMonth(), reference.getUTCDate()) +
+    weekOffset * 7 * 24 * 60 * 60 * 1000;
   const weekday = new Date(base).getUTCDay();
   const offsetToMonday = (weekday + 6) % 7;
   const mondayMs = base - offsetToMonday * 24 * 60 * 60 * 1000;
@@ -20,6 +22,45 @@ export function getWeekDays(reference: Date = new Date()): WeekDay[] {
       dayNumber: day.getUTCDate()
     };
   });
+}
+
+export interface MonthDay {
+  iso: string;
+  dayNumber: number;
+  inCurrentMonth: boolean;
+  weekOffsetFromToday: number;
+}
+
+export function getMonthDays(reference: Date = new Date(), monthOffset = 0): MonthDay[] {
+  const monthStart = new Date(Date.UTC(reference.getUTCFullYear(), reference.getUTCMonth() + monthOffset, 1));
+  const monthIndex = monthStart.getUTCMonth();
+  const weekday = monthStart.getUTCDay();
+  const offsetToMonday = (weekday + 6) % 7;
+  const gridStartMs = monthStart.getTime() - offsetToMonday * 24 * 60 * 60 * 1000;
+
+  const today = new Date();
+  const todayMondayMs =
+    Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()) -
+    ((today.getUTCDay() + 6) % 7) * 24 * 60 * 60 * 1000;
+
+  const totalCells = 42;
+  return Array.from({ length: totalCells }, (_, index) => {
+    const dayMs = gridStartMs + index * 24 * 60 * 60 * 1000;
+    const day = new Date(dayMs);
+    const dayMondayMs = dayMs - ((day.getUTCDay() + 6) % 7) * 24 * 60 * 60 * 1000;
+    return {
+      iso: day.toISOString().slice(0, 10),
+      dayNumber: day.getUTCDate(),
+      inCurrentMonth: day.getUTCMonth() === monthIndex,
+      weekOffsetFromToday: Math.round((dayMondayMs - todayMondayMs) / (7 * 24 * 60 * 60 * 1000))
+    };
+  });
+}
+
+export function formatMonthLabel(reference: Date = new Date(), monthOffset = 0): string {
+  const monthStart = new Date(Date.UTC(reference.getUTCFullYear(), reference.getUTCMonth() + monthOffset, 1));
+  const label = new Intl.DateTimeFormat("es-ES", { month: "long", year: "numeric", timeZone: "UTC" }).format(monthStart);
+  return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
 export function formatWeekRange(days: WeekDay[]): string {

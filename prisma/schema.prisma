@@ -128,6 +128,7 @@ model Tenant {
   operatories     Operatory[]
   treatments      Treatment[]
   appointments    Appointment[]
+  calendarEvents  CalendarEvent[]
   conversations   Conversation[]
   tasks           Task[]
   consents        Consent[]
@@ -223,6 +224,7 @@ model Provider {
 
   tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   appointments Appointment[]
+  calendarEvents CalendarEvent[]
 
   @@index([tenantId])
 }
@@ -238,6 +240,7 @@ model Operatory {
 
   tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   appointments Appointment[]
+  calendarEvents CalendarEvent[]
 
   @@index([tenantId])
 }
@@ -287,6 +290,35 @@ model Appointment {
 
   @@index([tenantId, startsAt])
   @@index([tenantId, status])
+}
+
+enum CalendarEventType {
+  MEETING
+  BLOCK
+  ABSENCE
+  OTHER
+}
+
+model CalendarEvent {
+  id              String            @id @default(cuid())
+  tenantId        String
+  providerId      String?
+  operatoryId     String?
+  title           String
+  type            CalendarEventType @default(MEETING)
+  startsAt        DateTime
+  durationMinutes Int               @default(30)
+  notes           String?
+  createdByUserId String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  tenant          Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  provider        Provider?         @relation(fields: [providerId], references: [id], onDelete: SetNull)
+  operatory       Operatory?        @relation(fields: [operatoryId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, startsAt])
+  @@index([providerId, startsAt])
 }
 
 model Conversation {

@@ -9,7 +9,6 @@ type WhatsAppDemoChatProps = {
   assistantName: string;
   clinicPhone: string;
   assistantEnabled: boolean;
-  rgpdNotes?: string;
 };
 
 type ChatEntry = {
@@ -37,15 +36,27 @@ export function WhatsAppDemoChat({
   clinicName,
   assistantName,
   clinicPhone,
-  assistantEnabled,
-  rgpdNotes
+  assistantEnabled
 }: WhatsAppDemoChatProps) {
-  const [patientName, setPatientName] = useState("Paciente demo");
-  const [patientPhone, setPatientPhone] = useState("+34 629 179 640");
-  const [consent, setConsent] = useState(false);
-  const [started, setStarted] = useState(false);
+  const [patientName] = useState("Paciente demo");
+  const [patientPhone] = useState("+34 629 179 640");
   const [message, setMessage] = useState("");
-  const [entries, setEntries] = useState<ChatEntry[]>([]);
+  const [entries, setEntries] = useState<ChatEntry[]>(() => [
+    {
+      id: crypto.randomUUID(),
+      from: "system",
+      text: "Demo privada: esta pantalla simula WhatsApp y guarda la conversacion en Dentia.",
+      time: new Intl.DateTimeFormat("es-ES", { hour: "2-digit", minute: "2-digit" }).format(new Date())
+    },
+    {
+      id: crypto.randomUUID(),
+      from: "assistant",
+      text: assistantEnabled
+        ? `Hola, soy ${assistantName}, recepcionista IA de ${clinicName}. Puedes contarme que necesitas y te oriento para cita, presupuesto o urgencia.`
+        : `Hola, ahora mismo el asistente esta pausado. Deja tu mensaje y recepcion lo revisara.`,
+      time: new Intl.DateTimeFormat("es-ES", { hour: "2-digit", minute: "2-digit" }).format(new Date())
+    }
+  ]);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const messagesRef = useRef<HTMLDivElement | null>(null);
@@ -61,32 +72,6 @@ export function WhatsAppDemoChat({
 
   function now() {
     return new Intl.DateTimeFormat("es-ES", { hour: "2-digit", minute: "2-digit" }).format(new Date());
-  }
-
-  function startDemo(event: React.FormEvent) {
-    event.preventDefault();
-    if (!patientPhone.trim() || !consent) {
-      setError("Para que la demo sea realista necesitamos telefono y consentimiento RGPD.");
-      return;
-    }
-    setError(null);
-    setStarted(true);
-    setEntries([
-      {
-        id: crypto.randomUUID(),
-        from: "system",
-        text: "Demo privada: esta pantalla simula WhatsApp y guarda la conversacion en Dentia.",
-        time: now()
-      },
-      {
-        id: crypto.randomUUID(),
-        from: "assistant",
-        text: assistantEnabled
-          ? `Hola, soy ${assistantName}, recepcionista IA de ${clinicName}. Puedes contarme que necesitas y te oriento para cita, presupuesto o urgencia.`
-          : `Hola, ahora mismo el asistente esta pausado. Deja tu mensaje y recepcion lo revisara.`,
-        time: now()
-      }
-    ]);
   }
 
   async function sendMessage(event?: React.FormEvent, preset?: string) {
@@ -173,84 +158,57 @@ export function WhatsAppDemoChat({
           </button>
         </header>
 
-        {!started ? (
-          <form className="wa-start-panel" onSubmit={startDemo}>
-            <div>
-              <h2>Configurar paciente demo</h2>
-              <p>Estos datos identifican el hilo en el CRM. Puedes cambiarlos antes de empezar.</p>
+        <div className="wa-chat-body" ref={messagesRef}>
+          <div className="wa-day-pill">{todayLabel}</div>
+          {entries.map(entry => (
+            <div className={`wa-bubble-row ${entry.from}`} key={entry.id}>
+              <p className="wa-bubble">
+                <span>{entry.text}</span>
+                <small>
+                  {entry.time}
+                  {entry.from === "patient" ? <CheckCheck aria-hidden="true" /> : null}
+                </small>
+              </p>
             </div>
-            <label>
-              Nombre
-              <input value={patientName} onChange={event => setPatientName(event.target.value)} />
-            </label>
-            <label>
-              Telefono
-              <input value={patientPhone} onChange={event => setPatientPhone(event.target.value)} required />
-            </label>
-            <label className="wa-consent">
-              <input type="checkbox" checked={consent} onChange={event => setConsent(event.target.checked)} required />
-              <span>
-                Acepto usar estos datos para gestionar la demo. {rgpdNotes || "El asistente no diagnostica y puede escalar a recepcion."}
-              </span>
-            </label>
-            {error ? <p className="wa-error" role="alert">{error}</p> : null}
-            <button className="wa-start-button" type="submit">Entrar al chat</button>
-          </form>
-        ) : (
-          <>
-            <div className="wa-chat-body" ref={messagesRef}>
-              <div className="wa-day-pill">{todayLabel}</div>
-              {entries.map(entry => (
-                <div className={`wa-bubble-row ${entry.from}`} key={entry.id}>
-                  <p className="wa-bubble">
-                    <span>{entry.text}</span>
-                    <small>
-                      {entry.time}
-                      {entry.from === "patient" ? <CheckCheck aria-hidden="true" /> : null}
-                    </small>
-                  </p>
-                </div>
-              ))}
-              {sending ? (
-                <div className="wa-bubble-row assistant">
-                  <p className="wa-bubble wa-typing" aria-label={`${assistantName} esta escribiendo`}>
-                    <span />
-                    <span />
-                    <span />
-                  </p>
-                </div>
-              ) : null}
+          ))}
+          {sending ? (
+            <div className="wa-bubble-row assistant">
+              <p className="wa-bubble wa-typing" aria-label={`${assistantName} esta escribiendo`}>
+                <span />
+                <span />
+                <span />
+              </p>
             </div>
+          ) : null}
+        </div>
 
-            <div className="wa-quick-prompts" aria-label="Mensajes rapidos de prueba">
-              {quickPrompts.map(prompt => (
-                <button key={prompt} type="button" onClick={() => void sendMessage(undefined, prompt)} disabled={sending}>
-                  {prompt}
-                </button>
-              ))}
-            </div>
+        <div className="wa-quick-prompts" aria-label="Mensajes rapidos de prueba">
+          {quickPrompts.map(prompt => (
+            <button key={prompt} type="button" onClick={() => void sendMessage(undefined, prompt)} disabled={sending}>
+              {prompt}
+            </button>
+          ))}
+        </div>
 
-            {error ? <p className="wa-error wa-error-inline" role="alert">{error}</p> : null}
+        {error ? <p className="wa-error wa-error-inline" role="alert">{error}</p> : null}
 
-            <form className="wa-input-bar" onSubmit={event => void sendMessage(event)}>
-              <button className="wa-icon-button" type="button" aria-label="Emoji">
-                <Smile />
-              </button>
-              <input
-                value={message}
-                onChange={event => setMessage(event.target.value)}
-                placeholder="Mensaje"
-                aria-label="Mensaje para la recepcionista IA"
-              />
-              <button className="wa-icon-button" type="button" aria-label="Adjuntar">
-                <Paperclip />
-              </button>
-              <button className="wa-send-button" type={message.trim() ? "submit" : "button"} aria-label={message.trim() ? "Enviar" : "Audio demo"} disabled={sending}>
-                {message.trim() ? <Send /> : <Mic />}
-              </button>
-            </form>
-          </>
-        )}
+        <form className="wa-input-bar" onSubmit={event => void sendMessage(event)}>
+          <button className="wa-icon-button" type="button" aria-label="Emoji">
+            <Smile />
+          </button>
+          <input
+            value={message}
+            onChange={event => setMessage(event.target.value)}
+            placeholder="Mensaje"
+            aria-label="Mensaje para la recepcionista IA"
+          />
+          <button className="wa-icon-button" type="button" aria-label="Adjuntar">
+            <Paperclip />
+          </button>
+          <button className="wa-send-button" type={message.trim() ? "submit" : "button"} aria-label={message.trim() ? "Enviar" : "Audio demo"} disabled={sending}>
+            {message.trim() ? <Send /> : <Mic />}
+          </button>
+        </form>
 
         <footer className="wa-phone-home" aria-label={`Telefono demo ${clinicPhone}`} />
       </section>

@@ -18,6 +18,7 @@ export async function getDashboardData() {
   const [
     patients,
     appointments,
+    calendarEvents,
     conversations,
     tasks,
     treatments,
@@ -38,6 +39,11 @@ export async function getDashboardData() {
       where: { tenantId: tenant.id },
       orderBy: { startsAt: "asc" },
       include: { patient: true, provider: true, operatory: true, treatment: true }
+    }),
+    prisma.calendarEvent.findMany({
+      where: { tenantId: tenant.id },
+      orderBy: { startsAt: "asc" },
+      include: { provider: true, operatory: true }
     }),
     prisma.conversation.findMany({
       where: { tenantId: tenant.id },
@@ -99,6 +105,7 @@ export async function getDashboardData() {
     currentUser,
     patients,
     appointments,
+    calendarEvents,
     conversations,
     tasks,
     treatments,
