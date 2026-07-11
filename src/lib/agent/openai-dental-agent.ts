@@ -12,7 +12,7 @@ const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
 const GEMINI_URL_PREFIX = "https://generativelanguage.googleapis.com/v1beta/models";
 const DEFAULT_OPENAI_MODEL = "gpt-5.6-terra";
 const DEFAULT_GEMINI_MODEL = "gemini-2.5-pro";
-const DEFAULT_GEMINI_FALLBACK_MODEL = "gemini-2.5-flash";
+const DEFAULT_GEMINI_FALLBACK_MODEL = "gemini-3.5-flash";
 const PENDING_INTENT = "INTENCION_PENDIENTE";
 
 const dentalIntentValues = [
