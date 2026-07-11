@@ -258,4 +258,31 @@ describe("runDentalAgentTurn", () => {
     expect(result.reply).not.toContain("\"reply\"");
     expect(result.reply).not.toContain("\"intent\"");
   });
+
+  it("extracts the reply when Gemini returns a truncated JSON fragment", async () => {
+    process.env.LLM_PROVIDER = "gemini";
+    process.env.GEMINI_API_KEY = "gemini-test-key";
+    process.env.GEMINI_MODEL = "gemini-truncated-json";
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        output_text:
+          '{\n  "reply": "Siento mucho que estes con ese dolor tan intenso. Podria tratarse de una inflamacion o afectacion del nervio, por lo que conviene que lo revise el doctor lo antes posible para darte alivio. Hoy mismo priorizamos estas urgencias en Murcia y Elche'
+      })
+    } as Response);
+
+    const result = await runDentalAgentTurn({
+      latestPatientMessage: "ME DUELE MUCHO UNA MUELA",
+      history: [],
+      state: initialDentalAgentState
+    });
+
+    expect(result.runtime).toBe("gemini");
+    expect(result.model).toContain("texto libre");
+    expect(result.reply).toContain("Siento mucho");
+    expect(result.reply).toContain("Murcia y Elche");
+    expect(result.reply).not.toContain("\"reply\"");
+    expect(result.reply).not.toContain("{");
+  });
 });

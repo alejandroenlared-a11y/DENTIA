@@ -575,17 +575,45 @@ function extractReplyFromLooseJson(value: string) {
       return typeof reply === "string" ? reply.trim() : "";
     }
   } catch {
-    const match = value.match(/"reply"\s*:\s*"((?:\\.|[^"\\])*)"/s);
-    if (!match?.[1]) {
+    const quotedMatch = value.match(/"reply"\s*:\s*"((?:\\.|[^"\\])*)"/s);
+    if (quotedMatch?.[1]) {
+      try {
+        return JSON.parse(`"${quotedMatch[1]}"`).trim();
+      } catch {
+        return quotedMatch[1].replace(/\\"/g, "\"").trim();
+      }
+    }
+
+    const looseReply = extractTruncatedReplyField(value);
+    if (!looseReply) {
       return "";
     }
-    try {
-      return JSON.parse(`"${match[1]}"`).trim();
-    } catch {
-      return match[1].replace(/\\"/g, "\"").trim();
-    }
+    return looseReply;
   }
   return "";
+}
+
+function extractTruncatedReplyField(value: string) {
+  const marker = /"reply"\s*:\s*"/.exec(value);
+  if (!marker) {
+    return "";
+  }
+
+  const start = marker.index + marker[0].length;
+  const afterReply = value.slice(start);
+  const nextField = afterReply.search(/",\s*"[\w]+\"\s*:/s);
+  const rawReply = (nextField >= 0 ? afterReply.slice(0, nextField) : afterReply)
+    .replace(/\\n/g, "\n")
+    .replace(/\\"/g, "\"")
+    .replace(/[}\]]+\s*$/g, "")
+    .replace(/"\s*$/g, "")
+    .trim();
+
+  if (!rawReply || rawReply === value.trim()) {
+    return "";
+  }
+
+  return rawReply;
 }
 
 function buildLocalFallback(
