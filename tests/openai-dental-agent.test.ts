@@ -225,4 +225,37 @@ describe("runDentalAgentTurn", () => {
     expect(result.reply).toContain("Murcia");
     expect(result.state.intent).toBe("caries_restoration");
   });
+
+  it("extracts only the patient-facing reply when Gemini returns loose JSON", async () => {
+    process.env.LLM_PROVIDER = "gemini";
+    process.env.GEMINI_API_KEY = "gemini-test-key";
+    process.env.GEMINI_MODEL = "gemini-loose-json";
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        output_text: JSON.stringify({
+          reply:
+            "Lamento que estes con ese dolor. Por seguridad, lo ideal es que te vea un doctor cuanto antes; dime tu nombre y si prefieres Murcia centro o Elche - Altabix.",
+          intent: "urgent_pain",
+          intentCode: "urgent_pain",
+          treatmentNeed: "Urgencia por dolor agudo de muela"
+        })
+      })
+    } as Response);
+
+    const result = await runDentalAgentTurn({
+      latestPatientMessage: "ME DUELE MUCHO UNA MUELA",
+      history: [],
+      state: initialDentalAgentState
+    });
+
+    expect(result.runtime).toBe("gemini");
+    expect(result.model).toContain("texto libre");
+    expect(result.reply).toBe(
+      "Lamento que estes con ese dolor. Por seguridad, lo ideal es que te vea un doctor cuanto antes; dime tu nombre y si prefieres Murcia centro o Elche - Altabix."
+    );
+    expect(result.reply).not.toContain("\"reply\"");
+    expect(result.reply).not.toContain("\"intent\"");
+  });
 });

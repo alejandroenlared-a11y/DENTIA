@@ -557,11 +557,35 @@ function buildGeminiFreeformReply(rawText: string, fallbackReply: string) {
     return fallbackReply;
   }
 
-  if (cleaned.length > 1200) {
-    return `${cleaned.slice(0, 1197).trim()}...`;
+  const replyFromJson = extractReplyFromLooseJson(cleaned);
+  const reply = replyFromJson || cleaned;
+
+  if (reply.length > 1200) {
+    return `${reply.slice(0, 1197).trim()}...`;
   }
 
-  return cleaned;
+  return reply;
+}
+
+function extractReplyFromLooseJson(value: string) {
+  try {
+    const parsed = JSON.parse(normalizeJsonText(value)) as unknown;
+    if (parsed && typeof parsed === "object" && "reply" in parsed) {
+      const reply = (parsed as { reply?: unknown }).reply;
+      return typeof reply === "string" ? reply.trim() : "";
+    }
+  } catch {
+    const match = value.match(/"reply"\s*:\s*"((?:\\.|[^"\\])*)"/s);
+    if (!match?.[1]) {
+      return "";
+    }
+    try {
+      return JSON.parse(`"${match[1]}"`).trim();
+    } catch {
+      return match[1].replace(/\\"/g, "\"").trim();
+    }
+  }
+  return "";
 }
 
 function buildLocalFallback(
