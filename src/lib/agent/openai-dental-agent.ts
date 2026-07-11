@@ -274,12 +274,12 @@ export async function runOpenAiDentalAgentTurn(input: {
       return buildLocalFallback(localTurn, model, payload.error?.message || "OpenAI no devolvio texto");
     }
 
-    const aiOutput = dentalAgentAiOutputSchema.parse(JSON.parse(rawText));
+    const aiOutput = parseDentalAgentOutput(rawText);
     const state = mergeAiState(localTurn.state, aiOutput);
     return { reply: aiOutput.reply, state, runtime: "openai", model };
   } catch (error) {
     console.error("runOpenAiDentalAgentTurn failed", error);
-    return buildLocalFallback(localTurn, model, "Respuesta IA no valida");
+    return buildLocalFallback(localTurn, model, error instanceof Error ? error.message : "Respuesta IA no valida");
   }
 }
 
@@ -336,7 +336,7 @@ async function runGeminiDentalAgentTurn(input: {
     );
   } catch (error) {
     console.error("runGeminiDentalAgentTurn failed", error);
-    return buildLocalFallback(localTurn, model, "Respuesta Gemini no valida");
+    return buildLocalFallback(localTurn, model, error instanceof Error ? error.message : "Respuesta Gemini no valida");
   }
 }
 
@@ -389,7 +389,7 @@ async function requestGeminiTurn(input: {
 
   return {
     ok: true,
-    output: dentalAgentAiOutputSchema.parse(JSON.parse(rawText))
+    output: parseDentalAgentOutput(rawText)
   };
 }
 
@@ -531,6 +531,38 @@ function extractOpenAiText(payload: OpenAiResponsePayload) {
 
 function extractGeminiText(payload: GeminiResponsePayload) {
   return payload.candidates?.[0]?.content?.parts?.map(part => part.text ?? "").join("").trim() || "";
+}
+
+function parseDentalAgentOutput(rawText: string) {
+  const normalizedText = normalizeJsonText(rawText);
+  const parsed = dentalAgentAiOutputSchema.safeParse(JSON.parse(normalizedText));
+  if (parsed.success) {
+    return parsed.data;
+  }
+  const issue = parsed.error.issues[0];
+  const path = issue?.path?.join(".") || "root";
+  throw new Error(`Salida IA invalida en ${path}: ${issue?.message || "schema mismatch"}`);
+}
+
+function normalizeJsonText(rawText: string) {
+  const trimmed = rawText.trim();
+  const withoutFence = trimmed
+    .replace(/^```json\s*/i, "")
+    .replace(/^```\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim();
+
+  try {
+    JSON.parse(withoutFence);
+    return withoutFence;
+  } catch {
+    const firstBrace = withoutFence.indexOf("{");
+    const lastBrace = withoutFence.lastIndexOf("}");
+    if (firstBrace >= 0 && lastBrace > firstBrace) {
+      return withoutFence.slice(firstBrace, lastBrace + 1);
+    }
+    throw new Error("Salida Gemini no se pudo interpretar como JSON");
+  }
 }
 
 function buildLocalFallback(
