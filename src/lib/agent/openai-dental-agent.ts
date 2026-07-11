@@ -299,14 +299,12 @@ async function requestGeminiTurn(input: {
     },
     body: JSON.stringify({
       model: input.model,
-      input: [
-        {
-          role: "user",
-          content: [{ type: "input_text", text: input.prompt }]
-        }
-      ],
-      temperature: 0.5,
-      max_output_tokens: 1400,
+      input: input.prompt,
+      system_instruction: "Responde en espanol natural y sigue el esquema JSON si response_format lo pide.",
+      generation_config: {
+        temperature: 0.5,
+        max_output_tokens: 1400
+      },
       response_format: {
         type: "text",
         mime_type: "application/json",
