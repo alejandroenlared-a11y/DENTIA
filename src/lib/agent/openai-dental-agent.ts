@@ -9,7 +9,9 @@ import {
 } from "@/lib/agent/dental-senior-agent";
 
 const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
-const DEFAULT_MODEL = "gpt-5.6-terra";
+const GEMINI_URL_PREFIX = "https://generativelanguage.googleapis.com/v1beta/models";
+const DEFAULT_OPENAI_MODEL = "gpt-5.6-terra";
+const DEFAULT_GEMINI_MODEL = "gemini-2.5-pro";
 const PENDING_INTENT = "INTENCION_PENDIENTE";
 
 const dentalIntentValues = [
@@ -37,7 +39,9 @@ export type DentalChatMessage = {
   body: string;
 };
 
-export type DentalAgentRuntime = "openai" | "local";
+type LlmProvider = "openai" | "gemini";
+
+export type DentalAgentRuntime = "openai" | "gemini" | "local";
 
 export type DentalAgentApiTurn = {
   reply: string;
@@ -109,8 +113,30 @@ const dentalAgentAiOutputSchema = z.object({
 type DentalAgentAiOutput = z.infer<typeof dentalAgentAiOutputSchema>;
 
 const dentalAgentJsonSchema = {
-  type: "object",
-  additionalProperties: false,
+  type: "OBJECT",
+  properties: {
+    reply: { type: "STRING" },
+    intent: { type: "STRING", enum: dentalIntentValues },
+    intentCode: { type: "STRING" },
+    treatmentNeed: { type: "STRING" },
+    budget: { type: "STRING" },
+    estimatedValue: { type: "INTEGER" },
+    escalated: { type: "BOOLEAN" },
+    consent: { type: "BOOLEAN" },
+    name: { type: "STRING" },
+    phone: { type: "STRING" },
+    location: { type: "STRING" },
+    availability: { type: "STRING" },
+    triageLevel: { type: "STRING", enum: triageValues },
+    triageLabel: { type: "STRING" },
+    clinicalReading: { type: "STRING" },
+    likelyCauses: { type: "ARRAY", items: { type: "STRING" } },
+    detectedSignals: { type: "ARRAY", items: { type: "STRING" } },
+    redFlags: { type: "ARRAY", items: { type: "STRING" } },
+    missingClinicalData: { type: "ARRAY", items: { type: "STRING" } },
+    confidence: { type: "STRING", enum: confidenceValues },
+    safetyScreened: { type: "BOOLEAN" }
+  },
   required: [
     "reply",
     "intent",
@@ -134,29 +160,29 @@ const dentalAgentJsonSchema = {
     "confidence",
     "safetyScreened"
   ],
-  properties: {
-    reply: { type: "string", maxLength: 1500 },
-    intent: { type: "string", enum: dentalIntentValues },
-    intentCode: { type: "string" },
-    treatmentNeed: { type: "string" },
-    budget: { type: "string" },
-    estimatedValue: { type: "integer", minimum: 0 },
-    escalated: { type: "boolean" },
-    consent: { type: "boolean" },
-    name: { type: "string" },
-    phone: { type: "string" },
-    location: { type: "string" },
-    availability: { type: "string" },
-    triageLevel: { type: "string", enum: triageValues },
-    triageLabel: { type: "string" },
-    clinicalReading: { type: "string" },
-    likelyCauses: { type: "array", items: { type: "string" }, maxItems: 5 },
-    detectedSignals: { type: "array", items: { type: "string" }, maxItems: 8 },
-    redFlags: { type: "array", items: { type: "string" }, maxItems: 8 },
-    missingClinicalData: { type: "array", items: { type: "string" }, maxItems: 5 },
-    confidence: { type: "string", enum: confidenceValues },
-    safetyScreened: { type: "boolean" }
-  }
+  propertyOrdering: [
+    "reply",
+    "intent",
+    "intentCode",
+    "treatmentNeed",
+    "budget",
+    "estimatedValue",
+    "escalated",
+    "consent",
+    "name",
+    "phone",
+    "location",
+    "availability",
+    "triageLevel",
+    "triageLabel",
+    "clinicalReading",
+    "likelyCauses",
+    "detectedSignals",
+    "redFlags",
+    "missingClinicalData",
+    "confidence",
+    "safetyScreened"
+  ]
 } as const;
 
 type OpenAiResponsePayload = {
@@ -171,6 +197,33 @@ type OpenAiResponsePayload = {
   error?: { message?: string };
 };
 
+type GeminiResponsePayload = {
+  candidates?: Array<{
+    content?: {
+      parts?: Array<{
+        text?: string;
+      }>;
+    };
+  }>;
+  error?: {
+    code?: number;
+    message?: string;
+  };
+};
+
+export async function runDentalAgentTurn(input: {
+  latestPatientMessage: string;
+  history: DentalChatMessage[];
+  state: DentalAgentState;
+  clinicContext?: string;
+}): Promise<DentalAgentApiTurn> {
+  const provider = resolveProvider();
+  if (provider === "gemini") {
+    return runGeminiDentalAgentTurn(input);
+  }
+  return runOpenAiDentalAgentTurn(input);
+}
+
 export async function runOpenAiDentalAgentTurn(input: {
   latestPatientMessage: string;
   history: DentalChatMessage[];
@@ -179,16 +232,10 @@ export async function runOpenAiDentalAgentTurn(input: {
 }): Promise<DentalAgentApiTurn> {
   const localTurn = runDentalSeniorTurn(input.state, input.latestPatientMessage);
   const apiKey = process.env.OPENAI_API_KEY;
-  const model = process.env.OPENAI_MODEL || DEFAULT_MODEL;
+  const model = process.env.OPENAI_MODEL || DEFAULT_OPENAI_MODEL;
 
   if (!apiKey) {
-    return {
-      reply: localTurn.reply,
-      state: localTurn.state,
-      runtime: "local",
-      model,
-      fallbackReason: "OPENAI_API_KEY no configurada"
-    };
+    return buildLocalFallback(localTurn, model, "OPENAI_API_KEY no configurada");
   }
 
   try {
@@ -208,7 +255,7 @@ export async function runOpenAiDentalAgentTurn(input: {
             type: "json_schema",
             name: "dentia_dental_agent_turn",
             strict: true,
-            schema: dentalAgentJsonSchema
+            schema: mapSchemaToOpenAi()
           }
         }
       })
@@ -217,25 +264,13 @@ export async function runOpenAiDentalAgentTurn(input: {
     if (!response.ok) {
       const errorText = await response.text().catch(() => "");
       console.error("runOpenAiDentalAgentTurn OpenAI error", response.status, errorText.slice(0, 500));
-      return {
-        reply: localTurn.reply,
-        state: localTurn.state,
-        runtime: "local",
-        model,
-        fallbackReason: `OpenAI API ${response.status}`
-      };
+      return buildLocalFallback(localTurn, model, `OpenAI API ${response.status}`);
     }
 
     const payload = (await response.json()) as OpenAiResponsePayload;
     const rawText = extractOpenAiText(payload);
     if (!rawText) {
-      return {
-        reply: localTurn.reply,
-        state: localTurn.state,
-        runtime: "local",
-        model,
-        fallbackReason: payload.error?.message || "OpenAI no devolvio texto"
-      };
+      return buildLocalFallback(localTurn, model, payload.error?.message || "OpenAI no devolvio texto");
     }
 
     const aiOutput = dentalAgentAiOutputSchema.parse(JSON.parse(rawText));
@@ -243,14 +278,73 @@ export async function runOpenAiDentalAgentTurn(input: {
     return { reply: aiOutput.reply, state, runtime: "openai", model };
   } catch (error) {
     console.error("runOpenAiDentalAgentTurn failed", error);
-    return {
-      reply: localTurn.reply,
-      state: localTurn.state,
-      runtime: "local",
-      model,
-      fallbackReason: "Respuesta IA no valida"
-    };
+    return buildLocalFallback(localTurn, model, "Respuesta IA no valida");
   }
+}
+
+async function runGeminiDentalAgentTurn(input: {
+  latestPatientMessage: string;
+  history: DentalChatMessage[];
+  state: DentalAgentState;
+  clinicContext?: string;
+}): Promise<DentalAgentApiTurn> {
+  const localTurn = runDentalSeniorTurn(input.state, input.latestPatientMessage);
+  const apiKey = process.env.GEMINI_API_KEY;
+  const model = process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL;
+
+  if (!apiKey) {
+    return buildLocalFallback(localTurn, model, "GEMINI_API_KEY no configurada");
+  }
+
+  try {
+    const response = await fetch(`${GEMINI_URL_PREFIX}/${model}:generateContent?key=${encodeURIComponent(apiKey)}`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({
+        contents: [
+          {
+            role: "user",
+            parts: [
+              {
+                text: buildGeminiPrompt(input.history, input.latestPatientMessage, localTurn.state, input.clinicContext)
+              }
+            ]
+          }
+        ],
+        generationConfig: {
+          temperature: 0.5,
+          maxOutputTokens: 1400,
+          responseMimeType: "application/json",
+          responseSchema: dentalAgentJsonSchema
+        }
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => "");
+      console.error("runGeminiDentalAgentTurn Gemini error", response.status, errorText.slice(0, 500));
+      return buildLocalFallback(localTurn, model, `Gemini API ${response.status}`);
+    }
+
+    const payload = (await response.json()) as GeminiResponsePayload;
+    const rawText = extractGeminiText(payload);
+    if (!rawText) {
+      return buildLocalFallback(localTurn, model, payload.error?.message || "Gemini no devolvio texto");
+    }
+
+    const aiOutput = dentalAgentAiOutputSchema.parse(JSON.parse(rawText));
+    const state = mergeAiState(localTurn.state, aiOutput);
+    return { reply: aiOutput.reply, state, runtime: "gemini", model };
+  } catch (error) {
+    console.error("runGeminiDentalAgentTurn failed", error);
+    return buildLocalFallback(localTurn, model, "Respuesta Gemini no valida");
+  }
+}
+
+function resolveProvider(): LlmProvider {
+  return process.env.LLM_PROVIDER === "gemini" ? "gemini" : "openai";
 }
 
 function buildDentalSystemPrompt(extraContext?: string) {
@@ -306,6 +400,74 @@ function buildDentalUserInput(history: DentalChatMessage[], latestPatientMessage
   ].join("\n");
 }
 
+function buildGeminiPrompt(
+  history: DentalChatMessage[],
+  latestPatientMessage: string,
+  localState: DentalAgentState,
+  clinicContext?: string
+) {
+  return [
+    "SISTEMA:",
+    buildDentalSystemPrompt(clinicContext),
+    "",
+    "USUARIO:",
+    buildDentalUserInput(history, latestPatientMessage, localState)
+  ].join("\n");
+}
+
+function mapSchemaToOpenAi() {
+  return {
+    type: "object",
+    additionalProperties: false,
+    required: [
+      "reply",
+      "intent",
+      "intentCode",
+      "treatmentNeed",
+      "budget",
+      "estimatedValue",
+      "escalated",
+      "consent",
+      "name",
+      "phone",
+      "location",
+      "availability",
+      "triageLevel",
+      "triageLabel",
+      "clinicalReading",
+      "likelyCauses",
+      "detectedSignals",
+      "redFlags",
+      "missingClinicalData",
+      "confidence",
+      "safetyScreened"
+    ],
+    properties: {
+      reply: { type: "string", maxLength: 1500 },
+      intent: { type: "string", enum: dentalIntentValues },
+      intentCode: { type: "string" },
+      treatmentNeed: { type: "string" },
+      budget: { type: "string" },
+      estimatedValue: { type: "integer", minimum: 0 },
+      escalated: { type: "boolean" },
+      consent: { type: "boolean" },
+      name: { type: "string" },
+      phone: { type: "string" },
+      location: { type: "string" },
+      availability: { type: "string" },
+      triageLevel: { type: "string", enum: triageValues },
+      triageLabel: { type: "string" },
+      clinicalReading: { type: "string" },
+      likelyCauses: { type: "array", items: { type: "string" }, maxItems: 5 },
+      detectedSignals: { type: "array", items: { type: "string" }, maxItems: 8 },
+      redFlags: { type: "array", items: { type: "string" }, maxItems: 8 },
+      missingClinicalData: { type: "array", items: { type: "string" }, maxItems: 5 },
+      confidence: { type: "string", enum: confidenceValues },
+      safetyScreened: { type: "boolean" }
+    }
+  } as const;
+}
+
 function extractOpenAiText(payload: OpenAiResponsePayload) {
   if (typeof payload.output_text === "string" && payload.output_text.trim()) {
     return payload.output_text.trim();
@@ -315,6 +477,24 @@ function extractOpenAiText(payload: OpenAiResponsePayload) {
     .map(content => content.text ?? "")
     .join("")
     .trim() || "";
+}
+
+function extractGeminiText(payload: GeminiResponsePayload) {
+  return payload.candidates?.[0]?.content?.parts?.map(part => part.text ?? "").join("").trim() || "";
+}
+
+function buildLocalFallback(
+  localTurn: { reply: string; state: DentalAgentState },
+  model: string,
+  fallbackReason: string
+): DentalAgentApiTurn {
+  return {
+    reply: localTurn.reply,
+    state: localTurn.state,
+    runtime: "local",
+    model,
+    fallbackReason
+  };
 }
 
 function mergeAiState(localState: DentalAgentState, aiOutput: DentalAgentAiOutput): DentalAgentState {

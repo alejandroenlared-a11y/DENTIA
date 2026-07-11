@@ -1,18 +1,25 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { initialDentalAgentState } from "@/lib/agent/dental-senior-agent";
-import { runOpenAiDentalAgentTurn } from "@/lib/agent/openai-dental-agent";
+import { runDentalAgentTurn, runOpenAiDentalAgentTurn } from "@/lib/agent/openai-dental-agent";
 
-const originalApiKey = process.env.OPENAI_API_KEY;
-const originalModel = process.env.OPENAI_MODEL;
+const originalProvider = process.env.LLM_PROVIDER;
+const originalOpenAiApiKey = process.env.OPENAI_API_KEY;
+const originalOpenAiModel = process.env.OPENAI_MODEL;
+const originalGeminiApiKey = process.env.GEMINI_API_KEY;
+const originalGeminiModel = process.env.GEMINI_MODEL;
 
 afterEach(() => {
-  process.env.OPENAI_API_KEY = originalApiKey;
-  process.env.OPENAI_MODEL = originalModel;
+  process.env.LLM_PROVIDER = originalProvider;
+  process.env.OPENAI_API_KEY = originalOpenAiApiKey;
+  process.env.OPENAI_MODEL = originalOpenAiModel;
+  process.env.GEMINI_API_KEY = originalGeminiApiKey;
+  process.env.GEMINI_MODEL = originalGeminiModel;
   vi.restoreAllMocks();
 });
 
-describe("runOpenAiDentalAgentTurn", () => {
+describe("runDentalAgentTurn", () => {
   it("falls back to the local dental engine when OPENAI_API_KEY is missing", async () => {
+    delete process.env.LLM_PROVIDER;
     delete process.env.OPENAI_API_KEY;
 
     const result = await runOpenAiDentalAgentTurn({
@@ -28,6 +35,7 @@ describe("runOpenAiDentalAgentTurn", () => {
   });
 
   it("uses a valid structured OpenAI response and keeps CRM-ready state", async () => {
+    delete process.env.LLM_PROVIDER;
     process.env.OPENAI_API_KEY = "test-key";
     process.env.OPENAI_MODEL = "gpt-test";
 
@@ -74,5 +82,57 @@ describe("runOpenAiDentalAgentTurn", () => {
     expect(result.state.ready).toBe(true);
     expect(result.state.intent).toBe("periodontics");
     expect(result.state.budget).toBe("desde 90 EUR");
+  });
+
+  it("uses Gemini when LLM_PROVIDER=gemini", async () => {
+    process.env.LLM_PROVIDER = "gemini";
+    process.env.GEMINI_API_KEY = "gemini-test-key";
+    process.env.GEMINI_MODEL = "gemini-test-model";
+
+    const output = {
+      reply:
+        "Por lo que cuentas, encaja con una consulta de primera visita para revisar esa molestia y te puedo dejar una propuesta en Elche esta semana.",
+      intent: "first_visit",
+      intentCode: "CITA_PRIMERA_VISITA",
+      treatmentNeed: "Primera visita",
+      budget: "0 EUR",
+      estimatedValue: 0,
+      escalated: false,
+      consent: true,
+      name: "Lucia Test",
+      phone: "611000999",
+      location: "Elche - Altabix",
+      availability: "manana",
+      triageLevel: "ROUTINE",
+      triageLabel: "Rutina",
+      clinicalReading: "Molestia leve sin banderas rojas, compatible con revision programable.",
+      likelyCauses: ["revision general"],
+      detectedSignals: ["sensibilidad leve"],
+      redFlags: [],
+      missingClinicalData: [],
+      confidence: "Media",
+      safetyScreened: true
+    };
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        candidates: [{ content: { parts: [{ text: JSON.stringify(output) }] } }]
+      })
+    } as Response);
+
+    const result = await runDentalAgentTurn({
+      latestPatientMessage:
+        "Acepto que guardes mis datos. Soy Lucia Test, telefono 611000999 y prefiero Elche por la manana. Quiero una revision.",
+      history: [],
+      state: initialDentalAgentState
+    });
+
+    expect(result.runtime).toBe("gemini");
+    expect(result.model).toBe("gemini-test-model");
+    expect(result.reply).toContain("Elche");
+    expect(result.state.ready).toBe(true);
+    expect(result.state.intent).toBe("first_visit");
+    expect(result.state.location).toBe("Elche - Altabix");
   });
 });

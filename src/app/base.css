@@ -1368,6 +1368,12 @@ a:hover {
   color: #047857;
 }
 
+.agent-runtime-badge.gemini {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
 .agent-runtime-badge.local {
   border-color: #fed7aa;
   background: #fff7ed;

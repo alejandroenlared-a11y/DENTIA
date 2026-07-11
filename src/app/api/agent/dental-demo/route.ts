@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getSessionUser } from "@/lib/auth";
-import { runOpenAiDentalAgentTurn, dentalAgentRequestSchema } from "@/lib/agent/openai-dental-agent";
+import { runDentalAgentTurn, dentalAgentRequestSchema } from "@/lib/agent/openai-dental-agent";
 import { prisma } from "@/lib/prisma";
 import { firstErrorMessage } from "@/lib/validation";
 
@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
       : ""
   ].filter(Boolean).join("\n");
 
-  const result = await runOpenAiDentalAgentTurn({
+  const result = await runDentalAgentTurn({
     latestPatientMessage: parsed.data.message,
     history: parsed.data.messages,
     state: parsed.data.state,

@@ -12,7 +12,7 @@ import {
 
 type ServerAction = (formData: FormData) => void | Promise<void>;
 type ChatRole = "patient" | "assistant";
-type AgentRuntime = "openai" | "local" | "idle";
+type AgentRuntime = "openai" | "gemini" | "local" | "idle";
 
 type ChatMessage = {
   id: string;
@@ -196,7 +196,13 @@ export function InteractiveAgentDemo({ saveAction }: { saveAction: ServerAction 
             <div className="agent-runtime-row">
               <h3>Lectura del agente</h3>
               <span className={`agent-runtime-badge ${agentRuntime}`}>
-                {agentRuntime === "openai" ? "IA API" : agentRuntime === "local" ? "Fallback local" : "Preparada"}
+                {agentRuntime === "openai"
+                  ? "OpenAI API"
+                  : agentRuntime === "gemini"
+                    ? "Gemini API"
+                    : agentRuntime === "local"
+                      ? "Fallback local"
+                      : "Preparada"}
               </span>
             </div>
             <p>{summary}</p>
