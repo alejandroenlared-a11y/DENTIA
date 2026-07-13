@@ -17,7 +17,7 @@ import {
   type DentalAgentApiTurn,
   type DentalChatMessage
 } from "@/lib/agent/openai-dental-agent";
-import { initialDentalAgentState, type DentalAgentState } from "@/lib/agent/dental-senior-agent";
+import { initialDentalAgentState, normalize, type DentalAgentState, type DentalIntentId } from "@/lib/agent/dental-senior-agent";
 import { prisma } from "@/lib/prisma";
 import {
   cancelAppointment,
@@ -183,7 +183,7 @@ export async function processInboundMessage(
   let reply = dentalTurn.reply;
   const intent = dentalTurn.state.intentCode || dentalTurn.state.intent || "INTENCION_PENDIENTE";
   const escalated = dentalTurn.state.escalated;
-  const { created: appointmentCreated, startsAt: bookedStartsAt } = await persistDentalOutcome({
+  const { created: appointmentCreated, startsAt: bookedStartsAt, providerName: bookedProviderName } = await persistDentalOutcome({
     tenantId: tenant.id,
     patientId: patient.id,
     conversationId: conversation.id,
@@ -192,10 +192,12 @@ export async function processInboundMessage(
   });
 
   // La pre-reserva solo menciona la franja preferida ("franja manana"), nunca
-  // el dia real: sin esto el paciente se queda sin saber para cuando es la
-  // cita (visto en QA: preguntaba "para cuando es?" tras la confirmacion).
+  // el dia real ni con quien: sin esto el paciente se queda sin saber para
+  // cuando es la cita (visto en QA: preguntaba "para cuando es?" tras la
+  // confirmacion) ni que el enrutado por especialidad es real, no al azar.
   if (!escalated && dentalTurn.state.ready && !previousState.ready && bookedStartsAt) {
-    reply = `${reply} Te espero ${formatFriendlyDateTime(bookedStartsAt)}.`;
+    const withWho = bookedProviderName ? ` con ${bookedProviderName}` : "";
+    reply = `${reply} Te espero ${formatFriendlyDateTime(bookedStartsAt)}${withWho}.`;
   }
 
   let urgentBooking: UrgentBooking | null = null;
@@ -313,6 +315,7 @@ function buildClinicContext(tenant: TenantWithSettings, treatments: TreatmentFor
     tenant.settings?.tone ? `Tono configurado: ${tenant.settings.tone}` : "",
     tenant.settings?.escalationRules ? `Reglas de escalado tenant: ${tenant.settings.escalationRules}` : "",
     tenant.settings?.rgpdNotes ? `Notas RGPD tenant: ${tenant.settings.rgpdNotes}` : "",
+    tenant.settings?.knowledgeNotes ? `Base de conocimiento de la clinica:\n${tenant.settings.knowledgeNotes}` : "",
     treatments.length > 0
       ? `Catalogo real del tenant:\n${treatments
           .map(treatment =>
@@ -336,7 +339,7 @@ function extractPreviousDentalState(messages: Array<{ metadata: unknown }>): Den
   return initialDentalAgentState;
 }
 
-type PersistOutcome = { created: boolean; startsAt: Date | null };
+type PersistOutcome = { created: boolean; startsAt: Date | null; providerName: string | null };
 
 async function persistDentalOutcome(input: {
   tenantId: string;
@@ -379,7 +382,7 @@ async function persistDentalOutcome(input: {
   }
 
   if (!state.ready || state.escalated) {
-    return { created: false, startsAt: null };
+    return { created: false, startsAt: null, providerName: null };
   }
 
   const existingAppointment = await prisma.appointment.findFirst({
@@ -390,10 +393,11 @@ async function persistDentalOutcome(input: {
       startsAt: { gte: new Date() },
       status: { in: [AppointmentStatus.REQUESTED, AppointmentStatus.PROPOSED, AppointmentStatus.CONFIRMED] }
     },
-    orderBy: { createdAt: "desc" }
+    orderBy: { createdAt: "desc" },
+    include: { provider: true }
   });
   if (existingAppointment) {
-    return { created: false, startsAt: existingAppointment.startsAt };
+    return { created: false, startsAt: existingAppointment.startsAt, providerName: existingAppointment.provider?.name ?? null };
   }
 
   const treatment = await prisma.treatment.findFirst({
@@ -404,7 +408,7 @@ async function persistDentalOutcome(input: {
     },
     orderBy: { name: "asc" }
   });
-  const provider = await prisma.provider.findFirst({ where: { tenantId, active: true }, orderBy: { name: "asc" } });
+  const provider = await findProviderForIntent(tenantId, state.intent);
   const operatory = await prisma.operatory.findFirst({ where: { tenantId, active: true }, orderBy: { name: "asc" } });
   const durationMinutes = treatment?.durationMinutes ?? 30;
   const preferredFrom = inferPreferredStart(state.availability);
@@ -444,7 +448,7 @@ async function persistDentalOutcome(input: {
     }
   });
 
-  return { created: true, startsAt };
+  return { created: true, startsAt, providerName: provider?.name ?? null };
 }
 
 async function ensureEscalationTask(
@@ -599,7 +603,7 @@ async function bookUrgentSlot(input: {
     return null;
   }
 
-  const provider = await prisma.provider.findFirst({ where: { tenantId, active: true }, orderBy: { name: "asc" } });
+  const provider = await findProviderForIntent(tenantId, dentalTurn.state.intent);
   if (!provider) {
     return null;
   }
@@ -652,6 +656,36 @@ async function bookUrgentSlot(input: {
   });
 
   return { startsAt, providerName: provider.name, operatoryName: operatory?.name };
+}
+
+// Enrutado por especialidad: cada motivo de consulta se asigna al doctor
+// cuya especialidad coincide (p.ej. ortodoncia -> doctor de ortodoncia), como
+// haria una recepcionista que conoce al equipo. Si nadie coincide, cualquier
+// profesional activo atiende (mejor eso que dejar sin cita).
+const SPECIALTY_KEYWORDS: Partial<Record<DentalIntentId, string[]>> = {
+  implant_price: ["implant", "periodon", "cirug"],
+  orthodontics: ["ortodon"],
+  endodontics: ["endodon"],
+  periodontics: ["periodon"],
+  prosthetics: ["estetic", "protesis", "conservador"],
+  whitening: ["estetic"],
+  caries_restoration: ["conservador"],
+  wisdom_tooth: ["cirug", "urgenc"],
+  trauma: ["cirug", "urgenc"],
+  urgent_pain: ["urgenc", "conservador"],
+  tmj_bruxism: ["conservador", "urgenc"]
+};
+
+async function findProviderForIntent(tenantId: string, intent: DentalIntentId | undefined) {
+  const keywords = intent ? (SPECIALTY_KEYWORDS[intent] ?? []) : [];
+  if (keywords.length > 0) {
+    const providers = await prisma.provider.findMany({ where: { tenantId, active: true }, orderBy: { name: "asc" } });
+    const match = providers.find(candidate => keywords.some(keyword => normalize(candidate.specialty ?? "").includes(keyword)));
+    if (match) {
+      return match;
+    }
+  }
+  return prisma.provider.findFirst({ where: { tenantId, active: true }, orderBy: { name: "asc" } });
 }
 
 // Fecha en lenguaje natural para el paciente ("hoy a las 18:00" / "martes 14

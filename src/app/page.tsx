@@ -1087,6 +1087,12 @@ function SettingsView({ data }: { data: Awaited<ReturnType<typeof getDashboardDa
           <Field label="Tono" name="tone" defaultValue={data.tenant.settings?.tone ?? ""} />
           <TextArea label="Reglas de escalado" name="escalationRules" defaultValue={data.tenant.settings?.escalationRules ?? ""} />
           <TextArea label="RGPD / AI Act" name="rgpdNotes" defaultValue={data.tenant.settings?.rgpdNotes ?? ""} />
+          <TextArea
+            label="Base de conocimiento de la clinica"
+            name="knowledgeNotes"
+            defaultValue={data.tenant.settings?.knowledgeNotes ?? ""}
+            hint="Equipo, especialidades, enrutado de citas, programas (PADI, etc.), diferenciadores. Se envia al agente IA como contexto adicional."
+          />
           <button className="button primary" type="submit">Guardar configuracion</button>
         </form>
       </section>
@@ -1344,11 +1350,12 @@ function EmptyState({ icon, title, hint }: { icon: IconName; title: string; hint
   );
 }
 
-function TextArea({ label, name, defaultValue = "" }: { label: string; name: string; defaultValue?: string }) {
+function TextArea({ label, name, defaultValue = "", hint }: { label: string; name: string; defaultValue?: string; hint?: string }) {
   return (
     <label className="field" style={{ gridColumn: "1 / -1" }}>
       <span>{label}</span>
       <textarea name={name} defaultValue={defaultValue} />
+      {hint ? <small style={{ color: "var(--muted)", fontWeight: 400 }}>{hint}</small> : null}
     </label>
   );
 }

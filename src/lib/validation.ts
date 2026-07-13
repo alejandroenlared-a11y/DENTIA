@@ -109,7 +109,8 @@ export const settingsInputSchema = z.object({
     .max(3650, "maximo 3650 dias"),
   tone: requiredString,
   escalationRules: requiredString,
-  rgpdNotes: requiredString
+  rgpdNotes: requiredString,
+  knowledgeNotes: z.string().trim().optional()
 });
 
 export const loginInputSchema = z.object({
