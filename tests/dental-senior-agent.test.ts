@@ -107,6 +107,25 @@ describe("runDentalSeniorTurn", () => {
     expect(second.reply).not.toContain("podria ser");
   });
 
+  it("uses the commercial copy when quote and treatment arrive in one message", () => {
+    const turn = runDentalSeniorTurn(initialDentalAgentState, "Quiero presupuesto para un implante");
+    expect(turn.state.intent).toBe("implant_price");
+    expect(turn.reply).toContain("1.200 EUR");
+    expect(turn.reply).not.toContain("podria ser");
+    expect(turn.reply.toLowerCase()).not.toContain("dolor");
+  });
+
+  it("includes the price when the treatment and all booking data arrive in one turn", () => {
+    const first = runDentalSeniorTurn(initialDentalAgentState, "Quiero un presupuesto");
+    const second = runDentalSeniorTurn(
+      first.state,
+      "Para un implante. Acepto que guardeis mis datos. Soy Rosa Gil, telefono 622333444. Murcia por la tarde."
+    );
+    expect(second.state.ready).toBe(true);
+    expect(second.reply).toContain("pre-reserva lista");
+    expect(second.reply).toContain("1.200 EUR");
+  });
+
   it("accepts a bare name reply when the agent just asked for the name", () => {
     const emergency = runDentalSeniorTurn(
       initialDentalAgentState,

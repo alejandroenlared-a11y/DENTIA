@@ -480,9 +480,13 @@ function buildDentalReply(state: DentalAgentState, previous: DentalAgentState, l
         latestPatientText
       );
     }
+    // Si el precio se pidio y este es el primer turno con tratamiento
+    // conocido (todo llego de golpe), incluirlo en la confirmacion.
+    const pricePending = isNewIntent && (previous.intentCode === BUDGET_PENDING_INTENT || mentionsPrice(latestPatientText));
+    const priceLine = pricePending ? ` ${profile.priceNote}` : "";
     return state.escalated
       ? `${first}, queda registrado con prioridad. Te llamamos al ${state.phone} enseguida.`
-      : `${first}, pre-reserva lista: ${state.treatmentNeed.toLowerCase()} en ${state.location}, franja ${state.availability}. El doctor te confirma plan y presupuesto en la visita.`;
+      : `${first}, pre-reserva lista: ${state.treatmentNeed.toLowerCase()} en ${state.location}, franja ${state.availability}.${priceLine} El doctor te confirma plan y presupuesto cerrado en la visita.`;
   }
 
   // Si la conversacion nacio pidiendo presupuesto, dar el rango de precio en
@@ -493,6 +497,10 @@ function buildDentalReply(state: DentalAgentState, previous: DentalAgentState, l
   const reply = [intro, question].filter(Boolean).join(" ").trim();
   return reply || "Cuentame un poco mas para orientarte bien.";
 }
+
+// Senales que expresan deseo de tratamiento, no un sintoma clinico: nombrar
+// "corona" o "implante" al pedir presupuesto no es reportar una molestia.
+const NON_SYMPTOM_SIGNALS = new Set(["pieza ausente", "estetica", "ortodoncia", "pieza rota o funda"]);
 
 function buildIntro(state: DentalAgentState, profile: IntentProfile, latestPatientText: string, cameFromBudget = false) {
   const expressesPain = /(duele|dolor|molest|me mata|horrible|fatal)/.test(normalize(latestPatientText));
@@ -505,8 +513,11 @@ function buildIntro(state: DentalAgentState, profile: IntentProfile, latestPatie
     : "";
   const price = cameFromBudget || wantsPrice(state.intent, latestPatientText) ? ` ${profile.priceNote}` : "";
 
-  // Consulta comercial de presupuesto: sin lectura de sintomas, al grano.
-  if (cameFromBudget && !expressesPain && !state.escalated) {
+  // Consulta comercial de presupuesto (venga en dos turnos o en un solo
+  // mensaje "quiero presupuesto para un implante"): sin lectura de sintomas.
+  const asksPriceNow = mentionsPrice(latestPatientText);
+  const hasSymptoms = state.detectedSignals.some(signal => !NON_SYMPTOM_SIGNALS.has(signal));
+  if ((cameFromBudget || asksPriceNow) && !expressesPain && !hasSymptoms && !state.escalated) {
     return `Buena eleccion. ${profile.priceNote} El doctor te confirma el presupuesto cerrado en la valoracion, que es sin coste.`;
   }
 
@@ -581,11 +592,15 @@ function nextStep(state: DentalAgentState, latestPatientText: string) {
   return "";
 }
 
+function mentionsPrice(latestPatientText: string) {
+  return /(precio|cuanto|coste|costar|cuesta|vale|financi|presupuesto)/.test(normalize(latestPatientText));
+}
+
 function wantsPrice(intent: DentalIntentId | undefined, latestPatientText: string) {
   if (intent && PRICE_FORWARD_INTENTS.includes(intent)) {
     return true;
   }
-  return /(precio|cuanto|coste|costar|cuesta|vale|financi|presupuesto)/.test(normalize(latestPatientText));
+  return mentionsPrice(latestPatientText);
 }
 
 function firstName(fullName: string) {
