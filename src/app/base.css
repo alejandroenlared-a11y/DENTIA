@@ -520,15 +520,19 @@ a:hover {
     "intro agenda"
     "kpis kpis"
     "main main";
-  column-gap: 18px;
-  row-gap: 14px;
-  padding-top: 42px;
-  padding-left: 95px;
+  column-gap: 16px;
+  row-gap: 16px;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding-top: 24px;
 }
 
 .home-intro {
   grid-area: intro;
-  min-height: 200px;
+  /* Centrado vertical respecto a la card de agenda: sin huecos muertos. */
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .home-intro h1 {
@@ -552,7 +556,7 @@ a:hover {
 }
 
 .home-agenda .card {
-  min-height: 228px;
+  height: 100%;
 }
 
 .home-agenda-list {
@@ -587,104 +591,60 @@ a:hover {
   gap: 10px;
 }
 
+/* Rejilla fija del dashboard: alturas iguales por fila, sin huecos y sin
+   redimensionado manual (descuadraba las cards y cortaba textos). */
 .widget-board {
   grid-area: main;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  /* El pipeline (la card mas alta) ocupa la columna derecha completa: las dos
+     filas de la izquierda quedan compactas y sin vacios interiores. */
+  grid-template-areas:
+    "upcoming queue pipeline"
+    "recent finance pipeline";
   gap: 14px;
 }
 
-.widget-card {
-  position: relative;
-  flex: 1 1 420px;
-  min-width: 300px;
-  min-height: 160px;
-  max-width: 100%;
-  overflow: auto;
-  resize: both;
-  border-radius: 10px;
-  cursor: default;
+.widget-board > .card {
+  min-width: 0;
 }
 
-.widget-card:has(.upcoming-panel),
-.widget-card:has(.pipeline-panel),
-.widget-card:has(.finance-panel) {
-  flex-basis: 480px;
-}
-
-.widget-card:has(.queue-panel),
-.widget-card:has(.recent-panel) {
-  flex-basis: 380px;
-}
-
-.widget-card > .widget-content {
-  height: 100%;
-}
-
-.widget-card > .widget-content > .card {
-  height: 100%;
-}
-
-.widget-handle {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 22px;
-  height: 22px;
-  border-radius: 6px;
-  display: grid;
-  place-items: center;
-  color: var(--faint);
-  background: var(--surface);
-  border: 1px solid var(--line-soft);
-  cursor: grab;
-  opacity: 0;
-  transition: opacity .15s var(--ease), color .15s var(--ease), background-color .15s var(--ease);
-  z-index: 2;
-}
-
-.widget-handle .icon {
-  width: 14px;
-  height: 14px;
-  fill: currentColor;
-  stroke: none;
-}
-
-.widget-card:hover .widget-handle {
-  opacity: 1;
-}
-
-.widget-handle:hover {
-  color: var(--primary);
-  background: var(--primary-soft);
-}
-
-.widget-card:active {
-  cursor: grabbing;
-}
+.upcoming-panel { grid-area: upcoming; }
+.queue-panel { grid-area: queue; }
+.pipeline-panel { grid-area: pipeline; }
+.recent-panel { grid-area: recent; }
+.finance-panel { grid-area: finance; }
 
 .compact-row {
   min-height: 48px;
   border: 1px solid var(--line);
   border-radius: 6px;
-  padding: 9px 10px;
+  padding: 8px 10px;
   margin-top: 6px;
+  /* Dos lineas fijas (titulo + meta) con elipsis: misma altura en cualquier
+     ancho de card, sin nombres sobre-recortados ni fechas partidas. */
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
   background: var(--surface-hover);
+  min-width: 0;
 }
 
 .compact-row strong {
   color: var(--ink);
   font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .compact-row span {
   color: var(--muted);
   font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .queue-panel h4,
@@ -711,7 +671,8 @@ a:hover {
 
 .pipeline-mini {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  /* 2x2: con 4 columnas el rotulo PRESUPUESTO no cabia y se cortaba. */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
   margin-bottom: 10px;
 }
@@ -722,6 +683,7 @@ a:hover {
   border-radius: 6px;
   padding: 10px;
   background: var(--surface-hover);
+  min-width: 0;
 }
 
 .pipeline-mini span,
@@ -741,6 +703,10 @@ a:hover {
   color: var(--ink);
   font-size: 20px;
   line-height: 1;
+  /* Las cifras ("0,00 EUR") nunca se parten en dos lineas. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .pipeline-mini i {
@@ -786,6 +752,12 @@ a:hover {
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 12px;
+}
+
+/* "Ver todo" no debe partirse en dos lineas en cards estrechas. */
+.card-head > .button {
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .card-title {
@@ -2104,12 +2076,12 @@ a:hover {
   .home-kpis {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
-  .widget-card {
-    flex-basis: 100% !important;
-    resize: vertical;
-  }
-  .pipeline-mini {
+  .widget-board {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-areas:
+      "upcoming queue"
+      "pipeline finance"
+      "recent recent";
   }
   .agent-demo-grid {
     grid-template-columns: 1fr;
@@ -2258,12 +2230,16 @@ a:hover {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px;
   }
-  .widget-card {
-    flex-basis: 100% !important;
-    resize: none;
+  .widget-board {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "upcoming"
+      "queue"
+      "pipeline"
+      "recent"
+      "finance";
   }
   .finance-grid,
-  .pipeline-mini,
   .scenario-grid {
     grid-template-columns: 1fr;
   }
