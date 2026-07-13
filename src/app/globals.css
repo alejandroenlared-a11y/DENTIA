@@ -258,6 +258,9 @@ a {
     linear-gradient(180deg, rgba(17, 94, 89, 0.08), rgba(241, 245, 249, 0) 38%),
     #eef2f5;
   color: #111827;
+  /* La demo es visualmente clara siempre: sin esto, con el movil en modo
+     oscuro el navegador pinta el texto de los inputs en blanco sobre blanco. */
+  color-scheme: light;
 }
 
 .wa-demo-stage {
@@ -715,7 +718,14 @@ a {
   /* 16px minimo: con menos, iOS Safari hace zoom automatico al enfocar el
      campo y el boton de enviar queda fuera de pantalla. */
   font-size: 16px;
+  /* Color explicito: que el modo oscuro del sistema nunca lo pinte en blanco. */
+  color: #0f172a;
+  caret-color: #0f172a;
   outline: none;
+}
+
+.wa-input-bar input::placeholder {
+  color: #94a3b8;
 }
 
 .wa-input-bar .wa-icon-button:hover {
