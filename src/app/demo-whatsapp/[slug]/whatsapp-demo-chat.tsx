@@ -144,7 +144,8 @@ export function WhatsAppDemoChat({
         </a>
       </section>
 
-      <section className="wa-phone" aria-label="Demo de chat tipo WhatsApp">
+      <div className="wa-phone-card">
+        <section className="wa-phone" aria-label="Demo de chat tipo WhatsApp">
         <div className="wa-phone-speaker" aria-hidden="true" />
         <header className="wa-chat-header">
           <button className="wa-icon-button" type="button" aria-label="Volver">
@@ -218,7 +219,8 @@ export function WhatsAppDemoChat({
         </form>
 
         <footer className="wa-phone-home" aria-label={`Telefono demo ${clinicPhone}`} />
-      </section>
+        </section>
+      </div>
     </div>
   );
 }
