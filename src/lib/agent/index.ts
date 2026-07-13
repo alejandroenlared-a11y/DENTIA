@@ -183,13 +183,20 @@ export async function processInboundMessage(
   let reply = dentalTurn.reply;
   const intent = dentalTurn.state.intentCode || dentalTurn.state.intent || "INTENCION_PENDIENTE";
   const escalated = dentalTurn.state.escalated;
-  const appointmentCreated = await persistDentalOutcome({
+  const { created: appointmentCreated, startsAt: bookedStartsAt } = await persistDentalOutcome({
     tenantId: tenant.id,
     patientId: patient.id,
     conversationId: conversation.id,
     channel: payload.channel,
     dentalTurn
   });
+
+  // La pre-reserva solo menciona la franja preferida ("franja manana"), nunca
+  // el dia real: sin esto el paciente se queda sin saber para cuando es la
+  // cita (visto en QA: preguntaba "para cuando es?" tras la confirmacion).
+  if (!escalated && dentalTurn.state.ready && !previousState.ready && bookedStartsAt) {
+    reply = `${reply} Te espero ${formatFriendlyDateTime(bookedStartsAt)}.`;
+  }
 
   let urgentBooking: UrgentBooking | null = null;
   // Regla conversacional: en una urgencia primero se hace la pregunta de
@@ -329,13 +336,15 @@ function extractPreviousDentalState(messages: Array<{ metadata: unknown }>): Den
   return initialDentalAgentState;
 }
 
+type PersistOutcome = { created: boolean; startsAt: Date | null };
+
 async function persistDentalOutcome(input: {
   tenantId: string;
   patientId: string;
   conversationId: string;
   channel: ConversationChannel;
   dentalTurn: DentalAgentApiTurn;
-}) {
+}): Promise<PersistOutcome> {
   const { tenantId, patientId, conversationId, channel, dentalTurn } = input;
   const state = dentalTurn.state;
 
@@ -370,7 +379,7 @@ async function persistDentalOutcome(input: {
   }
 
   if (!state.ready || state.escalated) {
-    return false;
+    return { created: false, startsAt: null };
   }
 
   const existingAppointment = await prisma.appointment.findFirst({
@@ -384,7 +393,7 @@ async function persistDentalOutcome(input: {
     orderBy: { createdAt: "desc" }
   });
   if (existingAppointment) {
-    return false;
+    return { created: false, startsAt: existingAppointment.startsAt };
   }
 
   const treatment = await prisma.treatment.findFirst({
@@ -435,7 +444,7 @@ async function persistDentalOutcome(input: {
     }
   });
 
-  return true;
+  return { created: true, startsAt };
 }
 
 async function ensureEscalationTask(
@@ -494,11 +503,17 @@ async function handleSchedulingRequest(input: {
       status: { in: [AppointmentStatus.REQUESTED, AppointmentStatus.PROPOSED, AppointmentStatus.CONFIRMED, AppointmentStatus.URGENT] }
     },
     orderBy: { startsAt: "asc" },
-    include: { provider: true }
+    include: { provider: true, operatory: true }
   });
 
   if (!appointment) {
     return { reply: "No encuentro ninguna cita proxima a tu nombre en la agenda. Si quieres, te ayudo a reservar una nueva." };
+  }
+
+  if (kind === "query") {
+    const withWho = appointment.provider ? ` con ${appointment.provider.name}` : "";
+    const where = appointment.operatory ? ` en ${appointment.operatory.name}` : "";
+    return { reply: `Tu cita es ${formatFriendlyDateTime(appointment.startsAt)}${withWho}${where}. Si necesitas cambiarla, dimelo.` };
   }
 
   if (kind === "cancel") {
@@ -639,17 +654,24 @@ async function bookUrgentSlot(input: {
   return { startsAt, providerName: provider.name, operatoryName: operatory?.name };
 }
 
-export function formatUrgentSlotSentence(booking: UrgentBooking): string {
+// Fecha en lenguaje natural para el paciente ("hoy a las 18:00" / "martes 14
+// de julio a las 10:00"): nunca dejamos una cita solo con la franja horaria
+// preferida ("manana"/"tarde") sin decir el dia real reservado.
+export function formatFriendlyDateTime(date: Date): string {
   const now = new Date();
-  const sameDay = booking.startsAt.toDateString() === now.toDateString();
-  const time = new Intl.DateTimeFormat("es-ES", { hour: "2-digit", minute: "2-digit" }).format(booking.startsAt);
+  const sameDay = date.toDateString() === now.toDateString();
+  const time = new Intl.DateTimeFormat("es-ES", { hour: "2-digit", minute: "2-digit" }).format(date);
   const dayLabel = sameDay
     ? "hoy"
-    : new Intl.DateTimeFormat("es-ES", { weekday: "long", day: "numeric", month: "long" }).format(booking.startsAt);
+    : new Intl.DateTimeFormat("es-ES", { weekday: "long", day: "numeric", month: "long" }).format(date);
+  return `${dayLabel} a las ${time}`;
+}
+
+export function formatUrgentSlotSentence(booking: UrgentBooking): string {
   const withWho = ` con ${booking.providerName}`;
   const where = booking.operatoryName ? ` en ${booking.operatoryName}` : "";
 
-  return `Te he reservado un hueco urgente ${dayLabel} a las ${time}${withWho}${where}. Queda confirmado; si no te encaja, dimelo y lo movemos.`;
+  return `Te he reservado un hueco urgente ${formatFriendlyDateTime(booking.startsAt)}${withWho}${where}. Queda confirmado; si no te encaja, dimelo y lo movemos.`;
 }
 
 function formatSlotForStaff(date: Date): string {
