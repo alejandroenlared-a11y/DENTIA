@@ -94,6 +94,20 @@ async function main() {
     }
   });
 
+  // Acceso rapido para presentaciones. OJO: contrasena debil a proposito;
+  // retirar este usuario cuando el tenant deje de ser de demostracion.
+  await prisma.user.upsert({
+    where: { tenantId_email: { tenantId: tenant.id, email: "demo@dentia.ai" } },
+    update: { name: "Usuario Demo", passwordHash: hashPassword("demo"), role: UserRole.OWNER },
+    create: {
+      tenantId: tenant.id,
+      name: "Usuario Demo",
+      email: "demo@dentia.ai",
+      passwordHash: hashPassword("demo"),
+      role: UserRole.OWNER
+    }
+  });
+
   const secondTenant = await prisma.tenant.upsert({
     where: { slug: "clinica-elche-demo" },
     update: {
