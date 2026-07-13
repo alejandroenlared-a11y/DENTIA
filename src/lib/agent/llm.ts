@@ -1,7 +1,9 @@
 import type { ReplyContext } from "@/lib/agent/intents";
+import { fetchWithTimeout, resolveTimeoutMs } from "@/lib/http";
 
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 const MODEL = "claude-haiku-4-5-20251001";
+const LLM_TIMEOUT_MS = resolveTimeoutMs("LLM_TIMEOUT_MS", 12_000);
 
 // Clave de la API de Anthropic; nombre propio para poder rotarla por tenant en el futuro.
 const LLM_KEY_ENV = "DENTIA_LLM_API_KEY";
@@ -34,7 +36,7 @@ export async function generateLlmReply(
   ].join("\n");
 
   try {
-    const response = await fetch(ANTHROPIC_URL, {
+    const response = await fetchWithTimeout(ANTHROPIC_URL, {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -47,7 +49,7 @@ export async function generateLlmReply(
         system,
         messages: history
       })
-    });
+    }, LLM_TIMEOUT_MS);
 
     if (!response.ok) {
       console.error("generateLlmReply: Anthropic API error", response.status);

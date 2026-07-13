@@ -7,6 +7,7 @@ import {
   type DentalIntentId,
   type TriageLevel
 } from "@/lib/agent/dental-senior-agent";
+import { fetchWithTimeout, isTimeoutError, resolveTimeoutMs } from "@/lib/http";
 
 const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
 const GEMINI_INTERACTIONS_URL = "https://generativelanguage.googleapis.com/v1beta/interactions";
@@ -14,6 +15,13 @@ const DEFAULT_OPENAI_MODEL = "gpt-5.6-terra";
 const DEFAULT_GEMINI_MODEL = "gemini-2.5-pro";
 const DEFAULT_GEMINI_FALLBACK_MODEL = "gemini-3.5-flash";
 const PENDING_INTENT = "INTENCION_PENDIENTE";
+
+// Presupuesto de tiempo por llamada al LLM. Si el proveedor no responde, el
+// agente local deterministico contesta igualmente: el paciente nunca espera
+// mas de este limite. El fallback de Gemini usa un presupuesto menor para que
+// el peor caso (primario + fallback) siga cabiendo en la ventana del cliente.
+const LLM_TIMEOUT_MS = resolveTimeoutMs("LLM_TIMEOUT_MS", 12_000);
+const LLM_FALLBACK_TIMEOUT_MS = resolveTimeoutMs("LLM_FALLBACK_TIMEOUT_MS", 8_000);
 
 const dentalIntentValues = [
   "first_visit",
@@ -172,7 +180,7 @@ export async function runOpenAiDentalAgentTurn(input: {
   }
 
   try {
-    const response = await fetch(OPENAI_RESPONSES_URL, {
+    const response = await fetchWithTimeout(OPENAI_RESPONSES_URL, {
       method: "POST",
       headers: {
         authorization: `Bearer ${apiKey}`,
@@ -192,7 +200,7 @@ export async function runOpenAiDentalAgentTurn(input: {
           }
         }
       })
-    });
+    }, LLM_TIMEOUT_MS);
 
     if (!response.ok) {
       const errorText = await response.text().catch(() => "");
@@ -232,7 +240,7 @@ async function runGeminiDentalAgentTurn(input: {
 
   try {
     const prompt = buildGeminiInput(input.history, input.latestPatientMessage, localTurn.state, input.clinicContext);
-    const primaryResult = await requestGeminiTurn({ apiKey, model, prompt });
+    const primaryResult = await requestGeminiTurn({ apiKey, model, prompt, timeoutMs: LLM_TIMEOUT_MS });
     if (primaryResult.ok) {
       const state = mergeAiState(localTurn.state, primaryResult.output);
       return { reply: primaryResult.output.reply, state, runtime: "gemini", model };
@@ -255,7 +263,7 @@ async function runGeminiDentalAgentTurn(input: {
       fallbackModel &&
       fallbackModel !== model
     ) {
-      const secondaryResult = await requestGeminiTurn({ apiKey, model: fallbackModel, prompt });
+      const secondaryResult = await requestGeminiTurn({ apiKey, model: fallbackModel, prompt, timeoutMs: LLM_FALLBACK_TIMEOUT_MS });
       if (secondaryResult.ok) {
         const state = mergeAiState(localTurn.state, secondaryResult.output);
         return {
@@ -298,31 +306,42 @@ async function requestGeminiTurn(input: {
   apiKey: string;
   model: string;
   prompt: string;
+  timeoutMs: number;
 }): Promise<
   | { ok: true; output: DentalAgentAiOutput }
   | { ok: false; status?: number; errorText: string; fallbackReason?: string }
 > {
-  const response = await fetch(GEMINI_INTERACTIONS_URL, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-goog-api-key": input.apiKey
-    },
-    body: JSON.stringify({
-      model: input.model,
-      input: input.prompt,
-      system_instruction: "Responde en espanol natural y sigue el esquema JSON si response_format lo pide.",
-      generation_config: {
-        temperature: 0.5,
-        max_output_tokens: 1400
+  let response: Response;
+  try {
+    response = await fetchWithTimeout(GEMINI_INTERACTIONS_URL, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-goog-api-key": input.apiKey
       },
-      response_format: {
-        type: "text",
-        mime_type: "application/json",
-        schema: dentalAgentJsonSchema
-      }
-    })
-  });
+      body: JSON.stringify({
+        model: input.model,
+        input: input.prompt,
+        system_instruction: "Responde en espanol natural y sigue el esquema JSON si response_format lo pide.",
+        generation_config: {
+          temperature: 0.5,
+          max_output_tokens: 1400
+        },
+        response_format: {
+          type: "text",
+          mime_type: "application/json",
+          schema: dentalAgentJsonSchema
+        }
+      })
+    }, input.timeoutMs);
+  } catch (error) {
+    if (isTimeoutError(error)) {
+      // Sin status: el flujo superior no intenta el modelo de fallback y
+      // responde ya con el agente local, evitando duplicar la espera.
+      return { ok: false, errorText: "", fallbackReason: error.message };
+    }
+    throw error;
+  }
 
   if (!response.ok) {
     return {

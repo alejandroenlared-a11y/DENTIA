@@ -61,4 +61,16 @@ describe("runDentalSeniorTurn", () => {
     expect(turn.state.budget).toBe("desde 1.200 EUR");
     expect(turn.reply).toContain("pre-reserva lista");
   });
+
+  it("does not repeat the price note when asking for consent", () => {
+    const turn = runDentalSeniorTurn(
+      initialDentalAgentState,
+      "Me falta una muela y quiero saber el precio de un implante y si se puede financiar."
+    );
+
+    const priceNote = "El implante unitario parte desde 1.200 EUR";
+    const occurrences = turn.reply.split(priceNote).length - 1;
+    expect(occurrences).toBe(1);
+    expect(turn.reply).toContain("aceptas que guardemos tus datos");
+  });
 });

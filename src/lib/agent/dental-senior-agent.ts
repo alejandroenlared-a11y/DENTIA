@@ -430,7 +430,8 @@ function buildDentalReply(state: DentalAgentState, latestPatientText: string) {
   }
 
   if (!state.consent) {
-    return `${clinicalIntro} ${profile.priceNote} Si quieres, puedo preparar una pre-reserva. Para eso necesito que confirmes si aceptas que guardemos tus datos para gestionar la solicitud.`;
+    // clinicalIntro ya termina con profile.priceNote: no repetirla aqui.
+    return `${clinicalIntro} Si quieres, puedo preparar una pre-reserva. Para eso necesito que confirmes si aceptas que guardemos tus datos para gestionar la solicitud.`;
   }
   if (!state.name) {
     return `${clinicalIntro} Con tu consentimiento, dime tu nombre y apellidos.`;

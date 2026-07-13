@@ -6,6 +6,8 @@ import { checkRateLimit } from "@/lib/rate-limit";
 import { parseWhatsAppCloudMessages, sendWhatsAppText } from "@/lib/whatsapp";
 
 export const runtime = "nodejs";
+// Cubre el peor caso: turno LLM + envio a WhatsApp Cloud, ambos con timeout propio.
+export const maxDuration = 60;
 
 const DEFAULT_DEMO_TENANT_SLUG = "clinica-murcia-elche";
 

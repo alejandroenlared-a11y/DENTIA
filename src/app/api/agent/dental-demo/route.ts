@@ -4,6 +4,9 @@ import { runDentalAgentTurn, dentalAgentRequestSchema } from "@/lib/agent/openai
 import { prisma } from "@/lib/prisma";
 import { firstErrorMessage } from "@/lib/validation";
 
+// Margen suficiente para el turno LLM (12s) + contexto del tenant.
+export const maxDuration = 30;
+
 export async function POST(request: NextRequest) {
   const user = await getSessionUser();
   if (!user) {

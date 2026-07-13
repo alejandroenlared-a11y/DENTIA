@@ -1,5 +1,8 @@
+import { fetchWithTimeout, resolveTimeoutMs } from "@/lib/http";
+
 const DEFAULT_GRAPH_API_VERSION = "v20.0";
 const WHATSAPP_MAX_TEXT_LENGTH = 3900;
+const WHATSAPP_SEND_TIMEOUT_MS = resolveTimeoutMs("WHATSAPP_SEND_TIMEOUT_MS", 12_000);
 
 export type WhatsAppCloudMessage = {
   id: string;
@@ -70,14 +73,14 @@ export async function sendWhatsAppText(input: { to: string; body: string }) {
     throw new Error("WhatsApp Cloud API no esta configurado.");
   }
 
-  const response = await fetch(`https://graph.facebook.com/${graphVersion}/${phoneNumberId}/messages`, {
+  const response = await fetchWithTimeout(`https://graph.facebook.com/${graphVersion}/${phoneNumberId}/messages`, {
     method: "POST",
     headers: {
       authorization: `Bearer ${accessToken}`,
       "content-type": "application/json"
     },
     body: JSON.stringify(buildWhatsAppTextPayload(input))
-  });
+  }, WHATSAPP_SEND_TIMEOUT_MS);
 
   if (!response.ok) {
     const errorText = await response.text().catch(() => "");

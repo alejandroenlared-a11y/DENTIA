@@ -1,6 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { fetchWithTimeout, isTimeoutError } from "@/lib/http";
+
+const CHAT_REQUEST_TIMEOUT_MS = 30_000;
 
 interface WidgetChatProps {
   slug: string;
@@ -60,11 +63,11 @@ export function WidgetChat({ slug, clinicName, assistantName, assistantEnabled }
     setMessage("");
 
     try {
-      const response = await fetch(`/api/webhooks/${slug}/web`, {
+      const response = await fetchWithTimeout(`/api/webhooks/${slug}/web`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ from: phone.trim(), name: name.trim() || undefined, body })
-      });
+      }, CHAT_REQUEST_TIMEOUT_MS);
       const payload = (await response.json()) as WebhookResponse;
 
       if (!payload.success) {
@@ -80,8 +83,12 @@ export function WidgetChat({ slug, clinicName, assistantName, assistantEnabled }
           { from: "system", text: "Mensaje recibido. Una persona del equipo te respondera en breve." }
         ]);
       }
-    } catch {
-      setError("Error de conexion. Intentalo de nuevo.");
+    } catch (error) {
+      setError(
+        isTimeoutError(error)
+          ? "El asistente esta tardando mas de lo normal. Envia el mensaje de nuevo."
+          : "Error de conexion. Intentalo de nuevo."
+      );
     } finally {
       setSending(false);
     }
