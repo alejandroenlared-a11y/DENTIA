@@ -455,6 +455,20 @@ Casos probables donde debo avisar:
 4. Despliegue productivo (Railway/Fly/Vercel + Postgres gestionado) con migraciones (`prisma migrate`) en lugar de `db push`.
 5. PMS dentales (Klinikare, Gesden) usando la API publica v1 como base.
 
+## Reglas conversacionales del agente (pedidas por Alejandro, 13 julio 2026)
+
+Estas reglas aplican al motor local Y al prompt del LLM. No romperlas al evolucionar el agente:
+
+- Mensajes cortos estilo WhatsApp: 2-3 frases y UNA sola pregunta por turno. Nunca parrafos largos.
+- Empatia genuina y variable cuando el paciente expresa dolor; no repetir siempre la misma muletilla.
+- La orientacion clinica se da UNA vez (al detectar el motivo); en turnos siguientes se reconoce lo recibido y se avanza.
+- Precios solo si el paciente los pide o el motivo es de valoracion economica (implante, ortodoncia, estetica, primera visita).
+- URGENCIAS EN DOS TIEMPOS: primero SOLO la pregunta de seguridad (fiebre, hinchazon, pus, dificultad para abrir/tragar) y esperar respuesta; la cita/hueco urgente se propone en el turno SIGUIENTE, nunca en el mismo mensaje que la pregunta. Excepcion: emergencia real (banderas rojas ya presentes) se prioriza de inmediato.
+- El hueco urgente se reserva UNA sola vez por paciente (idempotente); no repetir la frase de reserva en cada mensaje.
+- Negaciones: "no hay dolor fuerte", "sin fiebre", etc. no deben activar senales ni escalado.
+- Cambio de tema: las senales/alarmas de un motivo anterior no arrastran urgencia a una consulta nueva distinta.
+- La demo WhatsApp genera un numero de paciente aleatorio por visita para empezar siempre con conversacion limpia.
+
 ## Nota de criterio
 
 No seguir puliendo solo la maqueta si el objetivo es vender SaaS real.

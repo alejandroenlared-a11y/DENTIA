@@ -192,7 +192,11 @@ export async function processInboundMessage(
   });
 
   let urgentBooking: UrgentBooking | null = null;
-  if (escalated) {
+  // Regla conversacional: en una urgencia primero se hace la pregunta de
+  // seguridad (fiebre, hinchazon, dificultad para tragar...) y se espera la
+  // respuesta del paciente. Solo entonces se reserva y se habla de la cita.
+  const safetyKnown = dentalTurn.state.safetyScreened || dentalTurn.state.redFlags.length > 0;
+  if (escalated && safetyKnown) {
     urgentBooking = await bookUrgentSlot({
       tenantId: tenant.id,
       patientId: patient.id,
@@ -202,7 +206,19 @@ export async function processInboundMessage(
       dentalTurn
     });
     if (urgentBooking) {
-      reply = `${reply}\n\n${formatUrgentSlotSentence(urgentBooking)}`;
+      if (dentalTurn.state.triageLevel === "EMERGENCY") {
+        // En emergencia el aviso de acudir a urgencias debe conservarse.
+        reply = `${reply}\n\n${formatUrgentSlotSentence(urgentBooking)}`;
+      } else {
+        reply = [
+          formatUrgentSlotSentence(urgentBooking),
+          !dentalTurn.state.consent
+            ? "Para dejarla a tu nombre, aceptas que guardemos tus datos? Dime tambien tu nombre y un telefono."
+            : !dentalTurn.state.name || !dentalTurn.state.phone
+              ? "Dime tu nombre y un telefono para dejarla a tu nombre."
+              : ""
+        ].filter(Boolean).join(" ");
+      }
     }
   }
 
