@@ -122,6 +122,21 @@ describe("runDentalSeniorTurn", () => {
     expect(second.state.phone).toBe("655444333");
   });
 
+  it("does not store a clinical answer as the name when the pending question is clinical", () => {
+    const first = runDentalSeniorTurn(initialDentalAgentState, "Creo que tengo una caries en una muela");
+    const second = runDentalSeniorTurn(first.state, "acepto");
+    // La pregunta pendiente sigue siendo clinica (frio/morder), no el nombre.
+    const third = runDentalSeniorTurn(second.state, "desde ayer");
+    expect(third.state.name).toBe("");
+  });
+
+  it("does not store time expressions as a name in an escalated flow", () => {
+    const first = runDentalSeniorTurn(initialDentalAgentState, "Me duele mucho una muela");
+    const second = runDentalSeniorTurn(first.state, "no tengo fiebre ni hinchazon, acepto");
+    const third = runDentalSeniorTurn(second.state, "desde ayer");
+    expect(third.state.name).toBe("");
+  });
+
   it("does not mistake short non-name replies for a name", () => {
     const first = runDentalSeniorTurn(
       initialDentalAgentState,

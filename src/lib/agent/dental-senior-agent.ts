@@ -340,8 +340,7 @@ export function runDentalSeniorTurn(current: DentalAgentState, rawText: string):
   const profile = intent ? intentProfiles[intent] : null;
   // Si la pregunta pendiente era el nombre, aceptar una respuesta que sea
   // solo el nombre ("Alejandro Marti"), sin exigir "soy" o "me llamo".
-  const awaitingName = Boolean(current.intent && current.consent && !current.name);
-  const name = current.name || extractName(text) || (awaitingName ? extractBareName(text) : "");
+  const name = current.name || extractName(text) || (wasAskedForName(current) ? extractBareName(text) : "");
   const phone = current.phone || extractPhone(text);
   const location = current.location || extractLocation(normalized);
   const availability = current.availability || extractAvailability(normalized, text);
@@ -717,8 +716,34 @@ const PHONE_PATTERN = /(?:\+?34[\s.-]?)?[6789](?:[\s.-]?\d){8}/;
 const NON_NAME_WORDS = new Set([
   "si", "no", "vale", "ok", "okay", "hola", "buenas", "gracias", "acepto", "claro",
   "perfecto", "genial", "bien", "mal", "ya", "aqui", "manana", "tarde", "noche",
-  "murcia", "elche", "cita", "urgencia", "dolor", "muela", "porque", "que", "cuando"
+  "murcia", "elche", "cita", "urgencia", "dolor", "muela", "porque", "que", "cuando",
+  "desde", "ayer", "hoy", "anoche", "hace", "semana", "semanas", "dia", "dias",
+  "mes", "meses", "mucho", "poco", "nada", "todo", "fuerte", "por", "la", "el"
 ]);
+
+// Replica el orden de preguntas de buildDentalReply/nextStep para saber si el
+// ultimo mensaje del agente pidio el nombre: solo entonces se puede tratar una
+// respuesta suelta como nombre (evita guardar "desde ayer" como nombre cuando
+// la pregunta pendiente era clinica).
+function wasAskedForName(state: DentalAgentState): boolean {
+  if (!state.intent || !state.consent || state.name) {
+    return false;
+  }
+  if (state.triageLevel === "EMERGENCY") {
+    return true;
+  }
+  const safetyPending =
+    state.redFlags.length === 0 &&
+    !state.safetyScreened &&
+    ["urgent_pain", "endodontics", "wisdom_tooth", "trauma"].includes(state.intent);
+  if (safetyPending) {
+    return false;
+  }
+  if (!state.escalated && state.missingClinicalData.length > 0) {
+    return false;
+  }
+  return true;
+}
 
 function extractBareName(raw: string) {
   const candidate = raw
