@@ -22,7 +22,6 @@ import {
   updateSettingsAction
 } from "@/app/actions";
 import { logoutAction } from "@/app/auth-actions";
-import { DashboardBoard } from "@/app/dashboard-board";
 import { ThemeToggle } from "@/app/theme-toggle";
 import { Icon, type IconName } from "@/components/icon";
 import { InteractiveAgentDemo } from "@/components/interactive-agent-demo";
@@ -241,13 +240,8 @@ function HomeView({ data }: { data: Awaited<ReturnType<typeof getDashboardData>>
         <Tile icon="users" label="Pacientes activos" value={data.metrics.activePatients} note="base operativa" accent="accent-green" />
         <Tile icon="euro" label="Ingresos recuperados" value={formatMoney(data.metrics.recoveredCents)} note="pipeline IA" accent="accent-orange" />
       </div>
-      <DashboardBoard
-        storageKey={`dentia-dashboard-${data.tenant.id}`}
-        widgets={[
-          {
-            id: "upcoming",
-            node: (
-              <section className="card pad upcoming-panel">
+      <div className="widget-board">
+        <section className="card pad upcoming-panel">
                 <PanelHead icon="calendar" title="Proxima agenda" subtitle="Los siguientes eventos de la cuenta activa." href="/?view=calendar" />
                 {data.appointments.length === 0 ? (
                   <p className="empty-note">No hay citas en agenda. Crea la primera desde Calendario.</p>
@@ -261,26 +255,16 @@ function HomeView({ data }: { data: Awaited<ReturnType<typeof getDashboardData>>
                     </div>
                   ))
                 )}
-              </section>
-            )
-          },
-          {
-            id: "queue",
-            node: (
-              <section className="card pad queue-panel">
+        </section>
+        <section className="card pad queue-panel">
                 <PanelHead icon="task" title="Colas de trabajo" href="/?view=tasks" />
                 <h4>Tareas vencidas</h4>
                 <p>{data.tasks.some(task => task.status === "OVERDUE") ? "Hay tareas que requieren revision de recepcion." : "Ahora mismo no hay nada esperando en esta cola."}</p>
                 <hr />
                 <h4>Conversaciones recientes sin leer</h4>
                 <p>{data.metrics.unreadConversations ? `${data.metrics.unreadConversations} conversaciones pendientes de revisar.` : "No hay mensajes sin leer por revisar."}</p>
-              </section>
-            )
-          },
-          {
-            id: "pipeline",
-            node: (
-              <section className="card pad pipeline-panel">
+        </section>
+        <section className="card pad pipeline-panel">
                 <PanelHead icon="users" title="Pipeline de pacientes" subtitle="Estado actual y proximas acciones." href="/?view=patients" />
                 <div className="pipeline-mini">
                   <MiniPipeline label="Nuevo" value={data.patients.filter(patient => patient.status === "NEW_LEAD").length} accent="accent-blue" />
@@ -292,7 +276,7 @@ function HomeView({ data }: { data: Awaited<ReturnType<typeof getDashboardData>>
                 {data.tasks.length === 0 ? (
                   <p className="empty-note">Sin tareas pendientes en las colas de trabajo.</p>
                 ) : (
-                  data.tasks.slice(0, 3).map(task => (
+                  data.tasks.slice(0, 5).map(task => (
                     <div className="compact-row" key={task.id}>
                       <strong>{task.title}</strong>
                       <span>
@@ -301,13 +285,8 @@ function HomeView({ data }: { data: Awaited<ReturnType<typeof getDashboardData>>
                     </div>
                   ))
                 )}
-              </section>
-            )
-          },
-          {
-            id: "recent",
-            node: (
-              <section className="card pad recent-panel">
+        </section>
+        <section className="card pad recent-panel">
                 <PanelHead icon="inbox" title="Trabajo reciente" href="/?view=inbox" />
                 <h4>Conversaciones</h4>
                 {data.conversations.length === 0 ? (
@@ -322,18 +301,13 @@ function HomeView({ data }: { data: Awaited<ReturnType<typeof getDashboardData>>
                     </div>
                   ))
                 )}
-              </section>
-            )
-          },
-          {
-            id: "finance",
-            node: (
-              <section className="card pad finance-panel">
+        </section>
+        <section className="card pad finance-panel">
                 <PanelHead icon="euro" title="Resumen financiero" subtitle="Una vista ligera de facturacion y ROI." href="/?view=billing" />
                 <div className="finance-grid">
                   <div>
                     <span>Cobros pendientes</span>
-                    <strong>0,00 EUR</strong>
+                    <strong>0,00 €</strong>
                   </div>
                   <div>
                     <span>Facturas vencidas</span>
@@ -341,14 +315,11 @@ function HomeView({ data }: { data: Awaited<ReturnType<typeof getDashboardData>>
                   </div>
                   <div>
                     <span>Pagos pendientes</span>
-                    <strong>0,00 EUR</strong>
+                    <strong>0,00 €</strong>
                   </div>
                 </div>
-              </section>
-            )
-          }
-        ]}
-      />
+        </section>
+      </div>
     </div>
   );
 }

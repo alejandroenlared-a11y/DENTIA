@@ -712,7 +712,9 @@ a {
   background: #fff;
   padding: 11px 13px;
   font: inherit;
-  font-size: 14px;
+  /* 16px minimo: con menos, iOS Safari hace zoom automatico al enfocar el
+     campo y el boton de enviar queda fuera de pantalla. */
+  font-size: 16px;
   outline: none;
 }
 
@@ -781,6 +783,14 @@ a {
 }
 
 @media (max-width: 520px) {
+  /* iOS Safari amplia la pagina (zoom) al enfocar cualquier campo con letra
+     menor de 16px, descolocando el layout. Regla global para todo el SaaS. */
+  input,
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+
   .wa-demo-shell {
     background: #0f172a;
   }
