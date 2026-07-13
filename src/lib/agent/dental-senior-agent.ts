@@ -325,9 +325,18 @@ const signalPatterns = [
 export function runDentalSeniorTurn(current: DentalAgentState, rawText: string): DentalAgentTurn {
   const text = rawText.trim();
   const normalized = normalize(text);
-  const redFlags = unique([...current.redFlags, ...detectLabels(normalized, redFlagPatterns)]);
-  const detectedSignals = unique([...current.detectedSignals, ...detectLabels(normalized, signalPatterns)]);
+  const messageRedFlags = detectLabels(normalized, redFlagPatterns);
+  const messageSignals = detectLabels(normalized, signalPatterns);
+  let redFlags = unique([...current.redFlags, ...messageRedFlags]);
+  let detectedSignals = unique([...current.detectedSignals, ...messageSignals]);
   const intent = inferIntent(current.intent, normalized, detectedSignals, redFlags);
+  // Cambio de tema: los sintomas y alarmas del motivo anterior no deben
+  // arrastrar la urgencia a una consulta nueva distinta (p.ej. de un dolor ya
+  // resuelto a una consulta de ortodoncia dias despues).
+  if (intent && current.intent && intent !== current.intent) {
+    redFlags = messageRedFlags.length > 0 ? unique(messageRedFlags) : [];
+    detectedSignals = unique(messageSignals);
+  }
   const profile = intent ? intentProfiles[intent] : null;
   const name = current.name || extractName(text);
   const phone = current.phone || extractPhone(text);
@@ -366,7 +375,7 @@ export function runDentalSeniorTurn(current: DentalAgentState, rawText: string):
     availability
   });
 
-  return { state: nextState, reply: buildDentalReply(nextState, text) };
+  return { state: nextState, reply: buildDentalReply(nextState, current, text) };
 }
 
 export function buildDentalSummary(state: DentalAgentState) {
@@ -384,94 +393,174 @@ export function buildDentalSummary(state: DentalAgentState) {
   return `${state.triageLabel}. ${state.clinicalReading}`;
 }
 
-function buildDentalReply(state: DentalAgentState, latestPatientText: string) {
+// Estilo conversacional: mensajes cortos (2-3 frases), UNA pregunta por turno,
+// empatia variable y nada de repetir orientacion o precios ya dados. El estado
+// anterior dice que se comunico ya: la orientacion clinica solo se da la
+// primera vez que se detecta la intencion.
+const EMPATHY_PAIN = [
+  "Vaya, siento que estes asi.",
+  "Uf, entiendo lo molesto que es eso.",
+  "Siento que lo estes pasando mal."
+];
+
+const PAIN_INTENTS: DentalIntentId[] = [
+  "urgent_pain",
+  "endodontics",
+  "wisdom_tooth",
+  "trauma",
+  "prosthetics",
+  "caries_restoration"
+];
+
+// Intenciones donde el precio orientativo se adelanta sin que lo pidan.
+const PRICE_FORWARD_INTENTS: DentalIntentId[] = ["implant_price", "whitening", "orthodontics", "first_visit"];
+
+function buildDentalReply(state: DentalAgentState, previous: DentalAgentState, latestPatientText: string) {
   if (!state.intent) {
-    return "Te leo. Para orientarte bien necesito situarte un poco: dime si es dolor, encia, una pieza rota, implante, ortodoncia, estetica o una revision. Si hay hinchazon importante, fiebre, sangrado que no para o dificultad para tragar/respirar, lo tratamos como urgente.";
+    return "Te leo. Cuentame un poco mas: es dolor, encias, una pieza rota, implante, ortodoncia, estetica o una revision?";
   }
 
   const profile = intentProfiles[state.intent];
-  const clinicalIntro = naturalClinicalIntro(state, profile, latestPatientText);
-  const nextQuestion = nextQuestionFor(state, profile);
+  const isNewIntent = previous.intent !== state.intent;
+  const first = firstName(state.name);
 
   if (state.triageLevel === "EMERGENCY") {
     if (!state.consent) {
-      return `${clinicalIntro} Por seguridad, esto no deberia esperar a una cita normal. Si tienes dificultad para respirar, tragar o hablar, hinchazon que sube al ojo/cuello o sangrado que no cede, contacta con urgencias medicas. Si aceptas que registre tus datos, aviso a recepcion para priorizarte.`;
+      return `${pickVariant(EMPATHY_PAIN, latestPatientText)} Esto no deberia esperar: si te cuesta respirar o tragar, o la hinchazon avanza, acude a urgencias ya. Mientras, aceptas que guardemos tus datos para priorizarte?`;
     }
     if (!state.name) {
-      return `${clinicalIntro} Lo marco como prioridad maxima. Dime tu nombre y apellidos para que recepcion pueda identificarte.`;
+      return "Lo marco como prioridad maxima. Como te llamas?";
     }
     if (!state.phone) {
-      return `${state.name}, necesito un telefono para activar llamada prioritaria.`;
+      return `${first}, dime un telefono y te llamamos ya.`;
     }
-    return `${state.name}, dejo la alerta registrada para llamada prioritaria en ${state.phone}. No puedo diagnosticar por chat; el doctor debe explorarte. Si notas dificultad para respirar, tragar, hablar o la hinchazon avanza, no esperes a la llamada y acude a urgencias.`;
+    return `${first}, alerta enviada: te llamamos ahora al ${state.phone}. Si notas que empeora, no esperes nuestra llamada y acude a urgencias.`;
   }
 
   if (state.ready) {
+    // La reserva ya se comunico en el turno anterior: cerrar con naturalidad
+    // en vez de repetir el mismo mensaje de confirmacion.
+    if (previous.ready && !isNewIntent) {
+      return pickVariant(
+        [
+          `Todo listo${first ? `, ${first}` : ""}. Si necesitas cambiar algo de la cita, dimelo por aqui.`,
+          `Aqui sigo si necesitas algo mas${first ? `, ${first}` : ""}. Te esperamos en la clinica.`,
+          `Perfecto${first ? `, ${first}` : ""}. Cualquier duda antes de la visita, me escribes.`
+        ],
+        latestPatientText
+      );
+    }
     return state.escalated
-      ? `${state.name}, queda registrado como ${profile.title.toLowerCase()} con prioridad. Te llamaremos en ${state.phone}. Presupuesto orientativo de la visita: ${state.budget}, y el doctor confirmara tratamiento y coste tras exploracion.`
-      : `${state.name}, pre-reserva lista para ${state.treatmentNeed} en ${state.location}, franja ${state.availability}. Orientacion economica: ${state.budget}. El doctor confirmara diagnostico, plan y presupuesto cerrado en la valoracion.`;
+      ? `${first}, queda registrado con prioridad. Te llamamos al ${state.phone} enseguida.`
+      : `${first}, pre-reserva lista: ${state.treatmentNeed.toLowerCase()} en ${state.location}, franja ${state.availability}. El doctor te confirma plan y presupuesto en la visita.`;
   }
 
-  if (nextQuestion) {
-    return `${clinicalIntro} ${nextQuestion}`;
-  }
-
-  if (state.escalated) {
-    if (!state.consent) {
-      return `${clinicalIntro} Por lo que cuentas, conviene que recepcion lo vea con prioridad. Aceptas que guardemos tus datos para gestionar la llamada/cita?`;
-    }
-    if (!state.name) {
-      return `${clinicalIntro} Perfecto, dime tu nombre y apellidos para preparar el aviso.`;
-    }
-    if (!state.phone) {
-      return `${state.name}, dime un telefono de contacto para que recepcion pueda llamarte.`;
-    }
-    return `${state.name}, queda registrado como ${profile.title.toLowerCase()} con prioridad. Te llamaremos en ${state.phone}. Presupuesto orientativo de la visita: ${state.budget}, y el doctor confirmara tratamiento y coste tras exploracion.`;
-  }
-
-  if (!state.consent) {
-    // clinicalIntro ya termina con profile.priceNote: no repetirla aqui.
-    return `${clinicalIntro} Si quieres, puedo preparar una pre-reserva. Para eso necesito que confirmes si aceptas que guardemos tus datos para gestionar la solicitud.`;
-  }
-  if (!state.name) {
-    return `${clinicalIntro} Con tu consentimiento, dime tu nombre y apellidos.`;
-  }
-  if (!state.phone) {
-    return `${state.name}, dime un telefono para confirmar la cita y enviarte recordatorio.`;
-  }
-  if (!state.location) {
-    return `${state.name}, te encajaria mejor ${demoKnowledge.clinic.locations.join(" o ")}?`;
-  }
-  if (!state.availability) {
-    return `Para ${state.treatmentNeed} en ${state.location}, puedo dejar pre-reserva. Prefieres manana, tarde o algun dia concreto esta semana?`;
-  }
-
-  return `${state.name}, pre-reserva lista para ${state.treatmentNeed} en ${state.location}, franja ${state.availability}. Orientacion economica: ${state.budget}. El doctor confirmara diagnostico, plan y presupuesto cerrado en la valoracion.`;
+  const intro = isNewIntent ? buildIntro(state, profile, latestPatientText) : buildAck(state, previous);
+  const question = nextStep(state, latestPatientText);
+  const reply = [intro, question].filter(Boolean).join(" ").trim();
+  return reply || "Cuentame un poco mas para orientarte bien.";
 }
 
-function naturalClinicalIntro(state: DentalAgentState, profile: IntentProfile, latestPatientText: string) {
-  const signalText = state.detectedSignals.length ? `Por lo que cuentas (${state.detectedSignals.slice(0, 3).join(", ")})` : "Por lo que cuentas";
-  const causes = profile.likelyCauses.slice(0, 3).join(", ");
-  const safety = state.redFlags.length
-    ? ` Veo senales de alarma: ${state.redFlags.join(", ")}.`
+function buildIntro(state: DentalAgentState, profile: IntentProfile, latestPatientText: string) {
+  const expressesPain = /(duele|dolor|molest|me mata|horrible|fatal)/.test(normalize(latestPatientText));
+  const empathy =
+    state.intent && PAIN_INTENTS.includes(state.intent) && (expressesPain || state.escalated)
+      ? `${pickVariant(EMPATHY_PAIN, latestPatientText)} `
+      : "";
+  const causes = profile.likelyCauses.slice(0, 2).join(" o ");
+  const alarm = state.redFlags.length
+    ? ` Lo que comentas de ${state.redFlags[0]} es importante, asi que te vamos a priorizar.`
     : "";
-  const budget = profile.priceNote ? ` ${profile.priceNote}` : "";
-  const wording = latestPatientText.length > 120 ? "He recogido varios datos." : signalText;
-  return `${wording}, podria encajar con ${causes}. No es un diagnostico por chat; es una orientacion para priorizarte bien.${safety}${budget}`;
+  const price = wantsPrice(state.intent, latestPatientText) ? ` ${profile.priceNote}` : "";
+  return `${empathy}Por lo que me cuentas podria ser ${causes}; te lo confirmara el doctor al verte.${alarm}${price}`;
 }
 
-function nextQuestionFor(state: DentalAgentState, profile: IntentProfile) {
-  if (state.redFlags.length === 0 && !state.safetyScreened && ["urgent_pain", "endodontics", "wisdom_tooth", "trauma"].includes(state.intent ?? "")) {
-    return "Para descartar senales de alarma: hay fiebre, hinchazon en cara/cuello, pus o dificultad para abrir la boca, tragar o respirar?";
+function buildAck(state: DentalAgentState, previous: DentalAgentState) {
+  if (state.name && !previous.name) {
+    return `Encantada, ${firstName(state.name)}.`;
   }
-  const nextMissing = state.missingClinicalData[0];
-  if (nextMissing) {
-    return nextMissing;
+  if (state.consent && !previous.consent) {
+    return "Genial, gracias.";
   }
-  if (!state.consent && state.detectedSignals.length === 0) {
-    return profile.followUp.find(question => !wasAnswered(question, state)) ?? "";
+  if (state.phone && !previous.phone) {
+    return "Apuntado.";
+  }
+  if (state.redFlags.length > previous.redFlags.length) {
+    return "Gracias por decirmelo, eso es importante.";
+  }
+  if (state.detectedSignals.length > previous.detectedSignals.length) {
+    return "Vale, eso me ayuda a orientarte.";
   }
   return "";
+}
+
+const CONSENT_ASKS = [
+  "Si quieres te preparo una cita. Aceptas que guardemos tus datos para gestionarla?",
+  "Te dejo la cita preparada si te va bien. Aceptas que guardemos tus datos para gestionarla?",
+  "Puedo dejarte la cita lista ahora mismo. Aceptas que guardemos tus datos para gestionarla?"
+];
+
+function nextStep(state: DentalAgentState, latestPatientText: string) {
+  if (
+    state.redFlags.length === 0 &&
+    !state.safetyScreened &&
+    ["urgent_pain", "endodontics", "wisdom_tooth", "trauma"].includes(state.intent ?? "")
+  ) {
+    return "Antes de nada: hay fiebre, hinchazon, pus o te cuesta abrir la boca o tragar?";
+  }
+  if (!state.escalated && state.missingClinicalData[0]) {
+    return state.missingClinicalData[0];
+  }
+  if (!state.consent) {
+    return state.escalated
+      ? "Quiero que recepcion te llame con prioridad. Aceptas que guardemos tus datos para gestionarlo?"
+      : pickVariant(CONSENT_ASKS, latestPatientText);
+  }
+  if (!state.name && !state.phone) {
+    return state.escalated
+      ? "Dime tu nombre y un telefono y te llamamos enseguida."
+      : "Dime tu nombre y un telefono para la reserva.";
+  }
+  if (!state.name) {
+    return "Y tu nombre y apellidos?";
+  }
+  if (!state.phone) {
+    return `Y un telefono de contacto, ${firstName(state.name)}?`;
+  }
+  if (state.escalated) {
+    return "";
+  }
+  if (!state.location && !state.availability) {
+    return `Te viene mejor ${demoKnowledge.clinic.locations.join(" o ")}? Y por la manana o por la tarde?`;
+  }
+  if (!state.location) {
+    return `Te viene mejor ${demoKnowledge.clinic.locations.join(" o ")}?`;
+  }
+  if (!state.availability) {
+    return "Prefieres por la manana o por la tarde?";
+  }
+  return "";
+}
+
+function wantsPrice(intent: DentalIntentId | undefined, latestPatientText: string) {
+  if (intent && PRICE_FORWARD_INTENTS.includes(intent)) {
+    return true;
+  }
+  return /(precio|cuanto|coste|costar|cuesta|vale|financi|presupuesto)/.test(normalize(latestPatientText));
+}
+
+function firstName(fullName: string) {
+  return fullName.trim().split(/\s+/)[0] || "";
+}
+
+// Variacion determinista (testeable) a partir del texto del paciente, para que
+// las aperturas no suenen siempre identicas.
+function pickVariant(options: string[], seed: string) {
+  let hash = 0;
+  for (const char of seed) {
+    hash = (hash * 31 + char.charCodeAt(0)) % 997;
+  }
+  return options[hash % options.length];
 }
 
 function completeDentalState(state: DentalAgentState): DentalAgentState {
@@ -495,7 +584,7 @@ function inferIntent(current: DentalIntentId | undefined, normalized: string, si
   if (/(bruxismo|aprieto|rechino|chasquido|mandibula|atm|dolor de cabeza)/.test(normalized)) return "tmj_bruxism";
   if (/(late|pulsatil|por la noche|me despierta|calor|dolor espontaneo|nervio)/.test(normalized)) return "endodontics";
   if (/(frio|dulce|agujero|mancha|caries|empaste|sensibilidad|al morder)/.test(normalized)) return "caries_restoration";
-  if (/(dolor|duele|hinchad|inflamad|pus|flemon|urgencia)/.test(normalized) || signals.includes("dolor intenso")) return "urgent_pain";
+  if ((/(dolor|duele|hinchad|inflamad|pus|flemon|urgencia)/.test(normalized) && !isPainNegated(normalized)) || signals.includes("dolor intenso")) return "urgent_pain";
   if (/(limpieza|higiene|revision|revisar|primera visita|cita|valoracion)/.test(normalized)) return current ?? "first_visit";
   return current;
 }
@@ -559,13 +648,6 @@ function triageLabel(level: TriageLevel) {
   }
 }
 
-function wasAnswered(question: string, state: DentalAgentState) {
-  if (question.includes("pieza") && state.detectedSignals.includes("pieza ausente")) return true;
-  if (question.includes("sensibilidad") && state.detectedSignals.includes("sensibilidad al frio/calor")) return true;
-  if (question.includes("sangran") && state.detectedSignals.includes("sangrado de encias")) return true;
-  return false;
-}
-
 function detectLabels(normalized: string, rules: Array<{ label: string; pattern: RegExp }>) {
   return rules
     .filter(rule => rule.pattern.test(normalized) && !isNegatedLabel(rule.label, normalized))
@@ -577,7 +659,14 @@ function detectSafetyScreen(normalized: string, redFlags: string[]) {
   return /(no tengo fiebre|sin fiebre|no hay fiebre|no esta hinchad|sin hinchazon|no tengo hinchazon|puedo tragar|puedo respirar|no sangra|no hay pus|dolor [0-7])/.test(normalized);
 }
 
+function isPainNegated(normalized: string) {
+  return /(no hay dolor|no tengo dolor|sin dolor|no me duele|no duele|no es dolor)/.test(normalized);
+}
+
 function isNegatedLabel(label: string, normalized: string) {
+  if (label === "dolor intenso") {
+    return isPainNegated(normalized);
+  }
   if (label.includes("fiebre")) {
     return /(sin fiebre|no tengo fiebre|no hay fiebre)/.test(normalized);
   }

@@ -42,7 +42,9 @@ export function WhatsAppDemoChat({
   assistantEnabled
 }: WhatsAppDemoChatProps) {
   const [patientName] = useState("Paciente demo");
-  const [patientPhone] = useState("+34 629 179 640");
+  // Numero aleatorio por sesion: cada demo empieza con una conversacion limpia
+  // en vez de arrastrar el historial del numero fijo de pruebas anteriores.
+  const [patientPhone] = useState(() => `+346${Math.floor(10000000 + Math.random() * 89999999)}`);
   const [message, setMessage] = useState("");
   const [entries, setEntries] = useState<ChatEntry[]>(() => [
     {

@@ -552,6 +552,22 @@ async function bookUrgentSlot(input: {
 }): Promise<UrgentBooking | null> {
   const { tenantId, patientId, conversationId, channel, treatmentNeed, dentalTurn } = input;
 
+  // Idempotencia: si el paciente ya tiene un hueco urgente futuro creado por
+  // la IA, no crear otro en cada mensaje escalado de la misma conversacion.
+  const alreadyBooked = await prisma.appointment.findFirst({
+    where: {
+      tenantId,
+      patientId,
+      createdByAi: true,
+      startsAt: { gte: new Date() },
+      status: { in: [AppointmentStatus.CONFIRMED, AppointmentStatus.URGENT] },
+      title: { startsWith: "Urgencia IA" }
+    }
+  });
+  if (alreadyBooked) {
+    return null;
+  }
+
   const provider = await prisma.provider.findFirst({ where: { tenantId, active: true }, orderBy: { name: "asc" } });
   if (!provider) {
     return null;
@@ -617,7 +633,7 @@ export function formatUrgentSlotSentence(booking: UrgentBooking): string {
   const withWho = ` con ${booking.providerName}`;
   const where = booking.operatoryName ? ` en ${booking.operatoryName}` : "";
 
-  return `Te hemos reservado un hueco urgente ${dayLabel} a las ${time}${withWho}${where}. No hace falta que esperes a que te llamemos, ya esta confirmado y recepcion tambien lo ha revisado.`;
+  return `Te he reservado un hueco urgente ${dayLabel} a las ${time}${withWho}${where}. Queda confirmado; si no te encaja, dimelo y lo movemos.`;
 }
 
 function formatSlotForStaff(date: Date): string {
