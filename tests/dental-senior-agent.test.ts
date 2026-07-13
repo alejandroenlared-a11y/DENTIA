@@ -95,6 +95,18 @@ describe("runDentalSeniorTurn", () => {
     expect(second.reply.length).toBeLessThan(160);
   });
 
+  it("asks for the treatment, not pain options, when the patient wants a quote", () => {
+    const first = runDentalSeniorTurn(initialDentalAgentState, "Quiero un presupuesto");
+    expect(first.reply.toLowerCase()).toContain("implantes");
+    expect(first.reply.toLowerCase()).toContain("sin coste");
+    expect(first.reply.toLowerCase()).not.toContain("dolor");
+
+    const second = runDentalSeniorTurn(first.state, "Para una corona");
+    expect(second.state.intent).toBe("prosthetics");
+    expect(second.reply).toContain("450 EUR");
+    expect(second.reply).not.toContain("podria ser");
+  });
+
   it("accepts a bare name reply when the agent just asked for the name", () => {
     const emergency = runDentalSeniorTurn(
       initialDentalAgentState,

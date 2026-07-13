@@ -465,6 +465,7 @@ Estas reglas aplican al motor local Y al prompt del LLM. No romperlas al evoluci
 - Precios solo si el paciente los pide o el motivo es de valoracion economica (implante, ortodoncia, estetica, primera visita).
 - URGENCIAS EN DOS TIEMPOS: primero SOLO la pregunta de seguridad (fiebre, hinchazon, pus, dificultad para abrir/tragar) y esperar respuesta; la cita/hueco urgente se propone en el turno SIGUIENTE, nunca en el mismo mensaje que la pregunta. Excepcion: emergencia real (banderas rojas ya presentes) se prioriza de inmediato.
 - El hueco urgente se reserva UNA sola vez por paciente (idempotente); no repetir la frase de reserva en cada mensaje.
+- PRESUPUESTO SIN SINTOMAS: si el paciente pide presupuesto/precio sin describir molestias, NO ofrecer el menu de dolor; preguntar directamente que tratamiento quiere presupuestar (implantes, ortodoncia invisible, estetica, coronas/protesis...) recordando la primera visita gratuita, y dar el rango orientativo en cuanto nombre el tratamiento.
 - Negaciones: "no hay dolor fuerte", "sin fiebre", etc. no deben activar senales ni escalado.
 - Cambio de tema: las senales/alarmas de un motivo anterior no arrastran urgencia a una consulta nueva distinta.
 - La demo WhatsApp genera un numero de paciente aleatorio por visita para empezar siempre con conversacion limpia.
