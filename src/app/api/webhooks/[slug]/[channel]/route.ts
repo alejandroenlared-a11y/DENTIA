@@ -5,6 +5,10 @@ import { prisma } from "@/lib/prisma";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { firstErrorMessage, inboundMessageSchema } from "@/lib/validation";
 
+// Margen suficiente para el turno LLM (12s) + persistencia, sin depender del
+// limite por defecto de la plataforma.
+export const maxDuration = 30;
+
 const channelMap: Record<string, ConversationChannel> = {
   whatsapp: ConversationChannel.WHATSAPP,
   sms: ConversationChannel.SMS,

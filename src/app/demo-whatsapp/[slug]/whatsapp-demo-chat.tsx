@@ -2,6 +2,9 @@
 
 import { ArrowLeft, CheckCheck, Mic, Paperclip, Phone, Send, ShieldCheck, Smile, Video } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { fetchWithTimeout, isTimeoutError } from "@/lib/http";
+
+const CHAT_REQUEST_TIMEOUT_MS = 30_000;
 
 type WhatsAppDemoChatProps = {
   slug: string;
@@ -39,7 +42,9 @@ export function WhatsAppDemoChat({
   assistantEnabled
 }: WhatsAppDemoChatProps) {
   const [patientName] = useState("Paciente demo");
-  const [patientPhone] = useState("+34 629 179 640");
+  // Numero aleatorio por sesion: cada demo empieza con una conversacion limpia
+  // en vez de arrastrar el historial del numero fijo de pruebas anteriores.
+  const [patientPhone] = useState(() => `+346${Math.floor(10000000 + Math.random() * 89999999)}`);
   const [message, setMessage] = useState("");
   const [entries, setEntries] = useState<ChatEntry[]>(() => [
     {
@@ -87,7 +92,7 @@ export function WhatsAppDemoChat({
     setEntries(previous => [...previous, { id: crypto.randomUUID(), from: "patient", text: body, time: now() }]);
 
     try {
-      const response = await fetch(`/api/webhooks/${slug}/whatsapp`, {
+      const response = await fetchWithTimeout(`/api/webhooks/${slug}/whatsapp`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
@@ -95,7 +100,7 @@ export function WhatsAppDemoChat({
           name: patientName.trim() || undefined,
           body
         })
-      });
+      }, CHAT_REQUEST_TIMEOUT_MS);
       const payload = (await response.json()) as WebhookResponse;
 
       if (!payload.success) {
@@ -112,8 +117,12 @@ export function WhatsAppDemoChat({
           time: now()
         }
       ]);
-    } catch {
-      setError("Error de conexion con el agente. Intentalo de nuevo.");
+    } catch (error) {
+      setError(
+        isTimeoutError(error)
+          ? "Clara esta tardando mas de lo normal. Envia el mensaje de nuevo."
+          : "Error de conexion con el agente. Intentalo de nuevo."
+      );
     } finally {
       setSending(false);
     }
@@ -137,7 +146,8 @@ export function WhatsAppDemoChat({
         </a>
       </section>
 
-      <section className="wa-phone" aria-label="Demo de chat tipo WhatsApp">
+      <div className="wa-phone-card">
+        <section className="wa-phone" aria-label="Demo de chat tipo WhatsApp">
         <div className="wa-phone-speaker" aria-hidden="true" />
         <header className="wa-chat-header">
           <button className="wa-icon-button" type="button" aria-label="Volver">
@@ -211,7 +221,8 @@ export function WhatsAppDemoChat({
         </form>
 
         <footer className="wa-phone-home" aria-label={`Telefono demo ${clinicPhone}`} />
-      </section>
+        </section>
+      </div>
     </div>
   );
 }

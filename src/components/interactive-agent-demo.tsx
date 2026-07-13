@@ -9,6 +9,12 @@ import {
   runDentalSeniorTurn,
   type DentalAgentState
 } from "@/lib/agent/dental-senior-agent";
+import { fetchWithTimeout, isTimeoutError } from "@/lib/http";
+
+// El servidor responde en <=30s incluso si la IA externa falla (fallback local
+// garantizado); este limite evita que el chat quede "pensando" para siempre si
+// la propia peticion HTTP se pierde.
+const CHAT_REQUEST_TIMEOUT_MS = 30_000;
 
 type ServerAction = (formData: FormData) => void | Promise<void>;
 type ChatRole = "patient" | "assistant";
@@ -91,7 +97,7 @@ export function InteractiveAgentDemo({ saveAction }: { saveAction: ServerAction 
     setMessages(nextMessages);
 
     try {
-      const response = await fetch("/api/agent/dental-demo", {
+      const response = await fetchWithTimeout("/api/agent/dental-demo", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
@@ -99,7 +105,7 @@ export function InteractiveAgentDemo({ saveAction }: { saveAction: ServerAction 
           messages: nextMessages.map(message => ({ role: message.role, body: message.body })),
           state: dentalState
         })
-      });
+      }, CHAT_REQUEST_TIMEOUT_MS);
       const payload = await response.json() as {
         success?: boolean;
         error?: string | null;
@@ -122,7 +128,11 @@ export function InteractiveAgentDemo({ saveAction }: { saveAction: ServerAction 
       console.error("sendPatientMessage failed", error);
       setDentalState(fallbackTurn.state);
       setAgentRuntime("local");
-      setApiNotice("Fallback local: no se pudo consultar la IA.");
+      setApiNotice(
+        isTimeoutError(error)
+          ? "Fallback local: la IA externa tardo demasiado y Clara respondio con el motor local."
+          : "Fallback local: no se pudo consultar la IA."
+      );
       setMessages([...nextMessages, { id: makeId("assistant"), role: "assistant", body: fallbackTurn.reply }]);
     } finally {
       setIsThinking(false);

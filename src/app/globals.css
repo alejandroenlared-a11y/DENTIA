@@ -262,6 +262,7 @@ a {
 
 .wa-demo-stage {
   min-height: 100vh;
+  min-height: 100dvh;
   width: min(1180px, 100%);
   margin: 0 auto;
   display: grid;
@@ -269,7 +270,7 @@ a {
   align-items: center;
   justify-content: center;
   gap: 56px;
-  padding: 32px;
+  padding: 16px 32px;
 }
 
 .wa-demo-copy {
@@ -338,16 +339,34 @@ a {
   font-weight: 800;
 }
 
+.wa-phone-card {
+  justify-self: center;
+  /* Ancho fijo = movil (350) + padding (32) + borde (2). Sin esto, la fila de
+     mensajes rapidos con scroll horizontal infla el max-content del grid. */
+  width: min(100%, 384px);
+  border: 1px solid #d7dee7;
+  border-radius: 20px;
+  background: #fff;
+  padding: 16px;
+  box-shadow: 0 18px 48px rgba(15, 23, 42, 0.14);
+  max-height: calc(100vh - 32px);
+  max-height: calc(100dvh - 32px);
+  display: flex;
+}
+
 .wa-phone {
   position: relative;
-  width: min(100%, 410px);
-  height: min(820px, calc(100vh - 44px));
-  min-height: 680px;
-  border: 10px solid #0f172a;
-  border-radius: 34px;
+  width: min(100%, 350px);
+  /* Se adapta a la altura visible real: la barra de enviar SIEMPRE queda dentro. */
+  height: calc(100vh - 110px);
+  height: calc(100dvh - 110px);
+  max-height: 640px;
+  min-height: 440px;
+  border: 8px solid #0f172a;
+  border-radius: 30px;
   overflow: hidden;
   background: #efe7d8;
-  box-shadow: 0 28px 70px rgba(15, 23, 42, 0.32);
+  box-shadow: 0 14px 36px rgba(15, 23, 42, 0.24);
   display: flex;
   flex-direction: column;
 }
@@ -755,8 +774,9 @@ a {
     font-size: 34px;
   }
 
-  .wa-phone {
+  .wa-phone-card {
     justify-self: center;
+    max-height: none;
   }
 }
 
@@ -775,10 +795,22 @@ a {
     display: none;
   }
 
+  .wa-phone-card {
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    padding: 0;
+    box-shadow: none;
+    max-height: none;
+    width: 100%;
+  }
+
   .wa-phone {
     width: 100%;
     height: 100vh;
-    min-height: 100vh;
+    height: 100dvh;
+    max-height: none;
+    min-height: 0;
     border: 0;
     border-radius: 0;
     box-shadow: none;
