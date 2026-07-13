@@ -94,6 +94,26 @@ async function main() {
     }
   });
 
+  // Acceso rapido para presentaciones (demo@dentia.ai / demo). Contrasena
+  // debil a proposito: el tenant solo contiene datos sinteticos. Antes de
+  // cargar datos reales, definir DEMO_LOGIN_DISABLED=1 en el entorno: el
+  // siguiente deploy elimina el usuario (y sus sesiones, en cascada).
+  if (process.env.DEMO_LOGIN_DISABLED === "1") {
+    await prisma.user.deleteMany({ where: { tenantId: tenant.id, email: "demo@dentia.ai" } });
+  } else {
+    await prisma.user.upsert({
+      where: { tenantId_email: { tenantId: tenant.id, email: "demo@dentia.ai" } },
+      update: { name: "Usuario Demo", passwordHash: hashPassword("demo"), role: UserRole.OWNER },
+      create: {
+        tenantId: tenant.id,
+        name: "Usuario Demo",
+        email: "demo@dentia.ai",
+        passwordHash: hashPassword("demo"),
+        role: UserRole.OWNER
+      }
+    });
+  }
+
   const secondTenant = await prisma.tenant.upsert({
     where: { slug: "clinica-elche-demo" },
     update: {
