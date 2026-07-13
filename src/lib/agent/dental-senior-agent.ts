@@ -377,6 +377,12 @@ export function runDentalSeniorTurn(current: DentalAgentState, rawText: string):
     availability
   });
 
+  // Peticion de presupuesto sin tratamiento concreto: marcarla para que el
+  // siguiente turno de al grano con el rango de precio del tratamiento.
+  if (!intent && wantsPrice(undefined, text)) {
+    nextState.intentCode = BUDGET_PENDING_INTENT;
+  }
+
   return { state: nextState, reply: buildDentalReply(nextState, current, text) };
 }
 
@@ -417,8 +423,23 @@ const PAIN_INTENTS: DentalIntentId[] = [
 // Intenciones donde el precio orientativo se adelanta sin que lo pidan.
 const PRICE_FORWARD_INTENTS: DentalIntentId[] = ["implant_price", "whitening", "orthodontics", "first_visit"];
 
+// El paciente pidio presupuesto pero aun no sabemos de que tratamiento.
+const BUDGET_PENDING_INTENT = "PRESUPUESTO_PENDIENTE";
+
 function buildDentalReply(state: DentalAgentState, previous: DentalAgentState, latestPatientText: string) {
   if (!state.intent) {
+    // Quien pide presupuesto viene a comprar, no con dolor: se le pregunta
+    // directamente por el tratamiento del catalogo, sin menu de sintomas.
+    if (state.intentCode === BUDGET_PENDING_INTENT) {
+      return pickVariant(
+        [
+          "Encantada de prepararte un presupuesto. De que tratamiento hablamos: implantes, ortodoncia invisible, blanqueamiento o estetica, coronas/protesis, o algun otro? La primera visita con valoracion es sin coste.",
+          "Claro, te oriento con el presupuesto. Que te interesa: implantes, ortodoncia invisible, estetica dental, coronas/protesis u otro tratamiento? Recuerda que la primera valoracion es gratuita.",
+          "Perfecto. Dime para que tratamiento lo quieres: implantes, ortodoncia invisible, blanqueamiento, coronas/protesis u otro, y te doy el rango orientativo. La valoracion inicial es sin coste."
+        ],
+        latestPatientText
+      );
+    }
     return "Te leo. Cuentame un poco mas: es dolor, encias, una pieza rota, implante, ortodoncia, estetica o una revision?";
   }
 
@@ -459,28 +480,48 @@ function buildDentalReply(state: DentalAgentState, previous: DentalAgentState, l
         latestPatientText
       );
     }
+    // Si el precio se pidio y este es el primer turno con tratamiento
+    // conocido (todo llego de golpe), incluirlo en la confirmacion.
+    const pricePending = isNewIntent && (previous.intentCode === BUDGET_PENDING_INTENT || mentionsPrice(latestPatientText));
+    const priceLine = pricePending ? ` ${profile.priceNote}` : "";
     return state.escalated
       ? `${first}, queda registrado con prioridad. Te llamamos al ${state.phone} enseguida.`
-      : `${first}, pre-reserva lista: ${state.treatmentNeed.toLowerCase()} en ${state.location}, franja ${state.availability}. El doctor te confirma plan y presupuesto en la visita.`;
+      : `${first}, pre-reserva lista: ${state.treatmentNeed.toLowerCase()} en ${state.location}, franja ${state.availability}.${priceLine} El doctor te confirma plan y presupuesto cerrado en la visita.`;
   }
 
-  const intro = isNewIntent ? buildIntro(state, profile, latestPatientText) : buildAck(state, previous);
+  // Si la conversacion nacio pidiendo presupuesto, dar el rango de precio en
+  // cuanto se conoce el tratamiento aunque este mensaje ya no lo mencione.
+  const cameFromBudget = previous.intentCode === BUDGET_PENDING_INTENT;
+  const intro = isNewIntent ? buildIntro(state, profile, latestPatientText, cameFromBudget) : buildAck(state, previous);
   const question = nextStep(state, latestPatientText);
   const reply = [intro, question].filter(Boolean).join(" ").trim();
   return reply || "Cuentame un poco mas para orientarte bien.";
 }
 
-function buildIntro(state: DentalAgentState, profile: IntentProfile, latestPatientText: string) {
+// Senales que expresan deseo de tratamiento, no un sintoma clinico: nombrar
+// "corona" o "implante" al pedir presupuesto no es reportar una molestia.
+const NON_SYMPTOM_SIGNALS = new Set(["pieza ausente", "estetica", "ortodoncia", "pieza rota o funda"]);
+
+function buildIntro(state: DentalAgentState, profile: IntentProfile, latestPatientText: string, cameFromBudget = false) {
   const expressesPain = /(duele|dolor|molest|me mata|horrible|fatal)/.test(normalize(latestPatientText));
   const empathy =
     state.intent && PAIN_INTENTS.includes(state.intent) && (expressesPain || state.escalated)
       ? `${pickVariant(EMPATHY_PAIN, latestPatientText)} `
       : "";
-  const causes = profile.likelyCauses.slice(0, 2).join(" o ");
   const alarm = state.redFlags.length
     ? ` Lo que comentas de ${state.redFlags[0]} es importante, asi que te vamos a priorizar.`
     : "";
-  const price = wantsPrice(state.intent, latestPatientText) ? ` ${profile.priceNote}` : "";
+  const price = cameFromBudget || wantsPrice(state.intent, latestPatientText) ? ` ${profile.priceNote}` : "";
+
+  // Consulta comercial de presupuesto (venga en dos turnos o en un solo
+  // mensaje "quiero presupuesto para un implante"): sin lectura de sintomas.
+  const asksPriceNow = mentionsPrice(latestPatientText);
+  const hasSymptoms = state.detectedSignals.some(signal => !NON_SYMPTOM_SIGNALS.has(signal));
+  if ((cameFromBudget || asksPriceNow) && !expressesPain && !hasSymptoms && !state.escalated) {
+    return `Buena eleccion. ${profile.priceNote} El doctor te confirma el presupuesto cerrado en la valoracion, que es sin coste.`;
+  }
+
+  const causes = profile.likelyCauses.slice(0, 2).join(" o ");
   return `${empathy}Por lo que me cuentas podria ser ${causes}; te lo confirmara el doctor al verte.${alarm}${price}`;
 }
 
@@ -551,11 +592,15 @@ function nextStep(state: DentalAgentState, latestPatientText: string) {
   return "";
 }
 
+function mentionsPrice(latestPatientText: string) {
+  return /(precio|cuanto|coste|costar|cuesta|vale|financi|presupuesto)/.test(normalize(latestPatientText));
+}
+
 function wantsPrice(intent: DentalIntentId | undefined, latestPatientText: string) {
   if (intent && PRICE_FORWARD_INTENTS.includes(intent)) {
     return true;
   }
-  return /(precio|cuanto|coste|costar|cuesta|vale|financi|presupuesto)/.test(normalize(latestPatientText));
+  return mentionsPrice(latestPatientText);
 }
 
 function firstName(fullName: string) {
