@@ -677,15 +677,24 @@ const SPECIALTY_KEYWORDS: Partial<Record<DentalIntentId, string[]>> = {
 };
 
 async function findProviderForIntent(tenantId: string, intent: DentalIntentId | undefined) {
+  const providers = await prisma.provider.findMany({ where: { tenantId, active: true }, orderBy: { name: "asc" } });
+  if (providers.length === 0) {
+    return null;
+  }
+
   const keywords = intent ? (SPECIALTY_KEYWORDS[intent] ?? []) : [];
   if (keywords.length > 0) {
-    const providers = await prisma.provider.findMany({ where: { tenantId, active: true }, orderBy: { name: "asc" } });
     const match = providers.find(candidate => keywords.some(keyword => normalize(candidate.specialty ?? "").includes(keyword)));
     if (match) {
       return match;
     }
   }
-  return prisma.provider.findFirst({ where: { tenantId, active: true }, orderBy: { name: "asc" } });
+
+  // Sin especialidad concreta que casar (p.ej. primera visita): el orden
+  // alfabetico puede caer en el higienista, pero una primera visita/valoracion
+  // la hace un odontologo. Se prioriza cualquier profesional que no sea
+  // higienista antes de caer en el resto.
+  return providers.find(candidate => !normalize(candidate.specialty ?? "").includes("higien")) ?? providers[0];
 }
 
 // Fecha en lenguaje natural para el paciente ("hoy a las 18:00" / "martes 14
