@@ -145,6 +145,9 @@ model TenantSetting {
   tone            String
   escalationRules String
   rgpdNotes       String
+  // Conocimiento libre de la clinica (equipo, especialidades, enrutado,
+  // programas, diferenciadores) inyectado en el prompt del agente IA.
+  knowledgeNotes  String?
   voiceEnabled    Boolean  @default(true)
   whatsappEnabled Boolean  @default(true)
   smsEnabled      Boolean  @default(true)

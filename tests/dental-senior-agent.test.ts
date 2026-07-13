@@ -203,6 +203,22 @@ describe("runDentalSeniorTurn", () => {
     expect(second.state.detectedSignals).not.toContain("dolor intenso");
   });
 
+  it("does not let a past 'dolor intenso' signal force urgent_pain on a later unrelated reply", () => {
+    // Bug real: tras "me duele mucho" (endodontics + signal dolor intenso),
+    // una respuesta de seguridad sin sintomas nuevos ("no tengo fiebre ni
+    // hinchazon") se reclasificaba como urgent_pain solo porque el signal
+    // "dolor intenso" seguia acumulado del turno anterior.
+    const first = runDentalSeniorTurn(
+      initialDentalAgentState,
+      "Me duele mucho al frio y creo que es del nervio, desde hace dias"
+    );
+    expect(first.state.intent).toBe("endodontics");
+
+    const second = runDentalSeniorTurn(first.state, "No tengo fiebre ni hinchazon");
+    expect(second.state.intent).toBe("endodontics");
+    expect(second.reply).not.toContain("absceso dental");
+  });
+
   it("does not escalate to urgency when the patient denies strong pain", () => {
     const first = runDentalSeniorTurn(initialDentalAgentState, "Se me ha caido una funda y noto sensibilidad");
     expect(first.state.intent).toBe("prosthetics");

@@ -38,6 +38,7 @@ export async function POST(request: NextRequest) {
     user.tenant.settings?.tone ? `Tono configurado: ${user.tenant.settings.tone}` : "",
     user.tenant.settings?.escalationRules ? `Reglas de escalado tenant: ${user.tenant.settings.escalationRules}` : "",
     user.tenant.settings?.rgpdNotes ? `Notas RGPD tenant: ${user.tenant.settings.rgpdNotes}` : "",
+    user.tenant.settings?.knowledgeNotes ? `Base de conocimiento de la clinica:\n${user.tenant.settings.knowledgeNotes}` : "",
     treatments.length > 0
       ? `Catalogo real del tenant:\n${treatments
           .map(treatment =>

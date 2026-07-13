@@ -381,7 +381,7 @@ function resolveProvider(): LlmProvider {
 
 function buildDentalSystemPrompt(extraContext?: string) {
   const treatments = demoKnowledge.treatments
-    .map(treatment => `- ${treatment.name}: ${treatment.price}. Regla: ${treatment.rule}`)
+    .map(treatment => `- ${treatment.name}: ${treatment.price}. ${treatment.about} Regla: ${treatment.rule}`)
     .join("\n");
 
   return [
@@ -409,7 +409,9 @@ function buildDentalSystemPrompt(extraContext?: string) {
     `Guardrails: ${demoKnowledge.guardrails.join(" ")}`,
     "Tratamientos y precios:",
     treatments,
-    extraContext ? `Contexto adicional del tenant:\n${extraContext}` : "",
+    extraContext
+      ? `Contexto adicional del tenant (si contradice algo de la base generica de arriba -- sedes, horario, equipo, precios -- este contexto especifico de la clinica siempre prevalece):\n${extraContext}`
+      : "",
     "",
     "Devuelve solo JSON conforme al esquema. El campo reply es el mensaje que vera el paciente."
   ].filter(Boolean).join("\n");

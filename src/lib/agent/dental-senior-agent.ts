@@ -52,7 +52,6 @@ type IntentProfile = {
   likelyCauses: string[];
   clinicalReading: string;
   priceNote: string;
-  followUp: string[];
 };
 
 export const initialDentalAgentState: DentalAgentState = {
@@ -88,8 +87,7 @@ export const intentProfiles: Record<DentalIntentId, IntentProfile> = {
     defaultTriage: "ROUTINE",
     likelyCauses: ["revision general", "molestia sin clasificar", "valoracion preventiva"],
     clinicalReading: "Puede encajar con una primera valoracion para revisar el estado de una pieza o resolver dudas.",
-    priceNote: "La primera visita y diagnostico digital es sin coste.",
-    followUp: ["Que pieza o zona quieres revisar?", "Tienes dolor, sensibilidad o solo quieres una revision?"]
+    priceNote: "La primera visita y diagnostico digital es sin coste."
   },
   urgent_pain: {
     title: "Dolor / infeccion",
@@ -101,12 +99,7 @@ export const intentProfiles: Record<DentalIntentId, IntentProfile> = {
     likelyCauses: ["pulpitis", "absceso dental", "fisura", "infeccion periodontal", "pericoronaritis"],
     clinicalReading:
       "Los sintomas de dolor intenso, dolor pulsatil, hinchazon o mal sabor pueden sugerir inflamacion o infeccion odontogena. Requiere valoracion prioritaria.",
-    priceNote: "La urgencia dental parte desde 70 EUR; el tratamiento definitivo depende de la exploracion.",
-    followUp: [
-      "El dolor es espontaneo o aparece al morder?",
-      "Hay hinchazon, fiebre, pus, mal sabor o dificultad para abrir la boca?",
-      "Desde cuando ocurre y que intensidad tiene del 0 al 10?"
-    ]
+    priceNote: "La urgencia dental parte desde 70 EUR; el tratamiento definitivo depende de la exploracion."
   },
   implant_price: {
     title: "Implante",
@@ -117,13 +110,8 @@ export const intentProfiles: Record<DentalIntentId, IntentProfile> = {
     defaultTriage: "PRIORITY_72H",
     likelyCauses: ["ausencia de pieza", "pieza no restaurable", "rehabilitacion con implante", "protesis sobre implante"],
     clinicalReading:
-      "Si falta una pieza o esta pendiente de extraccion, conviene valorar hueso, encia, mordida y pruebas de imagen antes de cerrar presupuesto.",
-    priceNote: "El implante unitario parte desde 1.200 EUR y puede financiarse hasta 24 meses segun aprobacion.",
-    followUp: [
-      "La pieza ya falta o te han dicho que hay que extraerla?",
-      "En que zona es: muela, premolar o diente frontal?",
-      "Tienes radiografia reciente o presupuesto previo?"
-    ]
+      "Si falta una pieza o esta pendiente de extraccion, conviene valorar hueso, encia, mordida y un estudio de imagen (TAC/escaner 3D) antes de cerrar presupuesto; en casos con poco hueso puede requerir injerto previo.",
+    priceNote: "El implante unitario parte desde 1.200 EUR y puede financiarse hasta 24 meses segun aprobacion."
   },
   whitening: {
     title: "Blanqueamiento",
@@ -134,13 +122,8 @@ export const intentProfiles: Record<DentalIntentId, IntentProfile> = {
     defaultTriage: "ESTHETIC",
     likelyCauses: ["tratamiento estetico", "tincion dental", "evento proximo", "mantenimiento de sonrisa"],
     clinicalReading:
-      "El blanqueamiento puede ser una buena opcion estetica, pero antes se revisa sensibilidad, encia, caries y restauraciones visibles.",
-    priceNote: "El blanqueamiento empieza desde 280 EUR, pendiente de valorar sensibilidad y estado oral.",
-    followUp: [
-      "Tienes sensibilidad con frio o encia inflamada?",
-      "Es para una fecha concreta?",
-      "Has hecho blanqueamiento antes?"
-    ]
+      "El blanqueamiento puede ser una buena opcion estetica, pero antes se revisa sensibilidad, encia, caries y restauraciones visibles (las fundas/empastes no cambian de color).",
+    priceNote: "El blanqueamiento empieza desde 280 EUR, pendiente de valorar sensibilidad y estado oral."
   },
   reactivation: {
     title: "Higiene / mantenimiento",
@@ -152,12 +135,7 @@ export const intentProfiles: Record<DentalIntentId, IntentProfile> = {
     likelyCauses: ["mantenimiento periodontal", "sarro", "gingivitis", "revision preventiva"],
     clinicalReading:
       "Una higiene puede resolver sarro y sangrado leve, pero si hay sangrado frecuente, movilidad o mal aliento persistente conviene valorar periodoncia.",
-    priceNote: "La higiene dental dura unos 45 minutos y tiene precio orientativo de 55 EUR.",
-    followUp: [
-      "Hace cuanto fue tu ultima limpieza?",
-      "Te sangran las encias al cepillarte?",
-      "Notas movilidad, mal sabor o retraccion de encia?"
-    ]
+    priceNote: "La higiene dental dura unos 45 minutos y tiene precio orientativo de 55 EUR."
   },
   orthodontics: {
     title: "Ortodoncia invisible",
@@ -168,13 +146,8 @@ export const intentProfiles: Record<DentalIntentId, IntentProfile> = {
     defaultTriage: "ROUTINE",
     likelyCauses: ["apinamiento", "malposicion dental", "mordida abierta/cruzada", "recidiva tras ortodoncia"],
     clinicalReading:
-      "La ortodoncia invisible requiere estudio digital para confirmar si el caso es apto, duracion aproximada y presupuesto cerrado.",
-    priceNote: "La ortodoncia invisible parte desde 1.800 EUR y se confirma tras estudio digital.",
-    followUp: [
-      "Que quieres corregir: apinamiento, separacion, mordida o estetica general?",
-      "Has llevado ortodoncia antes?",
-      "Buscas alineadores invisibles o tambien valorarias otra opcion?"
-    ]
+      "La ortodoncia invisible requiere estudio digital para confirmar si el caso es apto, duracion aproximada y presupuesto cerrado; los alineadores son removibles (se quitan para comer y limpiar). En ninos puede valorarse ortopedia funcional para guiar el crecimiento.",
+    priceNote: "La ortodoncia invisible parte desde 1.800 EUR y se confirma tras estudio digital."
   },
   endodontics: {
     title: "Endodoncia / nervio",
@@ -186,12 +159,7 @@ export const intentProfiles: Record<DentalIntentId, IntentProfile> = {
     likelyCauses: ["pulpitis irreversible", "infeccion periapical", "caries profunda", "fractura con afectacion pulpar"],
     clinicalReading:
       "Dolor espontaneo, nocturno, pulsatil o sensibilidad que tarda en calmar puede apuntar a afectacion del nervio. Necesita valoracion prioritaria.",
-    priceNote: "La endodoncia parte desde 220 EUR, pendiente de radiografia, pieza afectada y complejidad.",
-    followUp: [
-      "El dolor te despierta por la noche?",
-      "El frio o el calor dejan dolor que dura varios segundos?",
-      "Notas dolor al morder o tocar la pieza?"
-    ]
+    priceNote: "La endodoncia parte desde 220 EUR, pendiente de radiografia, pieza afectada y complejidad."
   },
   caries_restoration: {
     title: "Caries / empaste",
@@ -203,12 +171,7 @@ export const intentProfiles: Record<DentalIntentId, IntentProfile> = {
     likelyCauses: ["caries", "filtracion de empaste", "fisura", "sensibilidad dentinaria"],
     clinicalReading:
       "Dolor breve con frio, dulce o al morder puede relacionarse con caries, filtracion de empaste o sensibilidad. Conviene revisar antes de que avance.",
-    priceNote: "El empaste parte desde 65 EUR, pendiente de tamano y profundidad de la lesion.",
-    followUp: [
-      "La sensibilidad se va rapido o se queda rato?",
-      "Ves un agujero, mancha oscura o empaste roto?",
-      "Duele al morder?"
-    ]
+    priceNote: "El empaste parte desde 65 EUR, pendiente de tamano y profundidad de la lesion."
   },
   periodontics: {
     title: "Encias / periodoncia",
@@ -219,13 +182,8 @@ export const intentProfiles: Record<DentalIntentId, IntentProfile> = {
     defaultTriage: "PRIORITY_72H",
     likelyCauses: ["gingivitis", "periodontitis", "sarro subgingival", "inflamacion periodontal"],
     clinicalReading:
-      "Sangrado de encias, mal aliento, retraccion o movilidad pueden sugerir inflamacion gingival o periodontal. Requiere exploracion y sondaje.",
-    priceNote: "La valoracion periodontal parte desde 90 EUR segun prueba y tratamiento necesario.",
-    followUp: [
-      "Sangran las encias al cepillarte o espontaneamente?",
-      "Notas dientes con movilidad o encia retraida?",
-      "Hace cuanto fue tu ultima higiene?"
-    ]
+      "Sangrado de encias, mal aliento, retraccion o movilidad pueden sugerir inflamacion gingival o periodontal. Requiere exploracion y sondaje; si se confirma periodontitis, el mantenimiento profesional pasa a ser cada 3 meses de forma indefinida.",
+    priceNote: "La valoracion periodontal parte desde 90 EUR segun prueba y tratamiento necesario."
   },
   prosthetics: {
     title: "Corona / protesis",
@@ -237,12 +195,7 @@ export const intentProfiles: Record<DentalIntentId, IntentProfile> = {
     likelyCauses: ["corona descementada", "fractura de corona", "empaste grande fracturado", "protesis desajustada"],
     clinicalReading:
       "Una corona o funda que se mueve, se cae o molesta debe revisarse para evitar caries, fractura del munon o irritacion de la encia.",
-    priceNote: "Una corona parte desde 450 EUR; si solo hay recementado o ajuste puede ser menos.",
-    followUp: [
-      "La funda se ha caido por completo o solo se mueve?",
-      "Hay dolor, mal olor o sangrado alrededor?",
-      "La conservas en buen estado?"
-    ]
+    priceNote: "Una corona parte desde 450 EUR; si solo hay recementado o ajuste puede ser menos."
   },
   wisdom_tooth: {
     title: "Muela del juicio",
@@ -254,12 +207,7 @@ export const intentProfiles: Record<DentalIntentId, IntentProfile> = {
     likelyCauses: ["pericoronaritis", "muela incluida", "infeccion local", "dolor de tercer molar"],
     clinicalReading:
       "Dolor en la zona posterior, encia inflamada, mal sabor o dificultad al abrir puede encajar con inflamacion alrededor de una muela del juicio.",
-    priceNote: "La extraccion de muela del juicio parte desde 120 EUR; depende de posicion y complejidad.",
-    followUp: [
-      "Es la zona de atras del todo?",
-      "Puedes abrir bien la boca?",
-      "Hay hinchazon, mal sabor o dolor al tragar?"
-    ]
+    priceNote: "La extraccion de muela del juicio parte desde 120 EUR; depende de posicion y complejidad."
   },
   tmj_bruxism: {
     title: "Bruxismo / ATM",
@@ -271,12 +219,7 @@ export const intentProfiles: Record<DentalIntentId, IntentProfile> = {
     likelyCauses: ["bruxismo", "sobrecarga mandibular", "dolor muscular", "trastorno temporomandibular"],
     clinicalReading:
       "Dolor mandibular, chasquidos, desgaste dental o cefalea al despertar pueden relacionarse con bruxismo o sobrecarga de ATM.",
-    priceNote: "La ferula de descarga parte desde 180 EUR, pendiente de exploracion y registros.",
-    followUp: [
-      "Aprietas o rechinas los dientes por la noche?",
-      "Tienes chasquidos al abrir o dolor cerca del oido?",
-      "Te levantas con dolor de mandibula o cabeza?"
-    ]
+    priceNote: "La ferula de descarga parte desde 180 EUR, pendiente de exploracion y registros."
   },
   trauma: {
     title: "Traumatismo dental",
@@ -288,12 +231,7 @@ export const intentProfiles: Record<DentalIntentId, IntentProfile> = {
     likelyCauses: ["fractura dental", "luxacion", "avulsion", "trauma de tejidos blandos"],
     clinicalReading:
       "Un golpe, diente roto, diente que se mueve o sangrado tras traumatismo requiere valoracion urgente para conservar la pieza y controlar tejidos blandos.",
-    priceNote: "La urgencia parte desde 70 EUR; el tratamiento depende de radiografia y tipo de trauma.",
-    followUp: [
-      "El diente se ha roto, se mueve o se ha salido?",
-      "Hay sangrado que no para?",
-      "Hace cuanto fue el golpe?"
-    ]
+    priceNote: "La urgencia parte desde 70 EUR; el tratamiento depende de radiografia y tipo de trauma."
   }
 };
 
@@ -329,7 +267,11 @@ export function runDentalSeniorTurn(current: DentalAgentState, rawText: string):
   const messageSignals = detectLabels(normalized, signalPatterns);
   let redFlags = unique([...current.redFlags, ...messageRedFlags]);
   let detectedSignals = unique([...current.detectedSignals, ...messageSignals]);
-  const intent = inferIntent(current.intent, normalized, detectedSignals, redFlags);
+  // La clasificacion de intencion usa SOLO las senales/alarmas de ESTE
+  // mensaje, no el historial acumulado: si no, un "dolor intenso" mencionado
+  // hace varios turnos seguia forzando urgent_pain en cualquier mensaje
+  // posterior sin relacion (incluso una simple negacion de sintomas).
+  const intent = inferIntent(current.intent, normalized, messageSignals, messageRedFlags);
   // Cambio de tema: los sintomas y alarmas del motivo anterior no deben
   // arrastrar la urgencia a una consulta nueva distinta (p.ej. de un dolor ya
   // resuelto a una consulta de ortodoncia dias despues).

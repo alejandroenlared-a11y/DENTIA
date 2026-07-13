@@ -803,12 +803,14 @@ export async function updateSettingsAction(formData: FormData) {
             create: {
               tone: parsed.data.tone,
               escalationRules: parsed.data.escalationRules,
-              rgpdNotes: parsed.data.rgpdNotes
+              rgpdNotes: parsed.data.rgpdNotes,
+              knowledgeNotes: parsed.data.knowledgeNotes || null
             },
             update: {
               tone: parsed.data.tone,
               escalationRules: parsed.data.escalationRules,
-              rgpdNotes: parsed.data.rgpdNotes
+              rgpdNotes: parsed.data.rgpdNotes,
+              knowledgeNotes: parsed.data.knowledgeNotes || null
             }
           }
         }

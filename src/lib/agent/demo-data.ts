@@ -7,18 +7,78 @@ export const demoKnowledge = {
     hours: "Lunes a viernes, 9:30-14:00 y 16:00-20:00. Urgencias priorizadas el mismo dia."
   },
   treatments: [
-    { name: "Primera visita y diagnostico digital", price: "0 EUR", rule: "Sin coste, incluye orientacion y plan inicial." },
-    { name: "Higiene dental", price: "55 EUR", rule: "45 minutos. Recordatorio automatico cada 6-12 meses." },
-    { name: "Empaste / conservadora", price: "desde 65 EUR", rule: "Requiere valorar caries, fractura o filtracion." },
-    { name: "Endodoncia", price: "desde 220 EUR", rule: "Dolor pulsatil, nocturno o sensibilidad persistente requiere valoracion." },
-    { name: "Periodoncia", price: "desde 90 EUR", rule: "Sangrado, movilidad o inflamacion de encias requiere sondaje periodontal." },
-    { name: "Blanqueamiento", price: "desde 280 EUR", rule: "Requiere valorar sensibilidad y estado de encia." },
-    { name: "Ortodoncia invisible", price: "desde 1.800 EUR", rule: "Siempre con valoracion previa y estudio digital." },
-    { name: "Implante unitario", price: "desde 1.200 EUR", rule: "No se cierra presupuesto sin TAC/valoracion." },
-    { name: "Corona / protesis fija", price: "desde 450 EUR", rule: "Valorar munon, ajuste, fractura o descementado." },
-    { name: "Extraccion muela del juicio", price: "desde 120 EUR", rule: "Dolor posterior, inflamacion o dificultad al abrir requiere triaje." },
-    { name: "Ferula de descarga", price: "desde 180 EUR", rule: "Bruxismo, dolor mandibular o desgaste requiere exploracion." },
-    { name: "Urgencia dental", price: "desde 70 EUR", rule: "Dolor intenso, inflamacion o traumatismo se escala a humano." }
+    {
+      name: "Primera visita y diagnostico digital",
+      price: "0 EUR",
+      about: "Revision completa con radiografia/escaner digital, diagnostico del doctor y plan de tratamiento con presupuesto, sin compromiso.",
+      rule: "Sin coste, incluye orientacion y plan inicial."
+    },
+    {
+      name: "Higiene dental",
+      price: "55 EUR",
+      about: "Limpieza profesional para eliminar placa y sarro; recomendada 1-2 veces al ano, o cada 3 meses si hay enfermedad periodontal.",
+      rule: "45 minutos. Recordatorio automatico cada 6-12 meses."
+    },
+    {
+      name: "Empaste / conservadora",
+      price: "desde 65 EUR",
+      about: "Elimina la caries y restaura la pieza con composite del color del diente; conserva la mayor parte del diente natural.",
+      rule: "Requiere valorar caries, fractura o filtracion."
+    },
+    {
+      name: "Endodoncia",
+      price: "desde 220 EUR",
+      about: "Trata la infeccion o inflamacion del nervio: limpia y sella el conducto para conservar la pieza sin necesidad de extraerla.",
+      rule: "Dolor pulsatil, nocturno o sensibilidad persistente requiere valoracion."
+    },
+    {
+      name: "Periodoncia",
+      price: "desde 90 EUR",
+      about: "Trata encias inflamadas (gingivitis) o con perdida de hueso (periodontitis); en casos avanzados requiere mantenimiento cada 3 meses.",
+      rule: "Sangrado, movilidad o inflamacion de encias requiere sondaje periodontal."
+    },
+    {
+      name: "Blanqueamiento",
+      price: "desde 280 EUR",
+      about: "Aclara el color natural del diente en clinica o con ferulas para casa; antes se revisa sensibilidad y estado de las encias.",
+      rule: "Requiere valorar sensibilidad y estado de encia."
+    },
+    {
+      name: "Ortodoncia invisible",
+      price: "desde 1.800 EUR",
+      about: "Alineadores transparentes removibles (se pueden quitar para comer y limpiar) o brackets de baja friccion como alternativa; requiere estudio digital previo.",
+      rule: "Siempre con valoracion previa y estudio digital."
+    },
+    {
+      name: "Implante unitario",
+      price: "desde 1.200 EUR",
+      about: "Raiz artificial de titanio que sustituye un diente perdido; requiere estudio de hueso (TAC/escaner 3D) antes de cerrar presupuesto.",
+      rule: "No se cierra presupuesto sin TAC/valoracion."
+    },
+    {
+      name: "Corona / protesis fija",
+      price: "desde 450 EUR",
+      about: "Cubre o sustituye una pieza danada o descementada para recuperar forma y funcion; se valora el estado del diente base antes de fabricarla.",
+      rule: "Valorar munon, ajuste, fractura o descementado."
+    },
+    {
+      name: "Extraccion muela del juicio",
+      price: "desde 120 EUR",
+      about: "Retira la muela cuando esta incluida, mal posicionada o causa infeccion/dolor de repeticion en la zona posterior.",
+      rule: "Dolor posterior, inflamacion o dificultad al abrir requiere triaje."
+    },
+    {
+      name: "Ferula de descarga",
+      price: "desde 180 EUR",
+      about: "Placa a medida para bruxismo o molestias de mandibula: protege los dientes del desgaste (se desgasta la ferula, no el diente) y alivia la tension muscular.",
+      rule: "Bruxismo, dolor mandibular o desgaste requiere exploracion."
+    },
+    {
+      name: "Urgencia dental",
+      price: "desde 70 EUR",
+      about: "Atencion prioritaria para dolor agudo, inflamacion o traumatismo; el tratamiento definitivo se decide tras la exploracion del doctor.",
+      rule: "Dolor intenso, inflamacion o traumatismo se escala a humano."
+    }
   ],
   financing: [
     "Financiacion hasta 24 meses segun importe y aprobacion.",

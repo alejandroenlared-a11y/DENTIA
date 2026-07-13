@@ -31,12 +31,41 @@ const PRIMARY_TENANT = {
   assistantEnabled: true,
   retentionDays: 90
 };
+// Resumen operativo de la clinica para el prompt del agente IA. Fuente:
+// RUIZ-ESTRADA-BASE-CONOCIMIENTO.md (investigacion propia sobre la web real
+// del cliente). Solo hechos administrativos/comerciales, nunca guia clinica
+// para diagnosticar: la IA orienta y agenda, el doctor explora y diagnostica.
+const PRIMARY_KNOWLEDGE_NOTES = `EQUIPO Y ENRUTADO POR MOTIVO DE CONSULTA:
+- Dr. Ernesto Ruiz Chumilla: periodoncia, implantes y cirugia oral (extracciones, cordales, injertos).
+- Dra. Esther Estrada Mallada: ortodoncia (alineadores invisibles y brackets de autoligado).
+- Dra. Laura Herencia Lizaran: endodoncia y odontopediatria (primera visita infantil recomendada a los 3 anos).
+- Dr. Manuel Ruiz Chumilla: estetica dental (carillas, blanqueamiento, Digital Smile Design) y conservadora.
+- Higienistas (Ana Isabel Garcia Marcos y equipo): limpiezas e mantenimiento periodontal.
+
+DIFERENCIADORES A COMUNICAR (siempre que sean relevantes, nunca inventar mas alla de esto):
+- Primera visita a coste cero: incluye escaner intraoral 3D, radiografia panoramica, diagnostico y presupuesto sin compromiso.
+- Sedacion consciente con oxido nitroso disponible para pacientes con miedo al dentista, ninos o reflejo nauseoso; recuperacion inmediata.
+- Cirugia guiada por ordenador e implantes con planificacion 3D (CBCT); PRGF (factores de crecimiento del propio paciente) para acelerar cicatrizacion.
+- Digital Smile Design: preview digital de la sonrisa antes de empezar el tratamiento estetico.
+- Ortodoncia invisible o brackets de autoligado de baja friccion segun caso; ortopedia funcional en ninos de 3 a 12 anos.
+
+PROGRAMAS Y POLITICAS:
+- PADI (Region de Murcia): gratuito para ninos de 6 a 8 anos con tarjeta sanitaria, solo sede Murcia (higiene, flúor, selladores, empastes y extracciones en dientes definitivos). No incluye ortodoncia.
+- Financiacion hasta 24 meses sin intereses sobre el 100% del tratamiento.
+- La clinica cierra todo el mes de agosto: capturar el lead igualmente y ofrecer primera cita disponible de septiembre.
+- Recomendacion general: revision dos veces al ano.
+
+SEDES Y HORARIOS REALES:
+- Murcia (Paseo Duques de Lugo, 16): lunes, miercoles, jueves y viernes 10:00-18:00; martes 10:00-13:00 y 15:30-20:00.
+- Elche (Carrer Reina Victoria, 49): lunes y miercoles 10:00-13:00 y 15:30-20:30; martes y jueves 10:00-13:00 y 15:00-20:00; viernes 10:00-18:00.`;
+
 const PRIMARY_SETTINGS = {
   tone: "Cercano, profesional y empatico",
   escalationRules:
     "Urgencia real, enfado, pagos/reclamaciones, peticion explicita de humano, dos fallos de comprension o sintomas fuera de protocolo.",
   rgpdNotes:
     "Locucion previa, consentimiento explicito, retencion 90 dias, residencia UE y minima PII al LLM.",
+  knowledgeNotes: PRIMARY_KNOWLEDGE_NOTES,
   voiceEnabled: true,
   whatsappEnabled: true,
   smsEnabled: true,
@@ -153,35 +182,58 @@ async function main() {
     }
   });
 
-  const [draVidal, drMarin, higienista] = await Promise.all([
+  // Equipo real de la clinica (ver RUIZ-ESTRADA-BASE-CONOCIMIENTO.md seccion 3):
+  // el enrutado por especialidad (findProviderForIntent en src/lib/agent/index.ts)
+  // hace match por subcadena contra estos campos "specialty".
+  const [draEstrada, drManuel, higienista, drErnesto, draLaura] = await Promise.all([
     prisma.provider.upsert({
       where: { id: "seed-provider-vidal" },
-      update: {},
+      update: { name: "Dra. Esther Estrada Mallada", specialty: "Ortodoncia" },
       create: {
         id: "seed-provider-vidal",
         tenantId: tenant.id,
-        name: "Dra. Laura Vidal",
-        specialty: "Ortodoncia e implantologia"
+        name: "Dra. Esther Estrada Mallada",
+        specialty: "Ortodoncia"
       }
     }),
     prisma.provider.upsert({
       where: { id: "seed-provider-marin" },
-      update: {},
+      update: { name: "Dr. Manuel Ruiz Chumilla", specialty: "Estetica dental y conservadora" },
       create: {
         id: "seed-provider-marin",
         tenantId: tenant.id,
-        name: "Dr. Sergio Marin",
-        specialty: "Urgencias y conservadora"
+        name: "Dr. Manuel Ruiz Chumilla",
+        specialty: "Estetica dental y conservadora"
       }
     }),
     prisma.provider.upsert({
       where: { id: "seed-provider-marta" },
-      update: {},
+      update: { name: "Ana Isabel Garcia Marcos", specialty: "Higiene y mantenimiento periodontal" },
       create: {
         id: "seed-provider-marta",
         tenantId: tenant.id,
-        name: "Higienista Marta",
-        specialty: "Higiene y periodoncia"
+        name: "Ana Isabel Garcia Marcos",
+        specialty: "Higiene y mantenimiento periodontal"
+      }
+    }),
+    prisma.provider.upsert({
+      where: { id: "seed-provider-ernesto" },
+      update: { name: "Dr. Ernesto Ruiz Chumilla", specialty: "Periodoncia, implantes y cirugia oral" },
+      create: {
+        id: "seed-provider-ernesto",
+        tenantId: tenant.id,
+        name: "Dr. Ernesto Ruiz Chumilla",
+        specialty: "Periodoncia, implantes y cirugia oral"
+      }
+    }),
+    prisma.provider.upsert({
+      where: { id: "seed-provider-laura" },
+      update: { name: "Dra. Laura Herencia Lizaran", specialty: "Endodoncia y odontopediatria" },
+      create: {
+        id: "seed-provider-laura",
+        tenantId: tenant.id,
+        name: "Dra. Laura Herencia Lizaran",
+        specialty: "Endodoncia y odontopediatria"
       }
     })
   ]);
@@ -275,7 +327,7 @@ async function main() {
         tenantId: tenant.id,
         patientId: maria.id,
         treatmentId: treatments[2].id,
-        providerId: draVidal.id,
+        providerId: draEstrada.id,
         operatoryId: gab2.id,
         title: "Valoracion ortodoncia",
         startsAt: new Date("2026-07-09T09:30:00.000Z"),
@@ -288,7 +340,7 @@ async function main() {
         tenantId: tenant.id,
         patientId: javier.id,
         treatmentId: treatments[4].id,
-        providerId: drMarin.id,
+        providerId: drManuel.id,
         operatoryId: urgencias.id,
         title: "Dolor agudo",
         startsAt: new Date("2026-07-08T18:15:00.000Z"),
@@ -314,7 +366,7 @@ async function main() {
         tenantId: tenant.id,
         patientId: ana.id,
         treatmentId: treatments[3].id,
-        providerId: draVidal.id,
+        providerId: drErnesto.id,
         operatoryId: gab2.id,
         title: "Cierre presupuesto",
         startsAt: new Date("2026-07-11T10:30:00.000Z"),
