@@ -338,7 +338,9 @@ export function runDentalSeniorTurn(current: DentalAgentState, rawText: string):
     detectedSignals = unique(messageSignals);
   }
   const profile = intent ? intentProfiles[intent] : null;
-  const name = current.name || extractName(text);
+  // Si la pregunta pendiente era el nombre, aceptar una respuesta que sea
+  // solo el nombre ("Alejandro Marti"), sin exigir "soy" o "me llamo".
+  const name = current.name || extractName(text) || (wasAskedForName(current) ? extractBareName(text) : "");
   const phone = current.phone || extractPhone(text);
   const location = current.location || extractLocation(normalized);
   const availability = current.availability || extractAvailability(normalized, text);
@@ -429,7 +431,14 @@ function buildDentalReply(state: DentalAgentState, previous: DentalAgentState, l
       return `${pickVariant(EMPATHY_PAIN, latestPatientText)} Esto no deberia esperar: si te cuesta respirar o tragar, o la hinchazon avanza, acude a urgencias ya. Mientras, aceptas que guardemos tus datos para priorizarte?`;
     }
     if (!state.name) {
-      return "Lo marco como prioridad maxima. Como te llamas?";
+      return pickVariant(
+        [
+          "Lo marco como prioridad maxima. Como te llamas?",
+          "Queda marcado como prioritario. Me dices tu nombre y apellidos?",
+          "Lo gestiono como urgencia ya. Dime tu nombre, por favor."
+        ],
+        latestPatientText
+      );
     }
     if (!state.phone) {
       return `${first}, dime un telefono y te llamamos ya.`;
@@ -697,8 +706,60 @@ function extractName(text: string) {
 }
 
 function extractPhone(text: string) {
-  const match = text.match(/(?:\+?34[\s.-]?)?[6789](?:[\s.-]?\d){8}/);
+  const match = text.match(PHONE_PATTERN);
   return match ? match[0].replace(/[^\d+]/g, "") : "";
+}
+
+const PHONE_PATTERN = /(?:\+?34[\s.-]?)?[6789](?:[\s.-]?\d){8}/;
+
+// Palabras que descartan que una respuesta corta sea un nombre.
+const NON_NAME_WORDS = new Set([
+  "si", "no", "vale", "ok", "okay", "hola", "buenas", "gracias", "acepto", "claro",
+  "perfecto", "genial", "bien", "mal", "ya", "aqui", "manana", "tarde", "noche",
+  "murcia", "elche", "cita", "urgencia", "dolor", "muela", "porque", "que", "cuando",
+  "desde", "ayer", "hoy", "anoche", "hace", "semana", "semanas", "dia", "dias",
+  "mes", "meses", "mucho", "poco", "nada", "todo", "fuerte", "por", "la", "el"
+]);
+
+// Replica el orden de preguntas de buildDentalReply/nextStep para saber si el
+// ultimo mensaje del agente pidio el nombre: solo entonces se puede tratar una
+// respuesta suelta como nombre (evita guardar "desde ayer" como nombre cuando
+// la pregunta pendiente era clinica).
+function wasAskedForName(state: DentalAgentState): boolean {
+  if (!state.intent || !state.consent || state.name) {
+    return false;
+  }
+  if (state.triageLevel === "EMERGENCY") {
+    return true;
+  }
+  const safetyPending =
+    state.redFlags.length === 0 &&
+    !state.safetyScreened &&
+    ["urgent_pain", "endodontics", "wisdom_tooth", "trauma"].includes(state.intent);
+  if (safetyPending) {
+    return false;
+  }
+  if (!state.escalated && state.missingClinicalData.length > 0) {
+    return false;
+  }
+  return true;
+}
+
+function extractBareName(raw: string) {
+  const candidate = raw
+    .replace(new RegExp(PHONE_PATTERN.source, "g"), "")
+    .replace(/[,;.!?]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!/^[\p{L}][\p{L}' -]{1,47}$/u.test(candidate)) {
+    return "";
+  }
+  const words = candidate.split(" ");
+  if (words.length > 4 || words.some(word => NON_NAME_WORDS.has(normalize(word)))) {
+    return "";
+  }
+  return candidate.slice(0, 48);
 }
 
 function extractLocation(normalized: string) {

@@ -95,6 +95,57 @@ describe("runDentalSeniorTurn", () => {
     expect(second.reply.length).toBeLessThan(160);
   });
 
+  it("accepts a bare name reply when the agent just asked for the name", () => {
+    const emergency = runDentalSeniorTurn(
+      initialDentalAgentState,
+      "Me duele mucho una muela, tengo la cara muy hinchada y me cuesta tragar"
+    );
+    expect(emergency.state.triageLevel).toBe("EMERGENCY");
+
+    const consented = runDentalSeniorTurn(emergency.state, "me vale");
+    expect(consented.state.consent).toBe(true);
+    expect(consented.reply.toLowerCase()).toContain("nombre");
+
+    const named = runDentalSeniorTurn(consented.state, "Alejandro Marti");
+    expect(named.state.name).toBe("Alejandro Marti");
+    expect(named.reply).not.toContain("Como te llamas");
+    expect(named.reply.toLowerCase()).toContain("telefono");
+  });
+
+  it("captures name and phone from a single bare reply", () => {
+    const first = runDentalSeniorTurn(
+      initialDentalAgentState,
+      "Me falta una muela y quiero implante. Acepto que guardeis mis datos."
+    );
+    const second = runDentalSeniorTurn(first.state, "Alejandro Marti, 655444333");
+    expect(second.state.name).toBe("Alejandro Marti");
+    expect(second.state.phone).toBe("655444333");
+  });
+
+  it("does not store a clinical answer as the name when the pending question is clinical", () => {
+    const first = runDentalSeniorTurn(initialDentalAgentState, "Creo que tengo una caries en una muela");
+    const second = runDentalSeniorTurn(first.state, "acepto");
+    // La pregunta pendiente sigue siendo clinica (frio/morder), no el nombre.
+    const third = runDentalSeniorTurn(second.state, "desde ayer");
+    expect(third.state.name).toBe("");
+  });
+
+  it("does not store time expressions as a name in an escalated flow", () => {
+    const first = runDentalSeniorTurn(initialDentalAgentState, "Me duele mucho una muela");
+    const second = runDentalSeniorTurn(first.state, "no tengo fiebre ni hinchazon, acepto");
+    const third = runDentalSeniorTurn(second.state, "desde ayer");
+    expect(third.state.name).toBe("");
+  });
+
+  it("does not mistake short non-name replies for a name", () => {
+    const first = runDentalSeniorTurn(
+      initialDentalAgentState,
+      "Me falta una muela y quiero implante. Acepto que guardeis mis datos."
+    );
+    const second = runDentalSeniorTurn(first.state, "vale, perfecto");
+    expect(second.state.name).toBe("");
+  });
+
   it("does not repeat the booking confirmation once the pre-booking is done", () => {
     const ready = runDentalSeniorTurn(
       initialDentalAgentState,
