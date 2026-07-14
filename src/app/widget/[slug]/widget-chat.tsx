@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { sleep, splitReplyIntoBubbles, typingDelayForBubble } from "@/lib/chat-bubbles";
 import { fetchWithTimeout, isTimeoutError } from "@/lib/http";
 
 const CHAT_REQUEST_TIMEOUT_MS = 30_000;
@@ -76,7 +77,11 @@ export function WidgetChat({ slug, clinicName, assistantName, assistantEnabled }
       }
 
       if (payload.data?.reply) {
-        setEntries(previous => [...previous, { from: "assistant", text: payload.data?.reply ?? "" }]);
+        const bubbles = splitReplyIntoBubbles(payload.data.reply);
+        for (const bubble of bubbles) {
+          await sleep(typingDelayForBubble(bubble));
+          setEntries(previous => [...previous, { from: "assistant", text: bubble }]);
+        }
       } else {
         setEntries(previous => [
           ...previous,

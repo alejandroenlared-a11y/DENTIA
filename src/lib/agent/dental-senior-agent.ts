@@ -414,7 +414,7 @@ function buildDentalReply(state: DentalAgentState, previous: DentalAgentState, l
 
   if (state.triageLevel === "EMERGENCY") {
     if (!state.consent) {
-      return `${pickVariant(EMPATHY_PAIN, latestPatientText)} Esto no deberia esperar: si te cuesta respirar o tragar, o la hinchazon avanza, acude a urgencias ya. Mientras, aceptas que guardemos tus datos para priorizarte?`;
+      return `${pickVariant(EMPATHY_PAIN, latestPatientText)}\n\nEsto no deberia esperar: si te cuesta respirar o tragar, o la hinchazon avanza, acude a urgencias ya. Mientras, ¿aceptas que guardemos tus datos para priorizarte?`;
     }
     if (!state.name) {
       return pickVariant(
@@ -449,9 +449,11 @@ function buildDentalReply(state: DentalAgentState, previous: DentalAgentState, l
     // conocido (todo llego de golpe), incluirlo en la confirmacion.
     const pricePending = isNewIntent && (previous.intentCode === BUDGET_PENDING_INTENT || mentionsPrice(latestPatientText));
     const priceLine = pricePending ? ` ${profile.priceNote}` : "";
-    return state.escalated
-      ? `${first}, queda registrado con prioridad. Te llamamos al ${state.phone} enseguida.`
-      : `${first}, pre-reserva lista: ${state.treatmentNeed.toLowerCase()} en ${state.location}, franja ${state.availability}.${priceLine} El doctor te confirma plan y presupuesto cerrado en la visita.`;
+    if (state.escalated) {
+      return `${first}, queda registrado con prioridad. Te llamamos al ${state.phone} enseguida.`;
+    }
+    const confirmation = `${first}, pre-reserva lista: ${state.treatmentNeed.toLowerCase()} en ${state.location}, franja ${state.availability}.${priceLine}`;
+    return `${confirmation}\n\nEl doctor te confirma plan y presupuesto cerrado en la visita.`;
   }
 
   // Si la conversacion nacio pidiendo presupuesto, dar el rango de precio en
@@ -459,7 +461,7 @@ function buildDentalReply(state: DentalAgentState, previous: DentalAgentState, l
   const cameFromBudget = previous.intentCode === BUDGET_PENDING_INTENT;
   const intro = isNewIntent ? buildIntro(state, profile, latestPatientText, cameFromBudget) : buildAck(state, previous);
   const question = nextStep(state, latestPatientText);
-  const reply = [intro, question].filter(Boolean).join(" ").trim();
+  const reply = [intro, question].filter(Boolean).join("\n\n").trim();
   return reply || "Cuentame un poco mas para orientarte bien.";
 }
 

@@ -197,7 +197,7 @@ export async function processInboundMessage(
   // confirmacion) ni que el enrutado por especialidad es real, no al azar.
   if (!escalated && dentalTurn.state.ready && !previousState.ready && bookedStartsAt) {
     const withWho = bookedProviderName ? ` con ${bookedProviderName}` : "";
-    reply = `${reply} Te espero ${formatFriendlyDateTime(bookedStartsAt)}${withWho}.`;
+    reply = `${reply}\n\nTe espero ${formatFriendlyDateTime(bookedStartsAt)}${withWho}.`;
   }
 
   let urgentBooking: UrgentBooking | null = null;
@@ -226,7 +226,7 @@ export async function processInboundMessage(
             : !dentalTurn.state.name || !dentalTurn.state.phone
               ? "Dime tu nombre y un telefono para dejarla a tu nombre."
               : ""
-        ].filter(Boolean).join(" ");
+        ].filter(Boolean).join("\n\n");
       }
     }
   }
