@@ -6,7 +6,17 @@ const RESCHEDULE_PATTERNS = [
   /reprogramar/i,
   /mover\s+la\s+cita/i,
   /posponer/i,
-  /aplazar\s+la\s+cita/i
+  /aplazar\s+la\s+cita/i,
+  // El paciente pide cambiar la fecha/hora sin decir la palabra "cita"
+  // (p.ej. tras una pre-reserva: "no me viene bien el 15 de julio, lo
+  // puedo cambiar?"). Sin esto, el mensaje caia al cierre generico del
+  // motor local en vez de ofrecer huecos alternativos.
+  /no\s+me\s+viene\s+bien/i,
+  /me\s+viene\s+mal/i,
+  /puedo\s+cambiar(lo|la|los|las)?\b/i,
+  /cambiar(lo|la)?\s+de\s+(dia|fecha|hora)/i,
+  /hay\s+otro\s+dia/i,
+  /otro\s+dia\s+(o\s+)?(hora|horario)/i
 ];
 // El paciente pregunta por la fecha/hora de una cita ya confirmada (p.ej.
 // tras una pre-reserva vaga como "franja manana"): responder con el dato

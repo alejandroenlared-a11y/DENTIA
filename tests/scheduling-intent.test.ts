@@ -12,6 +12,16 @@ describe("detectSchedulingRequest", () => {
     expect(detectSchedulingRequest("Quiero reprogramar")).toBe("reschedule");
   });
 
+  it("detects a reschedule request phrased without the word 'cita'", () => {
+    // Bug real detectado en demo: tras una pre-reserva para el 15 de julio,
+    // el paciente escribio "no me viene bien el 15 de julio, lo puedo
+    // cambiar?" y el patron original (que exigia la palabra "cita") no lo
+    // reconocia, asi que el mensaje caia al cierre generico del motor local.
+    expect(detectSchedulingRequest("no me viene bien el 15 de julio, lo puedo cambiar?")).toBe("reschedule");
+    expect(detectSchedulingRequest("Ese dia me viene mal, tienes otro hueco?")).toBe("reschedule");
+    expect(detectSchedulingRequest("Puedo cambiarlo para otro dia?")).toBe("reschedule");
+  });
+
   it("detects a query about the appointment date", () => {
     expect(detectSchedulingRequest("Para cuando es??")).toBe("query");
     expect(detectSchedulingRequest("Que dia es la cita")).toBe("query");
