@@ -9,6 +9,7 @@ import {
   runDentalSeniorTurn,
   type DentalAgentState
 } from "@/lib/agent/dental-senior-agent";
+import { sleep, splitReplyIntoBubbles, typingDelayForBubble } from "@/lib/chat-bubbles";
 import { fetchWithTimeout, isTimeoutError } from "@/lib/http";
 
 // El servidor responde en <=30s incluso si la IA externa falla (fallback local
@@ -123,7 +124,7 @@ export function InteractiveAgentDemo({ saveAction }: { saveAction: ServerAction 
       setDentalState(payload.data.state);
       setAgentRuntime(payload.data.runtime);
       setApiNotice(payload.data.fallbackReason ? `Fallback local: ${payload.data.fallbackReason}` : `IA API activa: ${payload.data.model}`);
-      setMessages([...nextMessages, { id: makeId("assistant"), role: "assistant", body: payload.data.reply }]);
+      await appendAssistantBubbles(nextMessages, payload.data.reply);
     } catch (error) {
       console.error("sendPatientMessage failed", error);
       setDentalState(fallbackTurn.state);
@@ -133,9 +134,21 @@ export function InteractiveAgentDemo({ saveAction }: { saveAction: ServerAction 
           ? "Fallback local: la IA externa tardo demasiado y Clara respondio con el motor local."
           : "Fallback local: no se pudo consultar la IA."
       );
-      setMessages([...nextMessages, { id: makeId("assistant"), role: "assistant", body: fallbackTurn.reply }]);
+      await appendAssistantBubbles(nextMessages, fallbackTurn.reply);
     } finally {
       setIsThinking(false);
+    }
+  }
+
+  // Clara puede mandar la respuesta partida en varios bloques (separados por
+  // linea en blanco) para sonar como 2-3 mensajes seguidos en vez de un
+  // unico texto de golpe.
+  async function appendAssistantBubbles(base: ChatMessage[], reply: string) {
+    let current = base;
+    for (const bubble of splitReplyIntoBubbles(reply)) {
+      await sleep(typingDelayForBubble(bubble));
+      current = [...current, { id: makeId("assistant"), role: "assistant", body: bubble }];
+      setMessages(current);
     }
   }
 

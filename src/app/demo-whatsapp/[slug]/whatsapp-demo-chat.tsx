@@ -2,6 +2,7 @@
 
 import { ArrowLeft, CheckCheck, Mic, Paperclip, Phone, Send, ShieldCheck, Smile, Video } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { sleep, splitReplyIntoBubbles, typingDelayForBubble } from "@/lib/chat-bubbles";
 import { fetchWithTimeout, isTimeoutError } from "@/lib/http";
 
 const CHAT_REQUEST_TIMEOUT_MS = 30_000;
@@ -108,15 +109,22 @@ export function WhatsAppDemoChat({
         return;
       }
 
-      setEntries(previous => [
-        ...previous,
-        {
-          id: crypto.randomUUID(),
-          from: payload.data?.reply ? "assistant" : "system",
-          text: payload.data?.reply ?? "Mensaje recibido. Recepcion lo revisara en breve.",
-          time: now()
-        }
-      ]);
+      if (!payload.data?.reply) {
+        setEntries(previous => [
+          ...previous,
+          { id: crypto.randomUUID(), from: "system", text: "Mensaje recibido. Recepcion lo revisara en breve.", time: now() }
+        ]);
+        return;
+      }
+
+      // Clara puede mandar la respuesta partida en varios bloques (separados
+      // por linea en blanco) para sonar como 2-3 mensajes seguidos de
+      // WhatsApp en vez de un unico texto de golpe.
+      const bubbles = splitReplyIntoBubbles(payload.data.reply);
+      for (const bubble of bubbles) {
+        await sleep(typingDelayForBubble(bubble));
+        setEntries(previous => [...previous, { id: crypto.randomUUID(), from: "assistant", text: bubble, time: now() }]);
+      }
     } catch (error) {
       setError(
         isTimeoutError(error)
