@@ -228,4 +228,60 @@ describe("runDentalSeniorTurn", () => {
     expect(second.state.escalated).toBe(false);
     expect(second.state.detectedSignals).not.toContain("dolor intenso");
   });
+
+  it("discloses it is an AI assistant when asked directly, without altering the conversation state", () => {
+    const first = runDentalSeniorTurn(initialDentalAgentState, "Me sangran las encias al cepillarme");
+    expect(first.state.intent).toBe("periodontics");
+
+    const asksIdentity = runDentalSeniorTurn(first.state, "Perdona, eres humana o eres un bot?");
+    expect(asksIdentity.reply).toContain("No, no soy humana");
+    expect(asksIdentity.reply.toLowerCase()).toContain("inteligencia artificial");
+    expect(asksIdentity.state).toEqual(first.state);
+
+    const resumed = runDentalSeniorTurn(
+      asksIdentity.state,
+      "Vale, acepto que guardeis mis datos. Soy Marta Ruiz, telefono 622111333."
+    );
+    expect(resumed.state.consent).toBe(true);
+    expect(resumed.state.name).toBe("Marta Ruiz");
+    expect(resumed.state.phone).toBe("622111333");
+  });
+
+  it("never implies it is human even at the very first message", () => {
+    const turn = runDentalSeniorTurn(initialDentalAgentState, "Hola, con quien hablo? eres real?");
+    expect(turn.reply.toLowerCase()).toContain("no soy humana");
+    expect(turn.state.intent).toBeUndefined();
+    expect(turn.state.consent).toBe(false);
+    expect(turn.state.name).toBe("");
+  });
+
+  it("still escalates a real emergency even when the same message also asks if it is human", () => {
+    // Bug real (P1) detectado en revision: el aviso de identidad devolvia el
+    // estado sin tocar y se saltaba el triaje, asi que una emergencia real
+    // combinada con la pregunta de identidad no escalaba ni pedia la
+    // pregunta de seguridad si el LLM no estaba disponible.
+    const turn = runDentalSeniorTurn(initialDentalAgentState, "No puedo respirar bien, eres humana o un bot?");
+    expect(turn.state.triageLevel).toBe("EMERGENCY");
+    expect(turn.state.escalated).toBe(true);
+    expect(turn.reply.toLowerCase()).toContain("no soy humana");
+    expect(turn.reply.toLowerCase()).toContain("urgencias");
+  });
+
+  it("does not cancel out a literal 'no puedo respirar/tragar/abrir' as if it were the negation", () => {
+    // Bug real: el filtro de negacion buscaba "puedo respirar" como
+    // substring, y esa cadena tambien aparece dentro de "no puedo
+    // respirar", asi que la frase de emergencia se anulaba a si misma.
+    const breathing = runDentalSeniorTurn(initialDentalAgentState, "No puedo respirar bien");
+    expect(breathing.state.redFlags).toContain("dificultad para respirar");
+    expect(breathing.state.triageLevel).toBe("EMERGENCY");
+
+    const swallowing = runDentalSeniorTurn(initialDentalAgentState, "No puedo tragar nada");
+    expect(swallowing.state.redFlags).toContain("dificultad para tragar o hablar");
+
+    const opening = runDentalSeniorTurn(initialDentalAgentState, "No puedo abrir la boca");
+    expect(opening.state.redFlags).toContain("dificultad para abrir la boca");
+
+    const reallyFine = runDentalSeniorTurn(initialDentalAgentState, "Puedo respirar bien, tranquilo");
+    expect(reallyFine.state.redFlags).not.toContain("dificultad para respirar");
+  });
 });

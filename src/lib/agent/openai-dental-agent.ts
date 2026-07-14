@@ -10,10 +10,15 @@ import {
 import { fetchWithTimeout, isTimeoutError, resolveTimeoutMs } from "@/lib/http";
 
 const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
-const GEMINI_INTERACTIONS_URL = "https://generativelanguage.googleapis.com/v1beta/interactions";
+// API real de Google (Generative Language API v1beta). La version anterior
+// llamaba a un endpoint "/v1beta/interactions" que nunca ha existido: por
+// eso Gemini nunca respondia de verdad, con clave valida o sin ella.
+function geminiGenerateContentUrl(model: string) {
+  return `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
+}
 const DEFAULT_OPENAI_MODEL = "gpt-5.6-terra";
 const DEFAULT_GEMINI_MODEL = "gemini-2.5-pro";
-const DEFAULT_GEMINI_FALLBACK_MODEL = "gemini-3.5-flash";
+const DEFAULT_GEMINI_FALLBACK_MODEL = "gemini-2.5-flash";
 const PENDING_INTENT = "INTENCION_PENDIENTE";
 
 // Presupuesto de tiempo por llamada al LLM. Si el proveedor no responde, el
@@ -133,24 +138,17 @@ type OpenAiResponsePayload = {
   error?: { message?: string };
 };
 
+// Forma real de la respuesta de la Generative Language API (generateContent).
 type GeminiResponsePayload = {
-  output_text?: string;
-  outputs?: Array<{
-    type?: string;
-    text?: string;
+  candidates?: Array<{
+    content?: { role?: string; parts?: Array<{ text?: string }> };
+    finishReason?: string;
   }>;
-  steps?: Array<{
-    type?: string;
-    content?: Array<{
-      type?: string;
-      text?: string;
-    }>;
-  }>;
-  error?: {
-    code?: number;
-    message?: string;
-  };
+  promptFeedback?: { blockReason?: string };
+  error?: { code?: number; message?: string; status?: string };
 };
+
+type GeminiContentPart = { role: "user" | "model"; parts: [{ text: string }] };
 
 export async function runDentalAgentTurn(input: {
   latestPatientMessage: string;
@@ -239,8 +237,9 @@ async function runGeminiDentalAgentTurn(input: {
   }
 
   try {
-    const prompt = buildGeminiInput(input.history, input.latestPatientMessage, localTurn.state, input.clinicContext);
-    const primaryResult = await requestGeminiTurn({ apiKey, model, prompt, timeoutMs: LLM_TIMEOUT_MS });
+    const systemInstruction = buildGeminiSystemInstruction(input.clinicContext);
+    const contents = buildGeminiContents(input.history, input.latestPatientMessage, localTurn.state);
+    const primaryResult = await requestGeminiTurn({ apiKey, model, systemInstruction, contents, timeoutMs: LLM_TIMEOUT_MS });
     if (primaryResult.ok) {
       const state = mergeAiState(localTurn.state, primaryResult.output);
       return { reply: primaryResult.output.reply, state, runtime: "gemini", model };
@@ -263,7 +262,7 @@ async function runGeminiDentalAgentTurn(input: {
       fallbackModel &&
       fallbackModel !== model
     ) {
-      const secondaryResult = await requestGeminiTurn({ apiKey, model: fallbackModel, prompt, timeoutMs: LLM_FALLBACK_TIMEOUT_MS });
+      const secondaryResult = await requestGeminiTurn({ apiKey, model: fallbackModel, systemInstruction, contents, timeoutMs: LLM_FALLBACK_TIMEOUT_MS });
       if (secondaryResult.ok) {
         const state = mergeAiState(localTurn.state, secondaryResult.output);
         return {
@@ -305,7 +304,8 @@ async function runGeminiDentalAgentTurn(input: {
 async function requestGeminiTurn(input: {
   apiKey: string;
   model: string;
-  prompt: string;
+  systemInstruction: string;
+  contents: GeminiContentPart[];
   timeoutMs: number;
 }): Promise<
   | { ok: true; output: DentalAgentAiOutput }
@@ -313,24 +313,20 @@ async function requestGeminiTurn(input: {
 > {
   let response: Response;
   try {
-    response = await fetchWithTimeout(GEMINI_INTERACTIONS_URL, {
+    response = await fetchWithTimeout(geminiGenerateContentUrl(input.model), {
       method: "POST",
       headers: {
         "content-type": "application/json",
         "x-goog-api-key": input.apiKey
       },
       body: JSON.stringify({
-        model: input.model,
-        input: input.prompt,
-        system_instruction: "Responde en espanol natural y sigue el esquema JSON si response_format lo pide.",
-        generation_config: {
-          temperature: 0.5,
-          max_output_tokens: 1400
-        },
-        response_format: {
-          type: "text",
-          mime_type: "application/json",
-          schema: dentalAgentJsonSchema
+        systemInstruction: { parts: [{ text: input.systemInstruction }] },
+        contents: input.contents,
+        generationConfig: {
+          temperature: 0.6,
+          maxOutputTokens: 1400,
+          responseMimeType: "application/json",
+          responseSchema: dentalAgentGeminiSchema
         }
       })
     }, input.timeoutMs);
@@ -352,6 +348,15 @@ async function requestGeminiTurn(input: {
   }
 
   const payload = (await response.json()) as GeminiResponsePayload;
+
+  if (payload.promptFeedback?.blockReason) {
+    return {
+      ok: false,
+      errorText: "",
+      fallbackReason: `Gemini bloqueo la respuesta por seguridad: ${payload.promptFeedback.blockReason}`
+    };
+  }
+
   const rawText = extractGeminiText(payload);
   if (!rawText) {
     return {
@@ -401,6 +406,7 @@ function buildDentalSystemPrompt(extraContext?: string) {
     "Escala a recepcion/doctor si hay dolor intenso, inflamacion, pus, fiebre, bloqueo mandibular, trauma, reclamacion o incertidumbre clinica relevante.",
     "Para presupuestos, da rangos orientativos y remata con que el doctor confirmara diagnostico y presupuesto cerrado.",
     "Debe parecer un agente formado en la clinica, no un flujo de formulario.",
+    "Si el paciente pregunta directamente si eres humana, una persona real o un bot: responde con naturalidad que eres la asistente de inteligencia artificial de la clinica (nunca digas que eres humana ni lo dejes ambiguo); el resto de la conversacion sigue siendo calida y cercana.",
     "",
     "Base de conocimiento:",
     `Sedes: ${demoKnowledge.clinic.locations.join(" | ")}`,
@@ -440,17 +446,78 @@ function buildDentalUserInput(history: DentalChatMessage[], latestPatientMessage
   ].join("\n");
 }
 
-function buildGeminiInput(
-  history: DentalChatMessage[],
-  latestPatientMessage: string,
-  localState: DentalAgentState,
-  clinicContext?: string
-) {
+function buildGeminiSystemInstruction(clinicContext?: string) {
   return [
     buildDentalSystemPrompt(clinicContext),
     "",
-    buildDentalUserInput(history, latestPatientMessage, localState)
+    "Instrucciones de salida:",
+    "- Si faltan datos de cita, rellena missingClinicalData con preguntas clinicas o administrativas relevantes.",
+    "- ready debe ser true solo si ya hay datos minimos para guardar: consentimiento, nombre y telefono; tambien sede y disponibilidad si no esta escalado.",
+    "- Si detectas emergencia, escalated debe ser true y ready no debe requerir sede ni disponibilidad.",
+    "- Devuelve solo JSON conforme al esquema. El campo reply es el mensaje que vera el paciente."
   ].join("\n");
+}
+
+// A diferencia del prompt plano anterior, Gemini recibe la conversacion como
+// turnos reales (user/model) en vez de un bloque de texto con "Paciente: ...
+// Clara: ...": es la forma nativa de la API y suena mas natural porque el
+// modelo la procesa como dialogo, no como un documento a resumir.
+function buildGeminiContents(
+  history: DentalChatMessage[],
+  latestPatientMessage: string,
+  localState: DentalAgentState
+): GeminiContentPart[] {
+  const trimmedHistory = history.slice(-12);
+  // contents debe empezar en "user": se descarta cualquier saludo inicial
+  // del asistente que no tenga un mensaje de paciente delante.
+  const firstPatientIndex = trimmedHistory.findIndex(message => message.role === "patient");
+  const relevantHistory = firstPatientIndex >= 0 ? trimmedHistory.slice(firstPatientIndex) : [];
+
+  const turns: GeminiContentPart[] = [];
+  for (const message of relevantHistory) {
+    const role: "user" | "model" = message.role === "assistant" ? "model" : "user";
+    const previous = turns[turns.length - 1];
+    if (previous && previous.role === role) {
+      // Turnos consecutivos del mismo rol (p.ej. el aviso de urgencia
+      // anadido tras la respuesta principal) se fusionan: Gemini exige
+      // alternancia estricta user/model.
+      previous.parts = [{ text: `${previous.parts[0].text}\n${message.body}` }];
+    } else {
+      turns.push({ role, parts: [{ text: message.body }] });
+    }
+  }
+
+  const latestWithContext = [
+    latestPatientMessage,
+    "",
+    "[Lectura determinista preliminar del sistema, usala como apoyo pero mejora la naturalidad si procede]:",
+    JSON.stringify(localState)
+  ].join("\n");
+
+  const last = turns[turns.length - 1];
+  if (last && last.role === "user") {
+    last.parts = [{ text: `${last.parts[0].text}\n\n${latestWithContext}` }];
+  } else {
+    turns.push({ role: "user", parts: [{ text: latestWithContext }] });
+  }
+
+  return turns;
+}
+
+// Gemini usa un subconjunto de OpenAPI para responseSchema: no admite
+// palabras clave de JSON Schema puro como additionalProperties/maxLength/
+// maxItems (las ignora en el mejor caso, puede rechazarlas en el peor).
+function toGeminiSchema(schema: unknown): unknown {
+  if (Array.isArray(schema)) {
+    return schema.map(toGeminiSchema);
+  }
+  if (schema && typeof schema === "object") {
+    const entries = Object.entries(schema as Record<string, unknown>)
+      .filter(([key]) => !["additionalProperties", "maxLength", "maxItems", "minLength", "minItems"].includes(key))
+      .map(([key, value]) => [key, toGeminiSchema(value)] as const);
+    return Object.fromEntries(entries);
+  }
+  return schema;
 }
 
 const dentalAgentJsonSchema = {
@@ -504,6 +571,8 @@ const dentalAgentJsonSchema = {
   }
 } as const;
 
+const dentalAgentGeminiSchema = toGeminiSchema(dentalAgentJsonSchema);
+
 function extractOpenAiText(payload: OpenAiResponsePayload) {
   if (typeof payload.output_text === "string" && payload.output_text.trim()) {
     return payload.output_text.trim();
@@ -516,28 +585,10 @@ function extractOpenAiText(payload: OpenAiResponsePayload) {
 }
 
 function extractGeminiText(payload: GeminiResponsePayload) {
-  if (payload.output_text?.trim()) {
-    return payload.output_text.trim();
-  }
-
-  const stepText = payload.steps
-    ?.filter(step => step.type === "model_output")
-    .flatMap(step => step.content ?? [])
-    .filter(content => content.type === "text" && typeof content.text === "string")
-    .map(content => content.text?.trim() ?? "")
-    .filter(Boolean)
-    .join("\n")
-    .trim();
-
-  if (stepText) {
-    return stepText;
-  }
-
-  return payload.outputs
-    ?.filter(output => output.type === "text" && typeof output.text === "string")
-    .map(output => output.text?.trim() ?? "")
-    .filter(Boolean)
-    .join("\n")
+  return payload.candidates
+    ?.flatMap(candidate => candidate.content?.parts ?? [])
+    .map(part => part.text ?? "")
+    .join("")
     .trim() || "";
 }
 

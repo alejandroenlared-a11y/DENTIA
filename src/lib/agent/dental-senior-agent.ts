@@ -260,9 +260,26 @@ const signalPatterns = [
   { label: "muela del juicio", pattern: /(muela del juicio|cordal|tercer molar|dolor atras|zona de atras)/ }
 ];
 
+// Transparencia obligatoria (AI Act): si preguntan directamente si es humana,
+// se responde siempre que no, sin ambiguedad. Esto se ANADE a la respuesta
+// que tocaria de todas formas: no sustituye el triaje. Si el mismo mensaje
+// trae una emergencia real ("no puedo respirar, eres humana?"), el escalado
+// y la pregunta de seguridad se procesan con normalidad y la revelacion se
+// antepone al aviso de urgencia (bug real detectado en revision: la version
+// anterior devolvia el estado congelado y se saltaba por completo el
+// triaje de banderas rojas para ese mensaje). Capa de seguridad ademas de la
+// instruccion en el prompt del LLM: funciona incluso si Gemini/OpenAI no
+// estan disponibles.
+const IDENTITY_QUESTION_PATTERN =
+  /(eres (una persona|un humano|humana|human|real)|hablo con (un humano|una persona)|(eres|sois) (un bot|un robot|una ia|inteligencia artificial)|es usted (una persona|un humano))/;
+const IDENTITY_DISCLOSURE =
+  "No, no soy humana, soy la asistente de inteligencia artificial de la clinica. Te ayudo igual que en recepcion.";
+
 export function runDentalSeniorTurn(current: DentalAgentState, rawText: string): DentalAgentTurn {
   const text = rawText.trim();
   const normalized = normalize(text);
+  const asksIdentity = IDENTITY_QUESTION_PATTERN.test(normalized);
+
   const messageRedFlags = detectLabels(normalized, redFlagPatterns);
   const messageSignals = detectLabels(normalized, signalPatterns);
   let redFlags = unique([...current.redFlags, ...messageRedFlags]);
@@ -281,8 +298,10 @@ export function runDentalSeniorTurn(current: DentalAgentState, rawText: string):
   }
   const profile = intent ? intentProfiles[intent] : null;
   // Si la pregunta pendiente era el nombre, aceptar una respuesta que sea
-  // solo el nombre ("Alejandro Marti"), sin exigir "soy" o "me llamo".
-  const name = current.name || extractName(text) || (wasAskedForName(current) ? extractBareName(text) : "");
+  // solo el nombre ("Alejandro Marti"), sin exigir "soy" o "me llamo"; una
+  // pregunta de identidad no cuenta como nombre aunque sea una frase corta.
+  const name =
+    current.name || extractName(text) || (wasAskedForName(current) && !asksIdentity ? extractBareName(text) : "");
   const phone = current.phone || extractPhone(text);
   const location = current.location || extractLocation(normalized);
   const availability = current.availability || extractAvailability(normalized, text);
@@ -325,7 +344,11 @@ export function runDentalSeniorTurn(current: DentalAgentState, rawText: string):
     nextState.intentCode = BUDGET_PENDING_INTENT;
   }
 
-  return { state: nextState, reply: buildDentalReply(nextState, current, text) };
+  const reply = buildDentalReply(nextState, current, text);
+  return {
+    state: nextState,
+    reply: asksIdentity ? `${IDENTITY_DISCLOSURE} ${reply}`.trim() : reply
+  };
 }
 
 export function buildDentalSummary(state: DentalAgentState) {
@@ -676,10 +699,15 @@ function isNegatedLabel(label: string, normalized: string) {
     return /(no hay pus|sin pus)/.test(normalized);
   }
   if (label.includes("tragar") || label.includes("respirar")) {
-    return /(puedo tragar|puedo respirar|sin dificultad para tragar|sin dificultad para respirar)/.test(normalized);
+    // "puedo respirar/tragar" es un substring literal de "no puedo
+    // respirar/tragar": sin el lookbehind, la frase de emergencia real se
+    // cancelaba a si misma y nunca escalaba.
+    return /(?<!no )puedo tragar|(?<!no )puedo respirar|sin dificultad para tragar|sin dificultad para respirar/.test(
+      normalized
+    );
   }
   if (label.includes("abrir")) {
-    return /(puedo abrir|abro bien|sin dificultad para abrir)/.test(normalized);
+    return /(?<!no )puedo abrir|abro bien|sin dificultad para abrir/.test(normalized);
   }
   return false;
 }
