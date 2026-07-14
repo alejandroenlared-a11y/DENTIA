@@ -228,4 +228,28 @@ describe("runDentalSeniorTurn", () => {
     expect(second.state.escalated).toBe(false);
     expect(second.state.detectedSignals).not.toContain("dolor intenso");
   });
+
+  it("discloses it is an AI assistant when asked directly, without altering the conversation state", () => {
+    const first = runDentalSeniorTurn(initialDentalAgentState, "Me sangran las encias al cepillarme");
+    expect(first.state.intent).toBe("periodontics");
+
+    const asksIdentity = runDentalSeniorTurn(first.state, "Perdona, eres humana o eres un bot?");
+    expect(asksIdentity.reply).toContain("No, no soy humana");
+    expect(asksIdentity.reply.toLowerCase()).toContain("inteligencia artificial");
+    expect(asksIdentity.state).toEqual(first.state);
+
+    const resumed = runDentalSeniorTurn(
+      asksIdentity.state,
+      "Vale, acepto que guardeis mis datos. Soy Marta Ruiz, telefono 622111333."
+    );
+    expect(resumed.state.consent).toBe(true);
+    expect(resumed.state.name).toBe("Marta Ruiz");
+    expect(resumed.state.phone).toBe("622111333");
+  });
+
+  it("never implies it is human even at the very first message", () => {
+    const turn = runDentalSeniorTurn(initialDentalAgentState, "Hola, con quien hablo? eres real?");
+    expect(turn.reply.toLowerCase()).toContain("no soy humana");
+    expect(turn.state).toEqual(initialDentalAgentState);
+  });
 });

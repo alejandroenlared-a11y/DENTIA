@@ -2,6 +2,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { initialDentalAgentState } from "@/lib/agent/dental-senior-agent";
 import { runDentalAgentTurn, runOpenAiDentalAgentTurn } from "@/lib/agent/openai-dental-agent";
 
+// Forma real de la respuesta de la Generative Language API (generateContent).
+function geminiResponse(text: string) {
+  return { candidates: [{ content: { role: "model", parts: [{ text }] } }] };
+}
+
 const originalProvider = process.env.LLM_PROVIDER;
 const originalOpenAiApiKey = process.env.OPENAI_API_KEY;
 const originalOpenAiModel = process.env.OPENAI_MODEL;
@@ -118,14 +123,7 @@ describe("runDentalAgentTurn", () => {
 
     vi.spyOn(globalThis, "fetch").mockResolvedValue({
       ok: true,
-      json: async () => ({
-        steps: [
-          {
-            type: "model_output",
-            content: [{ type: "text", text: `\`\`\`json\n${JSON.stringify(output)}\n\`\`\`` }]
-          }
-        ]
-      })
+      json: async () => geminiResponse(`\`\`\`json\n${JSON.stringify(output)}\n\`\`\``)
     } as Response);
 
     const result = await runDentalAgentTurn({
@@ -182,9 +180,7 @@ describe("runDentalAgentTurn", () => {
       } as Response)
       .mockResolvedValueOnce({
         ok: true,
-        json: async () => ({
-          output_text: JSON.stringify(output)
-        })
+        json: async () => geminiResponse(JSON.stringify(output))
       } as Response);
 
     const result = await runDentalAgentTurn({
@@ -207,10 +203,10 @@ describe("runDentalAgentTurn", () => {
 
     vi.spyOn(globalThis, "fetch").mockResolvedValue({
       ok: true,
-      json: async () => ({
-        output_text:
+      json: async () =>
+        geminiResponse(
           "Parece una molestia compatible con una revision conservadora. Si te va bien, te puedo dejar orientada una visita en Murcia por la tarde y alli el doctor confirmara el tratamiento."
-      })
+        )
     } as Response);
 
     const result = await runDentalAgentTurn({
@@ -233,15 +229,16 @@ describe("runDentalAgentTurn", () => {
 
     vi.spyOn(globalThis, "fetch").mockResolvedValue({
       ok: true,
-      json: async () => ({
-        output_text: JSON.stringify({
-          reply:
-            "Lamento que estes con ese dolor. Por seguridad, lo ideal es que te vea un doctor cuanto antes; dime tu nombre y si prefieres Murcia centro o Elche - Altabix.",
-          intent: "urgent_pain",
-          intentCode: "urgent_pain",
-          treatmentNeed: "Urgencia por dolor agudo de muela"
-        })
-      })
+      json: async () =>
+        geminiResponse(
+          JSON.stringify({
+            reply:
+              "Lamento que estes con ese dolor. Por seguridad, lo ideal es que te vea un doctor cuanto antes; dime tu nombre y si prefieres Murcia centro o Elche - Altabix.",
+            intent: "urgent_pain",
+            intentCode: "urgent_pain",
+            treatmentNeed: "Urgencia por dolor agudo de muela"
+          })
+        )
     } as Response);
 
     const result = await runDentalAgentTurn({
@@ -266,10 +263,10 @@ describe("runDentalAgentTurn", () => {
 
     vi.spyOn(globalThis, "fetch").mockResolvedValue({
       ok: true,
-      json: async () => ({
-        output_text:
+      json: async () =>
+        geminiResponse(
           '{\n  "reply": "Siento mucho que estes con ese dolor tan intenso. Podria tratarse de una inflamacion o afectacion del nervio, por lo que conviene que lo revise el doctor lo antes posible para darte alivio. Hoy mismo priorizamos estas urgencias en Murcia y Elche'
-      })
+        )
     } as Response);
 
     const result = await runDentalAgentTurn({

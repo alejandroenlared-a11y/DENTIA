@@ -260,9 +260,23 @@ const signalPatterns = [
   { label: "muela del juicio", pattern: /(muela del juicio|cordal|tercer molar|dolor atras|zona de atras)/ }
 ];
 
+// Transparencia obligatoria (AI Act): si preguntan directamente si es humana,
+// se responde siempre que no, sin ambiguedad, sin tocar el resto del estado
+// de la conversacion. Capa de seguridad ademas de la instruccion en el
+// prompt del LLM: funciona incluso si Gemini/OpenAI no estan disponibles.
+const IDENTITY_QUESTION_PATTERN =
+  /(eres (una persona|un humano|humana|human|real)|hablo con (un humano|una persona)|(eres|sois) (un bot|un robot|una ia|inteligencia artificial)|es usted (una persona|un humano))/;
+const IDENTITY_DISCLOSURE =
+  "No, no soy humana, soy la asistente de inteligencia artificial de la clinica. Te ayudo igual que en recepcion.";
+
 export function runDentalSeniorTurn(current: DentalAgentState, rawText: string): DentalAgentTurn {
   const text = rawText.trim();
   const normalized = normalize(text);
+
+  if (IDENTITY_QUESTION_PATTERN.test(normalized)) {
+    return { state: current, reply: IDENTITY_DISCLOSURE };
+  }
+
   const messageRedFlags = detectLabels(normalized, redFlagPatterns);
   const messageSignals = detectLabels(normalized, signalPatterns);
   let redFlags = unique([...current.redFlags, ...messageRedFlags]);
