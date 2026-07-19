@@ -1955,6 +1955,7 @@ body {
   }
 
   .home-agenda {
+    grid-column: auto;
     grid-row: auto;
   }
 
@@ -1990,6 +1991,7 @@ body {
     height: auto;
     min-height: 100dvh;
     padding-bottom: 68px;
+    overflow: visible;
   }
 
   .topbar {
@@ -2031,10 +2033,16 @@ body {
 
   .content {
     padding: 10px;
+    overflow-x: hidden;
   }
 
   .view-workspace {
     gap: 10px;
+    max-width: none;
+    width: 100%;
+    padding: 0;
+    border: 0;
+    box-shadow: none;
   }
 
   .view-head {
@@ -2059,6 +2067,50 @@ body {
   .pipeline-mini,
   .lab-status-board {
     grid-template-columns: 1fr;
+  }
+
+  .home-overview {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "intro"
+      "agenda"
+      "kpis"
+      "main";
+    width: 100%;
+    max-width: none;
+    padding: 0;
+  }
+
+  .home-agenda {
+    grid-column: auto;
+    grid-row: auto;
+    width: 100%;
+  }
+
+  .home-agenda-list,
+  .widget-board {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .home-agenda-item {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px;
+  }
+
+  .home-agenda-item strong,
+  .home-agenda-item span,
+  .compact-row strong,
+  .compact-row span {
+    white-space: normal;
+  }
+
+  .home-intro .toolbar .button {
+    width: 100%;
+  }
+
+  .home-agenda .button,
+  .panel-head .button {
+    width: auto;
   }
 
   .upcoming-panel,
