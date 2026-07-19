@@ -1,6 +1,6 @@
 import { Fragment } from "react";
 import Link from "next/link";
-import { AppointmentStatus, CalendarEventType, ConversationChannel, ElectronicInvoiceStatus, PatientIntakeStatus, PatientStatus, TaskPriority } from "@prisma/client";
+import { AppointmentStatus, CalendarEventType, ConversationChannel, ElectronicInvoiceStatus, InvoiceStatus, PatientIntakeStatus, PatientStatus, TaskPriority } from "@prisma/client";
 import {
   EmptyState,
   Field,
@@ -58,6 +58,9 @@ export default async function Page({ searchParams }: PageProps) {
   const selectedConversationId = Array.isArray(params?.conversation) ? params?.conversation[0] : params?.conversation;
   const selectedPatientId = Array.isArray(params?.patient) ? params?.patient[0] : params?.patient;
   const patientQuery = Array.isArray(params?.q) ? params?.q[0] : params?.q;
+  const patientStatusFilter = Array.isArray(params?.patientStatus) ? params?.patientStatus[0] : params?.patientStatus;
+  const patientDebtFilter = Array.isArray(params?.debt) ? params?.debt[0] : params?.debt;
+  const patientProviderFilter = Array.isArray(params?.provider) ? params?.provider[0] : params?.provider;
   const errorNotice = Array.isArray(params?.error) ? params?.error[0] : params?.error;
   const okNotice = Array.isArray(params?.ok) ? params?.ok[0] : params?.ok;
   const weekParam = Array.isArray(params?.week) ? params?.week[0] : params?.week;
@@ -81,7 +84,17 @@ export default async function Page({ searchParams }: PageProps) {
         </>
       }
     >
-      {renderView(view, data, { selectedConversationId, selectedPatientId, patientQuery, weekOffset, monthOffset, calendarMode })}
+      {renderView(view, data, {
+        selectedConversationId,
+        selectedPatientId,
+        patientQuery,
+        patientStatusFilter,
+        patientDebtFilter,
+        patientProviderFilter,
+        weekOffset,
+        monthOffset,
+        calendarMode
+      })}
     </SaasAppShell>
   );
 }
@@ -93,6 +106,9 @@ function renderView(
     selectedConversationId?: string;
     selectedPatientId?: string;
     patientQuery?: string;
+    patientStatusFilter?: string;
+    patientDebtFilter?: string;
+    patientProviderFilter?: string;
     weekOffset?: number;
     monthOffset?: number;
     calendarMode?: "week" | "month";
@@ -115,7 +131,18 @@ function renderView(
     case "aiReview":
       return <AiReviewView data={data} />;
     case "patients":
-      return <PatientsView data={data} selectedPatientId={options.selectedPatientId} query={options.patientQuery} />;
+      return (
+        <PatientsView
+          data={data}
+          selectedPatientId={options.selectedPatientId}
+          query={options.patientQuery}
+          filters={{
+            status: options.patientStatusFilter,
+            debt: options.patientDebtFilter,
+            provider: options.patientProviderFilter
+          }}
+        />
+      );
     case "clinic":
       return <ClinicView data={data} />;
     case "treatments":
@@ -761,20 +788,14 @@ function InboxView({
 function PatientsView({
   data,
   selectedPatientId,
-  query
+  query,
+  filters = {}
 }: {
   data: Awaited<ReturnType<typeof getDashboardData>>;
   selectedPatientId?: string;
   query?: string;
+  filters?: { status?: string; debt?: string; provider?: string };
 }) {
-  const appointmentLogsByAppointmentId = new Map<string, typeof data.auditLogs>();
-  for (const log of data.auditLogs) {
-    if (!log.entityId) continue;
-    const current = appointmentLogsByAppointmentId.get(log.entityId) ?? [];
-    current.push(log);
-    appointmentLogsByAppointmentId.set(log.entityId, current);
-  }
-
   const appointmentsByPatientId = new Map<string, typeof data.appointments>();
   for (const appointment of data.appointments) {
     const current = appointmentsByPatientId.get(appointment.patientId) ?? [];
@@ -789,84 +810,134 @@ function PatientsView({
     invoicesByPatientId.set(invoice.patientId, current);
   }
 
+  const appointmentLogsByAppointmentId = new Map<string, typeof data.auditLogs>();
+  for (const log of data.auditLogs) {
+    if (!log.entityId) continue;
+    const current = appointmentLogsByAppointmentId.get(log.entityId) ?? [];
+    current.push(log);
+    appointmentLogsByAppointmentId.set(log.entityId, current);
+  }
+
   const normalizedQuery = normalizeSearch(query ?? "");
-  const filteredPatients = normalizedQuery
-    ? data.patients.filter(patient => {
-        const searchable = normalizeSearch([
-          patient.name,
-          patient.phone,
-          patient.email,
-          patient.taxId,
-          patient.treatmentNeed,
-          patient.source,
-          patient.status
-        ].filter(Boolean).join(" "));
-        return searchable.includes(normalizedQuery);
-      })
-    : data.patients;
+  const statusMode = filters.status === "inactive" ? "inactive" : filters.status === "all" ? "all" : "active";
+  const debtMode = filters.debt === "with" ? "with" : filters.debt === "without" ? "without" : "all";
+  const providerFilter = filters.provider && filters.provider !== "all" ? filters.provider : "all";
+  const providerOptions = Array.from(
+    new Map(
+      data.appointments
+        .filter(appointment => appointment.provider)
+        .map(appointment => [appointment.providerId, appointment.provider])
+    ).values()
+  ).filter(Boolean);
+
+  const filteredPatients = data.patients.filter(patient => {
+    const patientAppointments = appointmentsByPatientId.get(patient.id) ?? [];
+    const patientInvoices = invoicesByPatientId.get(patient.id) ?? [];
+    const outstandingCents = getPatientOutstandingCents(patientInvoices);
+    const searchable = normalizeSearch([
+      patient.name,
+      patient.phone,
+      patient.email,
+      patient.taxId,
+      patient.treatmentNeed,
+      patient.source,
+      patient.status
+    ].filter(Boolean).join(" "));
+
+    if (normalizedQuery && !searchable.includes(normalizedQuery)) return false;
+    if (statusMode === "active" && patient.status === PatientStatus.INACTIVE) return false;
+    if (statusMode === "inactive" && patient.status !== PatientStatus.INACTIVE) return false;
+    if (debtMode === "with" && outstandingCents <= 0) return false;
+    if (debtMode === "without" && outstandingCents > 0) return false;
+    if (providerFilter !== "all" && !patientAppointments.some(appointment => appointment.providerId === providerFilter)) return false;
+    return true;
+  });
+
   const selectedPatient =
-    filteredPatients.find(patient => patient.id === selectedPatientId) ??
     data.patients.find(patient => patient.id === selectedPatientId) ??
-    filteredPatients[0] ??
-    data.patients[0];
-  const activePatients = data.patients.filter(patient => patient.status === PatientStatus.ACTIVE);
-  const fiscalPending = data.patients.filter(patient => !patient.taxId || !patient.fiscalName || !patient.fiscalAddress).length;
-  const contactPending = data.patients.filter(patient => !patient.email).length;
-  const patientsWithFutureAppointment = new Set(
-    data.appointments
-      .filter(appointment => appointment.startsAt >= new Date() && appointment.status !== AppointmentStatus.CANCELLED)
-      .map(appointment => appointment.patientId)
-  );
-  const openPipelineCents = data.patients
-    .filter(patient => patient.status === PatientStatus.NEW_LEAD || patient.status === PatientStatus.OPEN_BUDGET)
-    .reduce((sum, patient) => sum + patient.estimatedValue, 0);
+    null;
+
+  if (selectedPatientId && selectedPatient) {
+    return (
+      <PatientSummaryView
+        patient={selectedPatient}
+        appointments={appointmentsByPatientId.get(selectedPatient.id) ?? []}
+        invoices={invoicesByPatientId.get(selectedPatient.id) ?? []}
+        appointmentLogsByAppointmentId={appointmentLogsByAppointmentId}
+        query={query}
+        filters={{ status: statusMode, debt: debtMode, provider: providerFilter }}
+      />
+    );
+  }
+
+  const totalOutstandingCents = data.patients.reduce((sum, patient) => {
+    return sum + getPatientOutstandingCents(invoicesByPatientId.get(patient.id) ?? []);
+  }, 0);
 
   return (
-    <>
-      <ViewHead title="Pacientes" subtitle="Registro maestro: altas, bajas, modificaciones y ficha 360 del paciente." />
-      <section className="patient-registry-hero">
-        <MiniPipeline label="Activos" value={data.patients.filter(patient => patient.status === PatientStatus.ACTIVE).length} accent="accent-green" />
-        <MiniPipeline label="Nuevos" value={data.patients.filter(patient => patient.status === PatientStatus.NEW_LEAD).length} accent="accent-blue" />
-        <MiniPipeline label="Presupuesto" value={data.patients.filter(patient => patient.status === PatientStatus.OPEN_BUDGET).length} accent="accent-purple" />
-        <MiniPipeline label="Baja/Inactivos" value={data.patients.filter(patient => patient.status === PatientStatus.INACTIVE).length} accent="accent-red" />
-      </section>
-      <section className="patient-command-strip" aria-label="Calidad del registro de pacientes">
+    <section className="patients-screen">
+      <header className="patients-page-head">
         <div>
-          <span>Ficha saneada</span>
-          <strong>{Math.max(0, data.patients.length - fiscalPending)}</strong>
-          <small>{fiscalPending} con fiscal pendiente</small>
+          <h2>Pacientes</h2>
+          <p>Gestion y control de la base de datos clinica.</p>
         </div>
-        <div>
-          <span>Con cita futura</span>
-          <strong>{patientsWithFutureAppointment.size}</strong>
-          <small>{Math.max(0, activePatients.length - patientsWithFutureAppointment.size)} activos sin agenda</small>
+        <div className="patients-head-actions">
+          <button className="button ghost" type="button">
+            <Icon name="archive" />
+            Exportar
+          </button>
+          <Link className="button primary" href="/?view=patients#new-patient">
+            <Icon name="users" />
+            Nuevo paciente
+          </Link>
         </div>
-        <div>
-          <span>Contacto incompleto</span>
-          <strong>{contactPending}</strong>
-          <small>Email o canal pendiente</small>
+      </header>
+      <form className="patients-filter-bar" action="/" aria-label="Filtros de pacientes">
+        <input type="hidden" name="view" value="patients" />
+        <label>
+          <span>Sede</span>
+          <select name="site" defaultValue="all">
+            <option value="all">Todas las sedes</option>
+            <option value="centro">Sede Centro</option>
+            <option value="playa">Sede Playa</option>
+          </select>
+        </label>
+        <label>
+          <span>Profesional</span>
+          <select name="provider" defaultValue={providerFilter}>
+            <option value="all">Todos los profesionales</option>
+            {providerOptions.map(provider => provider ? (
+              <option value={provider.id} key={provider.id}>{provider.name}</option>
+            ) : null)}
+          </select>
+        </label>
+        <label>
+          <span>Deuda</span>
+          <select name="debt" defaultValue={debtMode}>
+            <option value="all">Cualquier estado</option>
+            <option value="with">Con deuda</option>
+            <option value="without">Sin deuda</option>
+          </select>
+        </label>
+        <label className="patients-filter-search">
+          <span>Buscar</span>
+          <input name="q" defaultValue={query ?? ""} placeholder="Nombre, telefono, historia o tratamiento" />
+        </label>
+        <div className="patients-state-toggle" role="group" aria-label="Estado de paciente">
+          <span>Estado</span>
+          <div>
+            <Link className={statusMode === "active" ? "active" : ""} href={patientListHref({ query, status: "active", debt: debtMode, provider: providerFilter })}>Activos</Link>
+            <Link className={statusMode === "inactive" ? "active" : ""} href={patientListHref({ query, status: "inactive", debt: debtMode, provider: providerFilter })}>Inactivos</Link>
+            <Link className={statusMode === "all" ? "active" : ""} href={patientListHref({ query, status: "all", debt: debtMode, provider: providerFilter })}>Todos</Link>
+          </div>
         </div>
-        <div>
-          <span>Pipeline paciente</span>
-          <strong>{formatMoney(openPipelineCents)}</strong>
-          <small>leads y presupuestos abiertos</small>
+        <div className="patients-filter-meta">
+          <span>Mostrando {filteredPatients.length} paciente{filteredPatients.length === 1 ? "" : "s"}</span>
+          <button className="icon-button" type="submit" title="Aplicar filtros" aria-label="Aplicar filtros">
+            <Icon name="filter" />
+          </button>
         </div>
-      </section>
-      <section className="card pad patient-registry-toolbar">
-        <form className="patient-search" action="/">
-          <input type="hidden" name="view" value="patients" />
-          <label className="field">
-            <span>Buscar paciente</span>
-            <input name="q" defaultValue={query ?? ""} placeholder="Nombre, telefono, email, DNI, tratamiento..." />
-          </label>
-          <button className="button" type="submit">Buscar</button>
-          {query ? <Link className="button ghost" href="/?view=patients">Limpiar</Link> : null}
-        </form>
-        <Link className="button primary" href="/?view=patients#new-patient">
-          <Icon name="plus" />
-          Alta paciente
-        </Link>
-      </section>
+      </form>
       {data.patients.length === 0 ? (
         <EmptyState
           icon="users"
@@ -874,35 +945,64 @@ function PatientsView({
           hint="Crea el primer paciente con el formulario de abajo o espera a que Clara capture un lead."
         />
       ) : (
-        <section className="patient-registry-layout">
-          <div className="card table-card patient-master-list">
-            <div style={{ overflow: "auto" }}>
+        <section className="patients-table-card">
+          <div className="patients-table-scroll">
               <table className="data-table patient-table">
                 <thead>
-                  <tr><th>Paciente</th><th>Contacto</th><th>Estado</th><th>Proxima cita</th><th>Tratamiento</th><th>Valor</th><th>Acciones</th></tr>
+                  <tr>
+                    <th>Paciente</th>
+                    <th>Historia</th>
+                    <th>Telefono</th>
+                    <th>Edad</th>
+                    <th>Proxima cita</th>
+                    <th>Ultima visita</th>
+                    <th>Saldo</th>
+                    <th>Estado</th>
+                    <th />
+                  </tr>
                 </thead>
                 <tbody>
                   {filteredPatients.map(patient => {
                     const patientAppointments = appointmentsByPatientId.get(patient.id) ?? [];
+                    const patientInvoices = invoicesByPatientId.get(patient.id) ?? [];
                     const nextAppointment = patientAppointments
                       .filter(appointment => appointment.startsAt >= new Date() && appointment.status !== AppointmentStatus.CANCELLED)
                       .sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime())[0];
+                    const lastAppointment = [...patientAppointments]
+                      .filter(appointment => appointment.startsAt < new Date())
+                      .sort((a, b) => b.startsAt.getTime() - a.startsAt.getTime())[0];
+                    const outstandingCents = getPatientOutstandingCents(patientInvoices);
                     return (
-                      <tr key={patient.id} className={selectedPatient?.id === patient.id ? "selected-row" : undefined}>
+                      <tr key={patient.id}>
                         <td data-label="Paciente">
-                          <strong>{patient.name}</strong>
-                          <br />
-                          <span className="muted-text">{patient.taxId || "Fiscal pendiente"}</span>
+                          <Link className="patient-identity" href={patientDetailHref(patient.id, query, { status: statusMode, debt: debtMode, provider: providerFilter })}>
+                            <span className={`patient-avatar ${patientStatusTone(patient.status)}`}>{getInitials(patient.name)}</span>
+                            <span>
+                              <strong>{patient.name}</strong>
+                              <small>{patient.email || "Email pendiente"}</small>
+                            </span>
+                          </Link>
                         </td>
-                        <td data-label="Contacto">{patient.phone}<br /><span className="muted-text">{patient.email || "Email pendiente"}</span></td>
-                        <td data-label="Estado"><Pill tone={patientStatusTone(patient.status)}>{patientStatusLabel(patient.status)}</Pill></td>
-                        <td data-label="Proxima cita">{nextAppointment ? formatDateTime(nextAppointment.startsAt) : "Sin cita futura"}</td>
-                        <td data-label="Tratamiento">{patient.treatmentNeed || "Pendiente"}</td>
-                        <td data-label="Valor">{formatMoney(patient.estimatedValue)}</td>
+                        <td data-label="Historia">{patientRecordNumber(patient.id)}</td>
+                        <td data-label="Telefono">{patient.phone}</td>
+                        <td data-label="Edad" className="centered-cell">N/D</td>
+                        <td data-label="Proxima cita">
+                          {nextAppointment ? (
+                            <span className={nextAppointment.status === AppointmentStatus.URGENT ? "warning-text" : "primary-text"}>
+                              <strong>{formatPatientAppointmentDate(nextAppointment.startsAt)}</strong>
+                              <small>{nextAppointment.title}</small>
+                            </span>
+                          ) : (
+                            <span className="muted-text">Sin cita</span>
+                          )}
+                        </td>
+                        <td data-label="Ultima visita">{lastAppointment ? formatPatientShortDate(lastAppointment.startsAt) : formatPatientShortDate(patient.lastVisitAt)}</td>
+                        <td data-label="Saldo" className={`money-cell ${outstandingCents > 0 ? "debt" : ""}`}>{outstandingCents > 0 ? `-${formatMoney(outstandingCents)}` : formatMoney(0)}</td>
+                        <td data-label="Estado"><PatientStatusTag status={patient.status} /></td>
                         <td data-label="Acciones">
                           <div className="table-actions">
-                            <Link className="button ghost" href={`/?view=patients&patient=${patient.id}${query ? `&q=${encodeURIComponent(query)}` : ""}`}>
-                              Abrir ficha
+                            <Link className="icon-button" href={patientDetailHref(patient.id, query, { status: statusMode, debt: debtMode, provider: providerFilter })} title="Abrir ficha" aria-label={`Abrir ficha de ${patient.name}`}>
+                              <Icon name="file" />
                             </Link>
                             {patient.status === PatientStatus.INACTIVE ? (
                               <PatientStatusButton patientId={patient.id} status={PatientStatus.ACTIVE} label="Activar" />
@@ -916,178 +1016,222 @@ function PatientsView({
                   })}
                 </tbody>
               </table>
-            </div>
+          </div>
             {filteredPatients.length === 0 ? (
               <p className="empty-note">No hay pacientes que coincidan con la busqueda.</p>
             ) : null}
-          </div>
-          {selectedPatient ? (
-            <PatientRecordPanel
-              patient={selectedPatient}
-              appointments={appointmentsByPatientId.get(selectedPatient.id) ?? []}
-              invoices={invoicesByPatientId.get(selectedPatient.id) ?? []}
-            />
-          ) : null}
         </section>
       )}
-      <section className="card pad appointment-history-panel">
-        <PanelHead
-          icon="calendar"
-          title="Historial de citas"
-          subtitle="Altas, modificaciones, cancelaciones y emails registrados en el SaaS."
-        />
-        {data.appointments.length === 0 ? (
-          <p className="empty-note">Todavia no hay citas registradas.</p>
-        ) : (
-          <div className="appointment-history-list">
-            {data.patients.map(patient => {
-              const patientAppointments = (appointmentsByPatientId.get(patient.id) ?? []).sort(
-                (a, b) => b.startsAt.getTime() - a.startsAt.getTime()
-              );
-              if (patientAppointments.length === 0) return null;
-
-              return (
-                <article className="appointment-history-patient" key={patient.id}>
-                  <header>
-                    <div>
-                      <strong>{patient.name}</strong>
-                      <span>{patient.phone}{patient.email ? ` · ${patient.email}` : ""}</span>
-                    </div>
-                    <Pill tone="purple">{patientAppointments.length} cita{patientAppointments.length === 1 ? "" : "s"}</Pill>
-                  </header>
-                  <div className="appointment-history-items">
-                    {patientAppointments.map(appointment => {
-                      const logs = appointmentLogsByAppointmentId.get(appointment.id) ?? [];
-                      return (
-                        <div className="appointment-history-item" key={appointment.id}>
-                          <div className="appointment-history-main">
-                            <div>
-                              <strong>{appointment.title}</strong>
-                              <span>{formatDateTime(appointment.startsAt)} · {appointment.durationMinutes} min</span>
-                              <span>
-                                {appointment.provider?.name ?? "Doctor pendiente"} · {appointment.operatory?.name ?? "Gabinete pendiente"}
-                              </span>
-                            </div>
-                            <div className="appointment-history-status">
-                              <Pill tone={appointmentStatusTone(appointment.status)}>{appointmentStatusLabel(appointment.status)}</Pill>
-                              {appointment.createdByAi ? <Pill tone="blue">Clara</Pill> : <Pill tone="green">Recepcion</Pill>}
-                            </div>
-                          </div>
-                          {logs.length > 0 ? (
-                            <div className="appointment-history-events">
-                              {logs.map(log => (
-                                <div className="appointment-history-event" key={log.id}>
-                                  <span>{formatAppointmentAuditAction(log.action, log.metadata)}</span>
-                                  <time>{formatDateTime(log.createdAt)}</time>
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <p className="empty-note small">Sin eventos de auditoria asociados a esta cita.</p>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-        )}
-      </section>
       <PatientForm />
-    </>
+      <div className="patients-floating-summary" aria-label="Resumen de pacientes">
+        <div>
+          <Icon name="users" />
+          <span>Total pacientes</span>
+          <strong>{data.patients.length}</strong>
+        </div>
+        <div>
+          <Icon name="card" />
+          <span>Deuda total</span>
+          <strong className={totalOutstandingCents > 0 ? "debt" : ""}>{totalOutstandingCents > 0 ? `-${formatMoney(totalOutstandingCents)}` : formatMoney(0)}</strong>
+        </div>
+      </div>
+    </section>
   );
 }
 
-function PatientRecordPanel({
+function PatientSummaryView({
   patient,
   appointments,
-  invoices
+  invoices,
+  appointmentLogsByAppointmentId,
+  query,
+  filters
 }: {
   patient: Awaited<ReturnType<typeof getDashboardData>>["patients"][number];
   appointments: Awaited<ReturnType<typeof getDashboardData>>["appointments"];
   invoices: Awaited<ReturnType<typeof getDashboardData>>["invoices"];
+  appointmentLogsByAppointmentId: Map<string, Awaited<ReturnType<typeof getDashboardData>>["auditLogs"]>;
+  query?: string;
+  filters: { status: string; debt: string; provider: string };
 }) {
-  const sortedAppointments = [...appointments].sort((a, b) => b.startsAt.getTime() - a.startsAt.getTime());
-  const activeAppointments = appointments.filter(appointment => appointment.status !== AppointmentStatus.CANCELLED);
-  const lastAppointment = sortedAppointments[0];
+  const now = new Date();
+  const sortedAppointments = [...appointments].sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime());
+  const pastAppointments = appointments.filter(appointment => appointment.startsAt < now).sort((a, b) => b.startsAt.getTime() - a.startsAt.getTime());
+  const nextAppointment = sortedAppointments.find(appointment => appointment.startsAt >= now && appointment.status !== AppointmentStatus.CANCELLED);
+  const latestAppointment = pastAppointments[0] ?? sortedAppointments[0];
+  const outstandingCents = getPatientOutstandingCents(invoices);
+  const paidCents = invoices.filter(invoice => invoice.status === InvoiceStatus.PAID).reduce((sum, invoice) => sum + invoice.amountCents, 0);
+  const totalBudgetCents = Math.max(patient.estimatedValue, invoices.reduce((sum, invoice) => sum + invoice.amountCents, 0));
+  const progress = totalBudgetCents > 0 ? Math.min(100, Math.round((paidCents / totalBudgetCents) * 100)) : 0;
+  const clinicalAlert = patient.status === PatientStatus.URGENT
+    ? "ALERTA MEDICA: revisar prioridad clinica antes de la cita"
+    : "Sin alertas medicas registradas";
+  const recentActivity = buildPatientRecentActivity(appointments, invoices, appointmentLogsByAppointmentId);
 
   return (
-    <aside className="card pad patient-record-panel">
-      <header className="patient-record-header">
-        <div className="avatar large">{getInitials(patient.name)}</div>
-        <div>
-          <p className="eyebrow">Ficha 360</p>
-          <h2>{patient.name}</h2>
-          <p>{patient.phone}{patient.email ? ` · ${patient.email}` : ""}</p>
+    <section className="patient-profile-screen">
+      <header className="patient-profile-banner">
+        <div className="patient-profile-id">
+          <span className={`patient-avatar large ${patientStatusTone(patient.status)}`}>
+            {getInitials(patient.name)}
+          </span>
+          <div>
+            <h2>{patient.name}</h2>
+            <p>{patientRecordNumber(patient.id)} <span /> <strong>{patientStatusLabel(patient.status)}</strong></p>
+          </div>
         </div>
-        <Pill tone={patientStatusTone(patient.status)}>{patientStatusLabel(patient.status)}</Pill>
+        <div className={`patient-alert-banner ${patient.status === PatientStatus.URGENT ? "danger" : "neutral"}`}>
+          <Icon name={patient.status === PatientStatus.URGENT ? "activity" : "checkCircle"} />
+          <strong>{clinicalAlert}</strong>
+        </div>
+        <div className="patient-balance-badge">
+          <span>Saldo pendiente</span>
+          <strong className={outstandingCents > 0 ? "debt" : ""}>{formatMoney(outstandingCents)}</strong>
+        </div>
+        <div className="patient-profile-actions">
+          <Link className="icon-button" href={patientListHref({ query, status: filters.status, debt: filters.debt, provider: filters.provider })} title="Volver al listado" aria-label="Volver al listado de pacientes">
+            <Icon name="users" />
+          </Link>
+          <Link className="icon-button" href="/?view=billing" title="Facturacion" aria-label="Abrir facturacion">
+            <Icon name="card" />
+          </Link>
+          <Link className="icon-button" href="/?view=documents" title="Documentos" aria-label="Abrir documentos">
+            <Icon name="file" />
+          </Link>
+        </div>
       </header>
-      <nav className="patient-record-tabs" aria-label="Secciones de ficha">
-        <span className="active">Resumen</span>
-        <span>Citas</span>
-        <span>Tratamientos</span>
-        <span>Presupuestos</span>
-        <span>Facturas</span>
-        <span>Clinico</span>
-        <span>Documentos</span>
-      </nav>
-      <div className="patient-record-grid">
-        <div><span>Ultima cita</span><strong>{lastAppointment ? formatDateTime(lastAppointment.startsAt) : "Sin citas"}</strong></div>
-        <div><span>Citas activas</span><strong>{activeAppointments.length}</strong></div>
-        <div><span>Valor estimado</span><strong>{formatMoney(patient.estimatedValue)}</strong></div>
-        <div><span>Facturas</span><strong>{invoices.length}</strong></div>
+      <div className="patient-profile-quick-actions">
+        <Link className="button primary" href={`/?view=calendar#new-appointment`}>
+          <Icon name="plus" />
+          Nueva cita
+        </Link>
+        <Link className="button ghost" href="/?view=clinic">
+          <Icon name="file" />
+          Abrir encuentro
+        </Link>
+        <Link className="button ghost" href="/?view=documents">
+          <Icon name="file" />
+          Nueva nota
+        </Link>
       </div>
-      <section className="patient-record-section">
-        <h3>Datos personales</h3>
-        <dl>
-          <div><dt>Nombre fiscal</dt><dd>{patient.fiscalName || "Pendiente"}</dd></div>
-          <div><dt>NIF/CIF</dt><dd>{patient.taxId || "Pendiente"}</dd></div>
-          <div><dt>Direccion fiscal</dt><dd>{patient.fiscalAddress || "Pendiente"}</dd></div>
-          <div><dt>Fuente</dt><dd>{patient.source || "Pendiente"}</dd></div>
-        </dl>
-      </section>
-      <section className="patient-record-section">
-        <h3>Vida clinica</h3>
-        <dl>
-          <div><dt>Tratamiento activo</dt><dd>{patient.treatmentNeed || "Pendiente"}</dd></div>
-          <div><dt>Alergias</dt><dd>Pendiente de registrar</dd></div>
-          <div><dt>Enfermedades</dt><dd>Pendiente de registrar</dd></div>
-          <div><dt>Medicación</dt><dd>Pendiente de registrar</dd></div>
-        </dl>
-      </section>
-      <section className="patient-record-section">
-        <h3>Actividad reciente</h3>
-        {sortedAppointments.length ? (
-          <div className="patient-record-list">
-            {sortedAppointments.slice(0, 4).map(appointment => (
-              <article key={appointment.id}>
-                <strong>{appointment.title}</strong>
-                <span>{formatDateTime(appointment.startsAt)} · {appointment.status}</span>
-              </article>
-            ))}
-          </div>
-        ) : (
-          <p className="empty-note small">Sin actividad clinica registrada.</p>
-        )}
-      </section>
-      <section className="patient-record-section">
-        <h3>Facturacion y documentos</h3>
-        {invoices.length ? (
-          <div className="patient-record-list">
-            {invoices.slice(0, 3).map(invoice => (
-              <article key={invoice.id}>
-                <strong>{invoice.number} · {formatMoney(invoice.amountCents)}</strong>
-                <span>{invoice.treatmentName} · {invoice.status}</span>
-              </article>
-            ))}
-          </div>
-        ) : (
-          <p className="empty-note small">Sin facturas ni documentos asociados.</p>
-        )}
-      </section>
-    </aside>
+      <div className="patient-profile-grid">
+        <div className="patient-profile-main">
+          <section className="patient-summary-card">
+            <header>
+              <h3><Icon name="calendar" /> Proxima cita</h3>
+              {nextAppointment ? <span>{formatRelativeAppointmentDay(nextAppointment.startsAt)}</span> : null}
+            </header>
+            {nextAppointment ? (
+              <div className="next-appointment-card">
+                <time>
+                  <span>{formatAppointmentMonth(nextAppointment.startsAt)}</span>
+                  <strong>{nextAppointment.startsAt.getDate()}</strong>
+                </time>
+                <div>
+                  <strong>{formatTime(nextAppointment.startsAt)} — {nextAppointment.title}</strong>
+                  <p>{nextAppointment.operatory?.name ?? "Gabinete pendiente"} · {nextAppointment.provider?.name ?? "Profesional pendiente"}</p>
+                  <small>Duracion estimada: {nextAppointment.durationMinutes} min</small>
+                </div>
+                <Link href="/?view=calendar">Ver detalles</Link>
+              </div>
+            ) : (
+              <p className="empty-note">No hay proxima cita registrada.</p>
+            )}
+          </section>
+          <section className="patient-summary-card treatment-card">
+            <header>
+              <h3>Tratamiento activo</h3>
+              <Link href="/?view=treatments">Ver plan completo</Link>
+            </header>
+            <div className="treatment-progress-head">
+              <strong>{patient.treatmentNeed || "Tratamiento pendiente"}</strong>
+              <span>{progress}% Completado</span>
+            </div>
+            <div className="treatment-progress-bar" aria-label={`Progreso estimado ${progress}%`}>
+              <span style={{ width: `${progress}%` }} />
+            </div>
+            <div className="treatment-milestones">
+              <div>
+                <span>Ultima fase</span>
+                <strong>{latestAppointment?.title ?? "Sin actividad previa"}</strong>
+                <small>{latestAppointment ? formatPatientShortDate(latestAppointment.startsAt) : "Pendiente"}</small>
+              </div>
+              <div>
+                <span>Siguiente hito</span>
+                <strong>{nextAppointment?.title ?? "Planificacion pendiente"}</strong>
+                <small>{nextAppointment ? formatPatientShortDate(nextAppointment.startsAt) : "Sin fecha"}</small>
+              </div>
+            </div>
+          </section>
+          <section className="patient-summary-card">
+            <header>
+              <h3>Actividad reciente</h3>
+            </header>
+            <div className="patient-activity-table">
+              <table>
+                <thead>
+                  <tr><th>Fecha</th><th>Accion</th><th>Profesional</th><th>Estado</th></tr>
+                </thead>
+                <tbody>
+                  {recentActivity.map(item => (
+                    <tr key={item.id}>
+                      <td>{item.date}</td>
+                      <td>{item.action}</td>
+                      <td>{item.actor}</td>
+                      <td><PatientActivityStatus tone={item.tone}>{item.status}</PatientActivityStatus></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+        <aside className="patient-profile-side">
+          <section className="patient-side-card medical-card">
+            <div>
+              <h4><Icon name="activity" /> Alergias</h4>
+              <div className="patient-tags">
+                <span>No registradas</span>
+              </div>
+            </div>
+            <div>
+              <h4><Icon name="checkCircle" /> Medicacion actual</h4>
+              <ul>
+                <li><span />Sin medicacion registrada</li>
+                {patient.status === PatientStatus.URGENT ? <li><span />Revisar triaje antes de sillón</li> : null}
+              </ul>
+            </div>
+          </section>
+          <section className="patient-side-card contact-card">
+            <h4>Informacion de contacto</h4>
+            <dl>
+              <div><dt>Telefono movil</dt><dd>{patient.phone}</dd></div>
+              <div><dt>Correo electronico</dt><dd>{patient.email || "No registrado"}</dd></div>
+              <div><dt>Nombre fiscal</dt><dd>{patient.fiscalName || patient.name}</dd></div>
+              <div><dt>NIF/CIF</dt><dd>{patient.taxId || "No registrado"}</dd></div>
+              <div><dt>Domicilio fiscal</dt><dd>{patient.fiscalAddress || "No registrado"}</dd></div>
+            </dl>
+            <div className="emergency-contact">
+              <span>Contacto de emergencia</span>
+              <strong>No registrado</strong>
+              <small>Campo pendiente de modelo clinico</small>
+            </div>
+          </section>
+          <section className="patient-side-card financial-card">
+            <h4>Resumen financiero</h4>
+            <dl>
+              <div><dt>Total presupuestado</dt><dd>{formatMoney(totalBudgetCents)}</dd></div>
+              <div><dt>Pagado hasta hoy</dt><dd className="success">{formatMoney(paidCents)}</dd></div>
+              <div><dt>Saldo restante</dt><dd className={outstandingCents > 0 ? "debt" : ""}>{formatMoney(outstandingCents)}</dd></div>
+            </dl>
+            <Link className="button subtle" href="/?view=billing">Generar factura</Link>
+          </section>
+        </aside>
+      </div>
+      <Link className="patient-floating-action" href={`/?view=calendar#new-appointment`} aria-label="Crear accion para paciente">
+        <Icon name="plus" />
+      </Link>
+    </section>
   );
 }
 
@@ -1109,6 +1253,165 @@ function PatientStatusButton({
       <button className={`button ${danger ? "danger" : "ghost"}`} type="submit">{label}</button>
     </form>
   );
+}
+
+function PatientStatusTag({ status }: { status: PatientStatus }) {
+  return <span className={`patient-status-tag ${patientStatusTone(status)}`}>{patientStatusLabel(status)}</span>;
+}
+
+function PatientActivityStatus({ children, tone }: { children: string; tone: "neutral" | "success" | "warning" | "danger" | "info" }) {
+  return <span className={`patient-activity-status ${tone}`}>{children}</span>;
+}
+
+function getPatientOutstandingCents(invoices: Awaited<ReturnType<typeof getDashboardData>>["invoices"]) {
+  return invoices
+    .filter(invoice => invoice.status !== InvoiceStatus.PAID && invoice.status !== InvoiceStatus.CANCELLED)
+    .reduce((sum, invoice) => sum + invoice.amountCents, 0);
+}
+
+function patientListHref({
+  query,
+  status,
+  debt,
+  provider
+}: {
+  query?: string;
+  status?: string;
+  debt?: string;
+  provider?: string;
+}) {
+  const params = new URLSearchParams({ view: "patients" });
+  if (query) params.set("q", query);
+  if (status && status !== "active") params.set("patientStatus", status);
+  if (debt && debt !== "all") params.set("debt", debt);
+  if (provider && provider !== "all") params.set("provider", provider);
+  return `/?${params.toString()}`;
+}
+
+function patientDetailHref(
+  patientId: string,
+  query?: string,
+  filters: { status?: string; debt?: string; provider?: string } = {}
+) {
+  const href = patientListHref(filters.status || filters.debt || filters.provider || query ? { query, ...filters } : {});
+  return `${href}&patient=${encodeURIComponent(patientId)}`;
+}
+
+function patientRecordNumber(id: string) {
+  const hash = Array.from(id).reduce((sum, char) => sum + char.charCodeAt(0), 0);
+  return `H-${String(82000 + (hash % 7000)).padStart(5, "0")}`;
+}
+
+function formatPatientShortDate(date?: Date | null) {
+  if (!date) return "No consta";
+  return new Intl.DateTimeFormat("es-ES", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric"
+  }).format(date);
+}
+
+function formatPatientAppointmentDate(date: Date) {
+  const today = new Date();
+  const tomorrow = new Date();
+  tomorrow.setDate(today.getDate() + 1);
+  const time = formatTime(date);
+  if (sameCalendarDate(date, today)) return `Hoy, ${time}`;
+  if (sameCalendarDate(date, tomorrow)) return `Manana, ${time}`;
+  return `${new Intl.DateTimeFormat("es-ES", { day: "2-digit", month: "short" }).format(date)}, ${time}`;
+}
+
+function formatRelativeAppointmentDay(date: Date) {
+  const today = new Date();
+  const tomorrow = new Date();
+  tomorrow.setDate(today.getDate() + 1);
+  if (sameCalendarDate(date, today)) return "Hoy";
+  if (sameCalendarDate(date, tomorrow)) return "Manana";
+  return formatPatientShortDate(date);
+}
+
+function formatAppointmentMonth(date: Date) {
+  return new Intl.DateTimeFormat("es-ES", { month: "short" }).format(date).replace(".", "").toUpperCase();
+}
+
+function sameCalendarDate(a: Date, b: Date) {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+
+function buildPatientRecentActivity(
+  appointments: Awaited<ReturnType<typeof getDashboardData>>["appointments"],
+  invoices: Awaited<ReturnType<typeof getDashboardData>>["invoices"],
+  appointmentLogsByAppointmentId: Map<string, Awaited<ReturnType<typeof getDashboardData>>["auditLogs"]>
+) {
+  const appointmentItems = appointments.map(appointment => ({
+    id: `appointment-${appointment.id}`,
+    rawDate: appointment.startsAt,
+    date: formatPatientAppointmentDate(appointment.startsAt),
+    action: appointment.title,
+    actor: appointment.provider?.name ?? "Recepcion",
+    status: appointmentStatusLabel(appointment.status),
+    tone: appointment.status === AppointmentStatus.CANCELLED || appointment.status === AppointmentStatus.NO_SHOW
+      ? "danger" as const
+      : appointment.status === AppointmentStatus.CONFIRMED || appointment.status === AppointmentStatus.COMPLETED
+        ? "success" as const
+        : appointment.status === AppointmentStatus.URGENT
+          ? "warning" as const
+          : "info" as const
+  }));
+  const invoiceItems = invoices.map(invoice => ({
+    id: `invoice-${invoice.id}`,
+    rawDate: invoice.issuedAt,
+    date: formatPatientShortDate(invoice.issuedAt),
+    action: `Factura ${invoice.number} · ${invoice.treatmentName}`,
+    actor: "Administracion",
+    status: invoiceStatusLabel(invoice.status),
+    tone: invoice.status === InvoiceStatus.PAID
+      ? "success" as const
+      : invoice.status === InvoiceStatus.OVERDUE
+        ? "danger" as const
+        : "neutral" as const
+  }));
+  const auditItems = appointments.flatMap(appointment => {
+    const logs = appointmentLogsByAppointmentId.get(appointment.id) ?? [];
+    return logs.map(log => ({
+      id: `audit-${log.id}`,
+      rawDate: log.createdAt,
+      date: formatPatientAppointmentDate(log.createdAt),
+      action: formatAppointmentAuditAction(log.action, log.metadata),
+      actor: "Sistema",
+      status: "Guardado",
+      tone: "neutral" as const
+    }));
+  });
+  const activity = [...appointmentItems, ...invoiceItems, ...auditItems]
+    .sort((a, b) => b.rawDate.getTime() - a.rawDate.getTime())
+    .slice(0, 5);
+
+  if (activity.length) return activity;
+
+  return [{
+    id: "empty-activity",
+    rawDate: new Date(0),
+    date: "Sin fecha",
+    action: "Sin actividad registrada",
+    actor: "Clinica",
+    status: "Pendiente",
+    tone: "neutral" as const
+  }];
+}
+
+function invoiceStatusLabel(status: InvoiceStatus) {
+  switch (status) {
+    case InvoiceStatus.PAID:
+      return "Pagado";
+    case InvoiceStatus.OVERDUE:
+      return "Vencido";
+    case InvoiceStatus.CANCELLED:
+      return "Cancelado";
+    case InvoiceStatus.SENT:
+    default:
+      return "Emitido";
+  }
 }
 
 function PatientIntakesPanel({
