@@ -1,6 +1,6 @@
 # HOJA DE RUTA — SAAS PARA CLÍNICAS DENTALES + AGENTE IA RECEPCIONISTA
 
-> Proyecto AVELKIA · Fecha: 8 de julio de 2026
+> Proyecto AVELKIA · Fecha: 19 de julio de 2026
 > Basado en investigación de RingLab, competidores internacionales (Arini, Annie, TrueLark/Weave, Savvy Agents, Adit) y el mercado español (Gesden, Klinikare, Clinic Cloud).
 
 ---
@@ -16,6 +16,71 @@ La tesis: las clínicas dentales pierden entre el 30% y el 40% de sus llamadas e
 2. Integración profunda con el ecosistema español (Gesden G5, Klinikare, Clinic Cloud) — los players americanos no cubren España.
 3. Agente IA con conocimiento clínico dental real: triaje de urgencias, orientación por tratamiento, gestión de primeras visitas.
 4. Cumplimiento RGPD nativo (dato de salud = categoría especial) como ventaja competitiva frente a soluciones USA.
+
+---
+
+## 1.1. ESTADO REAL DEL PROYECTO A 19 JULIO 2026
+
+Este documento mantiene la estrategia completa, pero el proyecto ya no esta en fase cero. Hay un SaaS funcional desplegado y conectado a GitHub/Vercel.
+
+Estado actual:
+
+- App full-stack en Next.js 16, React 19, TypeScript, Prisma y PostgreSQL.
+- UI SaaS rediseñada siguiendo las referencias locales de `saas new design/`.
+- Dashboard, Agenda, Conversaciones, Pacientes, Tratamientos, Tareas, Facturación, Analítica, Automatizaciones y Configuración ya existen como base navegable.
+- Listado de pacientes y ficha/resumen de paciente adaptados a las vistas de:
+  - `saas new design/pat_01_listado_de_pacientes/`
+  - `saas new design/pat_08_ficha_resumen_de_paciente/`
+- Clara, la recepcionista IA, queda como modulo protegido: no tocar salvo necesidad directa.
+- Demo local de pacientes saneada con 5 fichas ficticias completas mediante `npm run db:reset-demo-patients`.
+- Producción se despliega desde `main` en GitHub hacia Vercel.
+
+Infraestructura operativa:
+
+| Pieza | Estado |
+|---|---|
+| GitHub | `https://github.com/alejandroenlared-a11y/DENTIA.git` |
+| Rama de despliegue | `main` |
+| Dominio productivo | `https://dentia.avelkia.es` |
+| Vercel checks | `Vercel - dentia`, `Vercel - dentia-hu6t` |
+| Ultimo commit verificado | `738ee32 fix: align home agenda card height` |
+| Estado Vercel del ultimo commit | success en ambos checks |
+
+Commits recientes que forman la base visual actual:
+
+| Commit | Cambio |
+|---|---|
+| `27fc702` | Rediseño general del dashboard SaaS Dentia. |
+| `c313c96` | Vistas de pacientes y ficha/resumen adaptadas al diseño cliente. |
+| `67e0bec` | Sedes renombradas a `Sede Murcia` y `Sede Elche`. |
+| `8132a93` | Prevención de overflow de texto en cards compactas. |
+| `f354a11` | Card `Agenda` colocada arriba a la derecha en Inicio. |
+| `6f3d648` | Más espacio interno en cards para evitar texto pegado a bordes. |
+| `738ee32` | `Agenda` y `Bienvenida` alineadas en altura en la parte superior. |
+
+Protocolo de entrega a partir de ahora:
+
+1. Analizar `git status --short`, archivos afectados y últimos commits antes de tocar código.
+2. Implementar cambios pequeños, defendibles y coherentes con el diseño de `saas new design/`.
+3. No tocar el agente recepcionista Clara salvo petición explícita.
+4. Validar con:
+   - `npm run typecheck`
+   - `npm run lint`
+   - `npm run build`
+   - `npm test` cuando haya lógica, datos, acciones, validaciones o agente.
+5. Verificar visualmente con navegador cualquier cambio de UI.
+6. Commit en `main` con mensaje claro.
+7. `git push origin main`.
+8. Esperar los dos checks de Vercel en GitHub hasta `success`.
+9. Actualizar `MEMORIA_DENTAL.MD` y esta hoja de ruta cuando se cierre una fase o decision relevante.
+
+Prioridad inmediata:
+
+- Terminar la revisión visual por modulo en producción.
+- Unificar criterios de espaciado, cards, tablas, formularios y estados vacíos.
+- Convertir Pacientes/Ficha en una experiencia lista para demo comercial.
+- Mantener Clara estable mientras se pule el SaaS.
+- No meter datos reales de pacientes hasta cerrar seguridad, RGPD, permisos, auditoria y retención.
 
 ---
 

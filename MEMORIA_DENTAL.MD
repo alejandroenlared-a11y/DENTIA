@@ -1,8 +1,8 @@
 # MEMORIA_DENTAL — SaaS Clinica Dental + Recepcionista IA
 
-Fecha de memoria: 8 de julio de 2026  
-Proyecto: SaaS para clinicas dentales con recepcionista IA omnicanal  
-Carpeta: `SaaS CLINICA DENTAL`
+Fecha de memoria: 19 de julio de 2026
+Proyecto: SaaS para clinicas dentales con recepcionista IA omnicanal
+Carpeta: `DENTIA`
 
 ## Contexto principal
 
@@ -25,8 +25,8 @@ El producto debe cubrir:
 
 La carpeta incluye dos documentos de negocio que hay que tomar como base real del cliente:
 
-- [RUIZ-ESTRADA-BASE-CONOCIMIENTO.md](/Users/alejandroenlared/codex-test/proyecto/AVELKIA/PROYECTOS-CLIENTES/SaaS%20CLINICA%20DENTAL/RUIZ-ESTRADA-BASE-CONOCIMIENTO.md)
-- [RUIZ-ESTRADA-DOLORES-DETECTADOS.md](/Users/alejandroenlared/codex-test/proyecto/AVELKIA/PROYECTOS-CLIENTES/SaaS%20CLINICA%20DENTAL/RUIZ-ESTRADA-DOLORES-DETECTADOS.md)
+- [RUIZ-ESTRADA-BASE-CONOCIMIENTO.md](/Users/alejandroenlared/codex-test/proyecto/AVELKIA/PROYECTOS-CLIENTES/DENTIA/RUIZ-ESTRADA-BASE-CONOCIMIENTO.md)
+- [RUIZ-ESTRADA-DOLORES-DETECTADOS.md](/Users/alejandroenlared/codex-test/proyecto/AVELKIA/PROYECTOS-CLIENTES/DENTIA/RUIZ-ESTRADA-DOLORES-DETECTADOS.md)
 
 Resumen operativo del cliente:
 
@@ -99,11 +99,11 @@ Para dental, la iconografia debe estar relacionada con:
 
 ## Estado actual del proyecto
 
-Fase 1 iniciada y convertida a aplicacion full-stack real.
+Fase 1 iniciada y convertida a aplicacion full-stack real. El estado historico de esta seccion corresponde al arranque del 8-9 de julio; la situacion operativa vigente esta consolidada en la seccion "Actualizacion 19 julio 2026 - Estado SaaS, diseno y despliegue".
 
 Arquitectura actual:
 
-- Next.js 15 + React 19 + TypeScript.
+- Next.js 16 + React 19 + TypeScript.
 - PostgreSQL local mediante Docker.
 - Prisma ORM con schema multi-tenant.
 - Server Actions para CRUD real.
@@ -122,7 +122,9 @@ Archivos clave:
 - `src/lib/dashboard.ts`
 - `src/lib/prisma.ts`
 - `src/components/icon.tsx`
-- `styles.css`
+- `src/app/base.css`
+- `src/app/clinical-design.css`
+- `src/app/globals.css`
 
 Base de datos local:
 
@@ -133,7 +135,7 @@ Base de datos local:
 
 Servidor local:
 
-- URL: `http://localhost:3001`
+- URL habitual: `http://localhost:3002` cuando `3001` esta ocupado.
 
 Validaciones realizadas el 8 de julio de 2026:
 
@@ -149,11 +151,11 @@ Validaciones realizadas el 8 de julio de 2026:
 
 Limitaciones actuales:
 
-- No hay login productivo todavia.
-- El multi-tenant existe en modelo de datos, pero falta aislamiento por sesion/login.
+- Hay login funcional y usuarios demo; antes de datos reales falta cerrar hardening completo de seguridad/RGPD.
+- El multi-tenant existe en modelo de datos y se usa en acciones principales; antes de piloto real hay que auditar aislamiento por sesion, permisos y accesos indirectos.
 - No hay WhatsApp, voz, SMS ni widget web conectados.
 - No hay pagos Stripe.
-- No hay despliegue productivo.
+- Hay despliegue productivo en Vercel conectado a GitHub.
 - No esta listo para datos reales de pacientes hasta completar auth, seguridad, RGPD y auditoria avanzada.
 
 ## Modulos ya implementados en Fase 1
@@ -1681,3 +1683,128 @@ Criterio para seguir:
    - marketing/recuperacion,
    - configuracion.
 4. Redisenar antes de seguir anadiendo pantallas.
+
+## Actualizacion 19 julio 2026 - Estado SaaS, diseno y despliegue
+
+Contexto:
+
+- El cliente no validaba el diseno anterior del SaaS.
+- La referencia principal de diseno paso a ser la carpeta local:
+  - `saas new design/`
+- No se debe tocar ni degradar el agente recepcionista Clara; al cliente le ha gustado y queda como pieza protegida.
+- El trabajo del 19 julio se concentro en redisenar el SaaS y corregir problemas visuales de Inicio/Pacientes.
+
+Estado tecnico vigente:
+
+- Stack: Next.js 16.2.10, React 19, TypeScript, Prisma 6.19.3, PostgreSQL.
+- Scripts clave:
+  - `npm run dev`
+  - `npm run typecheck`
+  - `npm run lint`
+  - `npm test`
+  - `npm run build`
+  - `npm run db:seed`
+  - `npm run db:reset-demo-patients`
+- Base local Docker:
+  - servicio: `dentia-ai-postgres`
+  - puerto host: `56321`
+  - base: `dentia_ai`
+- Servidor local usado en QA reciente:
+  - `PORT=3002 npm run dev`
+- Credenciales demo locales:
+  - `demo@dentia.ai` / `demo`
+  - `alejandro@dentia.ai` / `dentia-demo-2026`
+
+Estado GitHub/Vercel:
+
+- Repositorio GitHub:
+  - `https://github.com/alejandroenlared-a11y/DENTIA.git`
+- Rama operativa:
+  - `main`
+- Vercel esta conectado a GitHub y despliega automaticamente cada push a `main`.
+- Checks de Vercel esperados por commit:
+  - `Vercel - dentia`
+  - `Vercel - dentia-hu6t`
+- Dominio productivo principal:
+  - `https://dentia.avelkia.es`
+- Proyecto Vercel operativo:
+  - `dentia-hu6t`
+- El ultimo commit verificado al actualizar esta memoria fue:
+  - `738ee32 fix: align home agenda card height`
+- Estado remoto de ese commit:
+  - `Vercel - dentia`: `success`
+  - `Vercel - dentia-hu6t`: `success`
+
+Commits funcionales recientes que definen el estado visual actual:
+
+- `27fc702 feat: redesign Dentia SaaS dashboard`
+  - Rediseno general del SaaS apoyado en las referencias de `saas new design/`.
+  - Base visual de dashboard, navegacion, paneles, cards y modulos.
+- `c313c96 feat: update patient views to client design`
+  - Sustitucion de listado de pacientes y ficha/resumen de paciente siguiendo:
+    - `saas new design/pat_01_listado_de_pacientes/`
+    - `saas new design/pat_08_ficha_resumen_de_paciente/`
+  - Alta de script `npm run db:reset-demo-patients`.
+  - Seed local con 5 pacientes ficticios completos para demo.
+- `67e0bec fix: rename clinic site labels`
+  - Cambio global de sedes visibles:
+    - `Sede Centro` -> `Sede Murcia`
+    - `Sede Playa` -> `Sede Elche`
+- `8132a93 fix: prevent compact card text overflow`
+  - Correccion de textos que se salian de cards compactas.
+- `f354a11 fix: pin home agenda card top right`
+  - Card `Agenda` posicionada en la parte superior derecha del Inicio.
+- `6f3d648 fix: increase card inner spacing`
+  - Aumento de padding interno para evitar texto pegado al borde de cards.
+- `738ee32 fix: align home agenda card height`
+  - Card `Agenda` alineada en altura con la card de `Bienvenida`.
+  - KPIs pasan debajo ocupando todo el ancho.
+
+Validaciones realizadas el 19 julio 2026:
+
+- `npm run typecheck`: OK.
+- `npm run lint`: OK.
+- `npm run build`: OK.
+- QA Playwright local en Inicio:
+  - login demo correcto,
+  - `Bienvenida` y `Agenda` con mismo `bottom` y misma altura (`bottomDelta: 0`, `heightDelta: 0`),
+  - sin overflow horizontal,
+  - sin cards con texto pegado por debajo del umbral de 12 px.
+- QA visual local de cards:
+  - Home y Tareas sin textos fuera de card.
+  - Cards compactas con padding minimo consistente.
+
+Regla operativa para cambios futuros:
+
+1. Antes de tocar codigo, revisar:
+   - `git status --short`
+   - archivos afectados,
+   - ultimos commits relevantes con `git log --oneline -12`.
+2. Si el cambio toca diseno:
+   - respetar `saas new design/` como fuente visual,
+   - mantener Clara/recepcionista IA sin cambios salvo peticion explicita,
+   - validar con navegador en desktop y, si aplica, movil/tablet.
+3. Antes de subir:
+   - `npm run typecheck`
+   - `npm run lint`
+   - `npm run build`
+   - `npm test` si hay cambio logico, acciones, validaciones, agente o datos.
+4. Para publicar:
+   - stagear solo archivos intencionales,
+   - commit claro en `main`,
+   - `git push origin main`.
+5. Despues de publicar:
+   - consultar estado del commit en GitHub:
+     - `https://api.github.com/repos/alejandroenlared-a11y/DENTIA/commits/<hash>/status`
+   - esperar a que los dos checks de Vercel terminen en `success`,
+   - si algun deployment queda en `failure`, revisar Vercel antes de darlo por terminado.
+6. Documentar cada fase cerrada en:
+   - `MEMORIA_DENTAL.MD`
+   - `HOJA-DE-RUTA-SAAS-DENTAL.md`
+
+Riesgos activos:
+
+- La base de pacientes ficticios se reseteo en local; produccion no se toco porque no habia `DATABASE_URL` productiva disponible en el entorno local.
+- El rediseno visual ya esta desplegado, pero aun necesita revision humana completa por modulo en produccion.
+- No meter datos reales de pacientes hasta cerrar auditoria de seguridad, RGPD, roles/permisos y retencion.
+- Cualquier cambio de Prisma que afecte produccion debe coordinarse con Neon/Vercel antes del deploy.
