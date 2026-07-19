@@ -236,12 +236,12 @@ Checklist operativo antes de datos reales de pacientes: EIPD hecha · DPA firmad
 
 Lista honesta, por orden de riesgo:
 
-1. **`build` ejecuta `prisma db push` contra producción.** Sin migraciones versionadas, un cambio de schema puede destruir datos en un deploy. → Migrar a `prisma migrate` + `migrate deploy` en build. **La más urgente.**
+1. **Migraciones Prisma a medio camino.** `build` ya NO ejecuta `prisma db push`; ahora hace `prisma generate && next build`. Falta cerrar el paso productivo: marcar/aplicar baseline `0_init` en Neon y activar `prisma migrate deploy` en el build de Vercel cuando producción esté resuelta. **La más urgente antes de nuevos cambios de schema.**
 2. **`src/app/page.tsx` con 3.206 líneas.** Monolito de vistas; frena cada cambio de UI y viola el estándar propio (<800 líneas/archivo). → Trocear por módulo en rutas/componentes al ejecutar el rediseño de menús.
-3. **Rate limiting in-memory.** En Vercel serverless cada instancia tiene su propia memoria → los límites no son reales. → Upstash Redis.
-4. **Token admin con fallback hardcodeado** (`dentia-admin-local`) y superadmin por query param. → Eliminar fallback y proteger `/admin` con auth real antes de clientes de pago.
-5. **Sin Sentry ni métricas.** Producción a ciegas. → Sentry + alertas + latencia del agente.
-6. **Sin política de backups/restore documentada** para Neon. → Verificar PITR, documentar y probar una restauración.
+3. **Rate limiting distribuido: base implementada.** API pública y webhooks ya pueden usar Upstash Redis REST con fallback a memoria. Pendiente: configurar `UPSTASH_REDIS_REST_URL` y `UPSTASH_REDIS_REST_TOKEN` en Vercel antes de tráfico real.
+4. **Admin cerrado: base implementada.** `/admin` ya no usa token por query param; requiere sesión, rol `OWNER` y allowlist `DENTIA_ADMIN_EMAILS` en producción.
+5. **Sentry: base implementada.** SDK configurado para Next.js App Router/Turbopack, sin PII ni replay. Pendiente: crear proyecto Sentry y configurar DSN/tokens en Vercel.
+6. **Backups/restore documentados.** Runbook en `docs/OPERATIONS.md`. Pendiente: ejecutar restore real de prueba en Neon y registrar resultado.
 7. **Sin MFA** en auth propia. → Obligatorio para roles MANAGER+ antes de datos reales.
 8. **Emails vía Gmail personal en Make.** → Brevo/SendGrid con dominio propio antes de clientes de pago.
 9. **Datos de QA en producción** (pacientes/conversaciones de test). → Script de limpieza + tenant de staging separado.
@@ -269,7 +269,7 @@ Objetivo único: **Clara contestando el WhatsApp real de Ruiz Estrada antes del 
 
 Mientras Clara trabaja sola, se blinda la plataforma (la clínica está cerrada: ventana perfecta para deuda técnica).
 
-- Toda la lista de §8, en orden (migraciones Prisma primero).
+- Toda la lista de §8, en orden (migraciones Prisma primero; Sentry, admin, rate limit y runbook de backups ya tienen base implementada).
 - Checklist RGPD de §7 (EIPD, DPA plantilla, retención/supresión, auditoría de aislamiento).
 - Rediseño de arquitectura de menús/submenús (pendiente de directrices del usuario) + troceo de `page.tsx` en el mismo movimiento. Separación clara: recepción IA · pacientes/ficha · agenda · tratamientos/presupuestos · facturación · crecimiento · configuración.
 - Recordatorios T-72h/24h/3h reales con cron + cola (hoy solo generación manual de tareas).
@@ -371,7 +371,7 @@ Mientras Clara trabaja sola, se blinda la plataforma (la clínica está cerrada:
 
 | Riesgo | Prob. | Impacto | Mitigación |
 |---|---|---|---|
-| Deploy destruye datos (db push sin migraciones) | Alta si no se corrige | Muy alto | §8.1 — migraciones versionadas en Sprint 2, antes que nada |
+| Deploy con schema fuera de control | Media hasta cerrar baseline Neon | Muy alto | §8.1 — completar baseline productiva y activar `migrate deploy` antes de nuevos cambios Prisma |
 | Alucinación del agente (precio/consejo clínico) | Media | Muy alto | Guardrails duros + eval automática 100/100 como gate + fallos reales → fixtures + seguro RC |
 | Incidente RGPD con datos de salud | Baja | Muy alto | Checklist §7 completo ANTES de datos reales; mínima PII al LLM; residencia UE |
 | RingLab consolida el mercado antes | Media | Alto | Velocidad + PMS que ellos no cubren + pricing público + caso agosto |
@@ -405,7 +405,7 @@ Mientras Clara trabaja sola, se blinda la plataforma (la clínica está cerrada:
 2. **Prueba E2E Make completa:** conversación real → opción 1 → email recibido → ficha accesible. Después `rescheduled` y `cancelled`.
 3. **Base de conocimiento Ruiz Estrada de agosto** cargada y validada con la clínica (horarios de cierre, protocolo de urgencias, citas para septiembre).
 4. **Protocolo de agosto firmado** con Ruiz Estrada: quién revisa pre-fichas, escalados, teléfono de urgencias.
-5. Iniciar en paralelo **migraciones Prisma versionadas** (§8.1) — única pieza de deuda que no espera a Sprint 2.
+5. Completar **migraciones Prisma versionadas en producción** (§8.1): baseline Neon resuelto, `migrate deploy` activado en Vercel y `db push` reservado solo para desarrollo local controlado.
 
 Protocolo de entrega vigente (invariable):
 

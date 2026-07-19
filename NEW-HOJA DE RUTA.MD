@@ -174,7 +174,7 @@ Clara = recepcion IA + captura + agenda + seguimiento
 - [ ] Falta vista de auditoria visible para cambios de pre-ficha.
 - [ ] Falta modelo clinico real para alergias, enfermedades, medicacion y alertas.
 - [ ] Falta ruta dedicada de ficha paciente completa cuando crezca la ficha 360.
-- [ ] `prisma db push` en build es valido para esta fase, pero debe sustituirse por migraciones versionadas.
+- [x] `prisma db push` ya no esta en `build`; queda pendiente cerrar baseline Neon y activar `migrate deploy` en Vercel.
 - [ ] Todavia no existe importador CSV de presupuestos dormidos.
 - [ ] Todavia no existe panel ROI real.
 - [ ] Todavia no existe motor de secuencias con consentimiento/frecuencia/idempotencia.
@@ -354,8 +354,8 @@ Cerrar el flujo PULSO + Clara minimo vendible.
 
 ### 5.4. Seguridad y base
 
-- [ ] Sustituir `prisma db push` en build por migraciones versionadas.
-- [ ] Crear migracion formal para `PatientIntake`.
+- [x] Sustituir `prisma db push` en build por migraciones versionadas.
+- [ ] Cerrar baseline Neon y activar `prisma migrate deploy` en Vercel.
 - [ ] Revisar que `/ficha/[codigo]` no expone datos sin verificacion.
 - [ ] Registrar acceso a ficha publica.
 
@@ -729,9 +729,9 @@ Mitigacion:
 
 Mitigacion:
 
-- Crear migraciones Prisma.
-- Quitar `db push` del build.
-- Separar deploy app de deploy DB.
+- Migraciones Prisma versionadas creadas.
+- `db push` quitado del build.
+- Pendiente: resolver baseline Neon y activar `migrate deploy` como paso productivo controlado.
 
 ---
 

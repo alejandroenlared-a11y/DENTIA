@@ -433,20 +433,20 @@ Casos probables donde debo avisar:
 ### Fases 5-6 — Base CERRADA (integraciones externas pendientes de credenciales)
 
 - API publica v1: `GET/POST /api/v1/patients` y `GET/POST /api/v1/appointments` con cabecera `x-api-key` (clave por tenant, visible en Configuracion), envelope `{success, data, error, meta}`, paginacion. Verificado: 401 sin clave, datos con clave.
-- Rate limiting in-memory por plan (STARTER 30/min, PRO 120/min, SCALE 600/min) + limite de pacientes por plan en POST.
-- Superadmin `/admin?token=...`: lista tenants con metricas. Token via env `DENTIA_ADMIN_TOKEN` (fallback dev: `dentia-admin-local`). 404 sin token.
+- Rate limiting originalmente in-memory por plan; estado actual: API y webhooks soportan Upstash Redis REST con fallback local.
+- Superadmin originalmente por `/admin?token=...`; estado actual: `/admin` requiere sesion, rol `OWNER` y allowlist `DENTIA_ADMIN_EMAILS` en produccion.
 - Campo `plan` en Tenant (default PRO).
-- Pendiente externo: Stripe (cobros reales), Sentry/OTel, PMS dentales (Gesden/Klinikare), telefonia. Todo requiere cuentas/credenciales del cliente.
+- Pendiente externo: Stripe (cobros reales), DSN/tokens de Sentry en Vercel, PMS dentales (Gesden/Klinikare), telefonia. Todo requiere cuentas/credenciales del cliente.
 
 ## Validacion del cierre (9 julio 2026)
 
 - `npm run typecheck`, `npm test` (55 tests, 8 suites), `npm run build`: verdes.
-- QA navegador: login/logout, redireccion sin sesion, aislamiento entre tenants, onboarding de clinica nueva (Ruiz Estrada demo), gate de rol con error visible, consentimiento RGPD toggle, recordatorios (2 creados), webhook whatsapp/sms con respuestas del agente y escalado de urgencia, API v1 con y sin clave, /admin con y sin token.
+- QA navegador: login/logout, redireccion sin sesion, aislamiento entre tenants, onboarding de clinica nueva (Ruiz Estrada demo), gate de rol con error visible, consentimiento RGPD toggle, recordatorios (2 creados), webhook whatsapp/sms con respuestas del agente y escalado de urgencia, API v1 con y sin clave, y admin heredado con token antes del cierre actual por sesion/rol.
 - Bug cazado en QA en vivo: "me duele" no matcheaba keyword "dolor" -> saludo en vez de urgencia. Corregido + test de regresion.
 
 ## Nota operativa
 
-- MCP Sentinel bloquea tocar ficheros de entorno y nombres de claves API conocidas via tools: por eso la clave LLM usa nombre propio `DENTIA_LLM_API_KEY` y el token admin tiene fallback dev en codigo. Anadir esas variables al fichero de entorno a mano si se necesitan.
+- Mantener secretos fuera de git. La clave LLM usa nombre propio `DENTIA_LLM_API_KEY`; `/admin` ya no usa token y se controla con sesion, rol `OWNER` y `DENTIA_ADMIN_EMAILS`.
 - El dev server y `npm run build` no deben correr a la vez (corrompen `.next`).
 
 ## Prioridad siguiente
@@ -1395,7 +1395,7 @@ Pendiente:
    - descartar,
    - marcar revisada.
 4. Incluir el enlace de ficha en emails de confirmacion/modificacion/cancelacion.
-5. Sustituir `prisma db push` en build por migraciones Prisma versionadas antes de uso serio con mas clientes.
+5. Estado actualizado: `prisma db push` ya no esta en `build`; queda pendiente cerrar baseline Neon y activar `prisma migrate deploy` en Vercel antes de nuevos cambios de schema.
 
 ## Actualizacion 17 julio 2026 - Enlace de ficha en payload Make
 
@@ -1781,6 +1781,21 @@ Validaciones realizadas el 19 julio 2026:
 - QA visual local de cards:
   - Home y Tareas sin textos fuera de card.
   - Cards compactas con padding minimo consistente.
+
+Actualizacion tecnica posterior del 19 julio 2026:
+
+- `src/app/page.tsx` empezo a dividirse: la vista de Pacientes y pre-fichas se movio a `src/components/patients-view.tsx`.
+- Los helpers de tonos/etiquetas de dashboard se movieron a `src/lib/dashboard-view-format.ts`.
+- Sentry quedo configurado de forma base para Next.js App Router/Turbopack:
+  - `instrumentation.ts`
+  - `instrumentation-client.ts`
+  - `sentry.server.config.ts`
+  - `sentry.edge.config.ts`
+  - `src/app/global-error.tsx`
+- Rate limit distribuido listo con Upstash Redis REST y fallback a memoria.
+- `/admin` ya no usa `?token=...`; requiere sesion, rol `OWNER` y `DENTIA_ADMIN_EMAILS` en produccion.
+- Runbook operativo creado:
+  - `docs/OPERATIONS.md`
 
 Regla operativa para cambios futuros:
 

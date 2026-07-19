@@ -83,7 +83,7 @@ Objetivo: convertir Clara en una recepcionista IA altamente fiable, medible y pr
 - [x] `/ficha/DENTIA-XXXXXX`: 404 con codigo inexistente, correcto.
 - [x] QA viva en produccion: Clara pide consentimiento, nombre, email, telefono, sede y luego 3 opciones.
 - [x] QA viva en produccion: email invalido tipo `laura@` no se acepta.
-- [ ] Sustituir `prisma db push` en build por migraciones Prisma versionadas.
+- [x] Sustituir `prisma db push` en build por migraciones Prisma versionadas. Pendiente operativo: baseline Neon + `migrate deploy` en Vercel.
 - [ ] Subir de 103 a 150 conversaciones de regresion.
 - [ ] Separar fixtures por categoria cuando el archivo extra crezca demasiado.
 - [ ] Convertir `quality:release` en control obligatorio de CI remoto.
@@ -562,7 +562,7 @@ Orden inmediato recomendado:
 7. Hacer una prueba de modificacion de cita y comprobar que solo sale el email de modificacion.
 8. Hacer una prueba de cancelacion de cita y comprobar que solo sale el email de cancelacion.
 9. Guardar cualquier fallo real como fixture nuevo antes de tocar mas logica.
-10. Sustituir `prisma db push` en build por migraciones Prisma versionadas.
+10. Completar baseline Neon y activar `prisma migrate deploy` en Vercel; `db push` ya no esta en `build`.
 11. Subir el dataset de 103 a 150 conversaciones.
 12. Elegir proveedor definitivo de email para produccion: Gmail temporal, Brevo, SendGrid o SMTP transaccional.
 13. Preparar el siguiente bloque grande: WhatsApp Meta real, PMS dental real y panel de recepcion.

@@ -1,20 +1,18 @@
 import { notFound } from "next/navigation";
+import { UserRole } from "@prisma/client";
 import { Icon } from "@/components/icon";
+import { hasRole, requireSessionUser } from "@/lib/auth";
 import { formatDate } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 
-type AdminPageProps = {
-  searchParams?: Promise<Record<string, string | string[] | undefined>>;
-};
+export default async function AdminPage() {
+  const user = await requireSessionUser();
+  const adminEmails = getAdminEmails();
+  const allowedByEmail = adminEmails.length > 0
+    ? adminEmails.includes(user.email.toLowerCase())
+    : process.env.NODE_ENV !== "production";
 
-export default async function AdminPage({ searchParams }: AdminPageProps) {
-  const expected =
-    process.env.DENTIA_ADMIN_TOKEN ??
-    (process.env.NODE_ENV === "development" ? "dentia-admin-local" : undefined);
-  const params = await searchParams;
-  const token = Array.isArray(params?.token) ? params?.token[0] : params?.token;
-
-  if (!expected || token !== expected) {
+  if (!hasRole(user, UserRole.OWNER) || !allowedByEmail) {
     notFound();
   }
 
@@ -74,4 +72,11 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
       </section>
     </div>
   );
+}
+
+function getAdminEmails() {
+  return (process.env.DENTIA_ADMIN_EMAILS || "")
+    .split(",")
+    .map(email => email.trim().toLowerCase())
+    .filter(Boolean);
 }
