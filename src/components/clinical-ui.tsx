@@ -1,5 +1,5 @@
-import Link from "next/link";
 import type React from "react";
+import { DashboardLink as Link } from "@/components/dashboard-link";
 import { Icon, type IconName } from "@/components/icon";
 
 export type Tone = "blue" | "green" | "orange" | "purple" | "red";

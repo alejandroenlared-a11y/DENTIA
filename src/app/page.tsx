@@ -1,5 +1,4 @@
 import { Fragment } from "react";
-import Link from "next/link";
 import { AppointmentStatus, CalendarEventType, ConversationChannel, ElectronicInvoiceStatus, PatientIntakeStatus, PatientStatus, TaskPriority } from "@prisma/client";
 import {
   EmptyState,
@@ -12,6 +11,7 @@ import {
   ViewHead,
   type Tone
 } from "@/components/clinical-ui";
+import { DashboardLink as Link } from "@/components/dashboard-link";
 import {
   cancelAppointmentAction,
   cancelCalendarEventAction,

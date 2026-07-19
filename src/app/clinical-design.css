@@ -166,6 +166,10 @@ body {
   font-weight: 700;
 }
 
+.nav-item.pending {
+  cursor: progress;
+}
+
 .nav-item .icon {
   width: 16px;
   height: 16px;
@@ -178,6 +182,46 @@ body {
   border-radius: 999px;
   font-size: 10px;
   background: var(--primary);
+}
+
+.nav-spinner {
+  width: 14px;
+  height: 14px;
+  margin-left: auto;
+  border-radius: 999px;
+  border: 2px solid color-mix(in srgb, var(--primary) 24%, transparent);
+  border-top-color: var(--primary);
+  animation: nav-spin .7s linear infinite;
+  flex: 0 0 auto;
+}
+
+.route-pending-indicator {
+  position: fixed;
+  top: 14px;
+  right: 18px;
+  z-index: 120;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 36px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.route-pending-indicator .nav-spinner {
+  margin-left: 0;
+}
+
+@keyframes nav-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .sidebar-bottom {
@@ -2271,8 +2315,28 @@ body {
     font-weight: 800;
   }
 
+  .mobile-nav-item.pending {
+    cursor: progress;
+  }
+
   .mobile-nav-item .icon {
     width: 18px;
     height: 18px;
+  }
+
+  .mobile-nav-item .nav-spinner {
+    position: absolute;
+    top: 5px;
+    right: 7px;
+    width: 13px;
+    height: 13px;
+    margin: 0;
+    border-width: 2px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nav-spinner {
+    animation: none;
   }
 }

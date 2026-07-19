@@ -1,9 +1,10 @@
-import Link from "next/link";
 import type React from "react";
 import { logoutAction } from "@/app/auth-actions";
 import { ThemeToggle } from "@/app/theme-toggle";
+import { DashboardLink as Link } from "@/components/dashboard-link";
+import { MobileNavigation, SidebarNavigation } from "@/components/dashboard-navigation";
 import { Icon } from "@/components/icon";
-import { navGroups, navItems, primaryActionHref, viewMeta } from "@/lib/app-navigation";
+import { primaryActionHref, viewMeta } from "@/lib/app-navigation";
 import type { AppView, getDashboardData } from "@/lib/dashboard";
 import { getInitials } from "@/lib/format";
 
@@ -31,30 +32,11 @@ export function SaasAppShell({ data, view, patientQuery, notices, children }: Sa
             <span>Dental Software</span>
           </div>
         </div>
-        {navGroups.map(group => (
-          <div className="nav-group" key={group.label}>
-            <div className="nav-label">{group.label}</div>
-            <nav className="nav-section" aria-label={group.label}>
-              {group.items.map(item => (
-                <Link
-                  key={item.id}
-                  aria-current={view === item.id ? "page" : undefined}
-                  className={`nav-item ${view === item.id ? "active" : ""}`}
-                  href={`/?view=${item.id}`}
-                >
-                  <Icon name={item.icon} />
-                  <span>{item.label}</span>
-                  {item.badge === "unread" && data.metrics.unreadConversations > 0 ? (
-                    <span className="count">{data.metrics.unreadConversations}</span>
-                  ) : null}
-                  {item.badge === "tasks" && data.metrics.openTasks > 0 ? (
-                    <span className="count">{data.metrics.openTasks}</span>
-                  ) : null}
-                </Link>
-              ))}
-            </nav>
-          </div>
-        ))}
+        <SidebarNavigation
+          view={view}
+          unreadConversations={data.metrics.unreadConversations}
+          openTasks={data.metrics.openTasks}
+        />
         <div className="sidebar-bottom">
           <div className={`assistant-pill ${data.tenant.assistantEnabled ? "online" : ""}`}>
             <span />
@@ -73,22 +55,11 @@ export function SaasAppShell({ data, view, patientQuery, notices, children }: Sa
           </form>
         </div>
       </aside>
-      <nav className="mobile-switch" aria-label="Navegacion principal">
-        {navItems.slice(0, 6).map(item => (
-          <Link
-            key={item.id}
-            aria-current={view === item.id ? "page" : undefined}
-            className={`mobile-nav-item ${view === item.id ? "active" : ""}`}
-            href={`/?view=${item.id}`}
-          >
-            <Icon name={item.icon} />
-            <span>{item.shortLabel ?? item.label}</span>
-            {item.id === "inbox" && data.metrics.unreadConversations > 0 ? (
-              <span className="count">{data.metrics.unreadConversations}</span>
-            ) : null}
-          </Link>
-        ))}
-      </nav>
+      <MobileNavigation
+        view={view}
+        unreadConversations={data.metrics.unreadConversations}
+        openTasks={data.metrics.openTasks}
+      />
       <main className="main">
         <header className="topbar">
           <div className="topbar-left">

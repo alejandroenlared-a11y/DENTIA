@@ -1,7 +1,7 @@
-import Link from "next/link";
 import { AppointmentStatus, InvoiceStatus, PatientIntakeStatus, PatientStatus, TaskPriority } from "@prisma/client";
 import { createPatientAction, createTaskFromPatientIntakeAction, updatePatientIntakeStatusAction, updatePatientStatusAction } from "@/app/actions";
 import { EmptyState, Field, MiniPipeline, PanelHead, Pill } from "@/components/clinical-ui";
+import { DashboardLink as Link } from "@/components/dashboard-link";
 import { Icon } from "@/components/icon";
 import type { getDashboardData } from "@/lib/dashboard";
 import {
