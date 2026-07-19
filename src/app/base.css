@@ -664,29 +664,37 @@ a:hover {
   border-radius: 6px;
   padding: 8px 10px;
   margin-top: 6px;
-  /* Dos lineas fijas (titulo + meta) con elipsis: misma altura en cualquier
-     ancho de card, sin nombres sobre-recortados ni fechas partidas. */
   display: flex;
   flex-direction: column;
   justify-content: center;
   gap: 2px;
   background: var(--surface-hover);
   min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .compact-row strong {
   color: var(--ink);
   font-size: 12px;
+  min-width: 0;
+  max-width: 100%;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  white-space: normal;
 }
 
 .compact-row span {
   color: var(--muted);
   font-size: 11px;
+  min-width: 0;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
+  overflow-wrap: anywhere;
   white-space: nowrap;
 }
 

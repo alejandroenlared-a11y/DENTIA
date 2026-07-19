@@ -816,12 +816,15 @@ body {
 .compact-row,
 .dense-row {
   min-height: 42px;
-  display: flex;
+  display: grid;
   align-items: center;
-  justify-content: space-between;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 12px;
   padding: 9px 0;
   border-bottom: 1px solid var(--line-soft);
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .compact-row:last-child,
@@ -832,6 +835,14 @@ body {
 .compact-row strong,
 .dense-row strong {
   color: var(--ink);
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  white-space: normal;
 }
 
 .compact-row span,
@@ -839,6 +850,21 @@ body {
 .compact-row-end span {
   color: var(--muted);
   font-size: 11px;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
+  white-space: nowrap;
+}
+
+.upcoming-panel .compact-row,
+.pipeline-panel .compact-row,
+.recent-panel .compact-row,
+.automation-log .compact-row {
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: 4px;
 }
 
 .dense-list {
