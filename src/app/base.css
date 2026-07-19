@@ -561,7 +561,7 @@ a:hover {
   grid-template-columns: minmax(0, 1fr) 380px;
   grid-template-areas:
     "intro agenda"
-    "kpis agenda"
+    "kpis kpis"
     "main main";
   column-gap: 16px;
   row-gap: 16px;
@@ -596,8 +596,8 @@ a:hover {
 .home-agenda {
   grid-area: agenda;
   grid-column: 2;
-  grid-row: 1 / span 2;
-  align-self: start;
+  grid-row: 1;
+  align-self: stretch;
   min-width: 0;
 }
 
