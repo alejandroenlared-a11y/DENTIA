@@ -122,3 +122,25 @@ DENTIA_ADMIN_EMAILS=alejandro@dentia.ai
 ```
 
 En desarrollo, si `DENTIA_ADMIN_EMAILS` no existe, un `OWNER` puede entrar para no bloquear QA local.
+
+### Reset de pacientes demo
+
+`/admin` incluye una accion de mantenimiento para limpiar el tenant demo y recrear 5 fichas ficticias completas.
+
+Requisitos:
+
+- Entrar como usuario `OWNER` incluido en `DENTIA_ADMIN_EMAILS`.
+- Seleccionar el tenant correcto, normalmente `clinica-murcia-elche`.
+- Escribir confirmacion exacta: `RESET PACIENTES DEMO`.
+
+La accion:
+
+- Borra datos vinculados a pacientes del tenant: pacientes, citas, conversaciones, mensajes, pre-fichas, sesiones IA, tareas, facturas, consentimientos y logs asociados.
+- Recrea 5 pacientes ficticios completos con citas, conversaciones, tareas, facturas y consentimientos.
+- Registra `demo_patients.reset` en `AuditLog`.
+
+Validacion esperada tras ejecutar:
+
+- Menu Pacientes muestra 5 pacientes.
+- No aparece `Paciente demo`.
+- La ficha de cada paciente demo abre correctamente.

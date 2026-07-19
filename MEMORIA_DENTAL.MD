@@ -1827,7 +1827,8 @@ Regla operativa para cambios futuros:
 
 Riesgos activos:
 
-- La base de pacientes ficticios se reseteo en local; produccion no se toco porque no habia `DATABASE_URL` productiva disponible en el entorno local.
+- La base de pacientes ficticios se reseteo en produccion el 19/07/2026 desde `/admin`: 111 pacientes demo antiguos borrados y 5 fichas ficticias completas activas en `clinica-murcia-elche`.
+- `DENTIA_ADMIN_EMAILS` quedo configurado en Vercel `dentia-hu6t` para permitir acceso admin a `alejandro@dentia.ai`.
 - El rediseno visual ya esta desplegado, pero aun necesita revision humana completa por modulo en produccion.
 - No meter datos reales de pacientes hasta cerrar auditoria de seguridad, RGPD, roles/permisos y retencion.
 - Cualquier cambio de Prisma que afecte produccion debe coordinarse con Neon/Vercel antes del deploy.
