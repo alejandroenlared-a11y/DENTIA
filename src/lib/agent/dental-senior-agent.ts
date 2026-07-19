@@ -2,6 +2,7 @@ import { demoKnowledge, type DemoScenarioId } from "@/lib/agent/demo-data";
 
 export type DentalIntentId =
   | DemoScenarioId
+  | "cosmetic_dentistry"
   | "orthodontics"
   | "endodontics"
   | "caries_restoration"
@@ -23,8 +24,10 @@ export type DentalAgentState = {
   consent: boolean;
   name: string;
   phone: string;
+  email: string;
   location: string;
   availability: string;
+  offeredAvailabilityOptions: string[];
   ready: boolean;
   triageLevel: TriageLevel;
   triageLabel: string;
@@ -63,8 +66,10 @@ export const initialDentalAgentState: DentalAgentState = {
   consent: false,
   name: "",
   phone: "",
+  email: "",
   location: "",
   availability: "",
+  offeredAvailabilityOptions: [],
   ready: false,
   triageLevel: "ROUTINE",
   triageLabel: "Pendiente",
@@ -125,6 +130,19 @@ export const intentProfiles: Record<DentalIntentId, IntentProfile> = {
       "El blanqueamiento puede ser una buena opcion estetica, pero antes se revisa sensibilidad, encia, caries y restauraciones visibles (las fundas/empastes no cambian de color).",
     priceNote: "El blanqueamiento empieza desde 280 EUR, pendiente de valorar sensibilidad y estado oral."
   },
+  cosmetic_dentistry: {
+    title: "Estetica dental",
+    intentCode: "ESTETICA_DENTAL_VALORACION",
+    treatmentNeed: "Estetica dental",
+    budget: "valoracion sin coste",
+    estimatedValue: 85000,
+    defaultTriage: "ESTHETIC",
+    likelyCauses: ["mejora de sonrisa", "color dental", "forma dental", "diseno de sonrisa"],
+    clinicalReading:
+      "En estetica dental puede valorarse blanqueamiento, carillas, restauraciones esteticas de composite o Digital Smile Design segun color, forma, encia y mordida.",
+    priceNote:
+      "En estetica dental hay varias opciones: blanqueamiento desde 280 EUR; carillas, composite estetico o Digital Smile Design requieren valoracion para presupuesto cerrado."
+  },
   reactivation: {
     title: "Higiene / mantenimiento",
     intentCode: "HIGIENE_PERIODONCIA",
@@ -138,16 +156,17 @@ export const intentProfiles: Record<DentalIntentId, IntentProfile> = {
     priceNote: "La higiene dental dura unos 45 minutos y tiene precio orientativo de 55 EUR."
   },
   orthodontics: {
-    title: "Ortodoncia invisible",
-    intentCode: "ORTODONCIA_INVISIBLE_ESTUDIO",
-    treatmentNeed: "Ortodoncia invisible",
+    title: "Ortodoncia",
+    intentCode: "ORTODONCIA_ESTUDIO",
+    treatmentNeed: "Ortodoncia",
     budget: "desde 1.800 EUR",
     estimatedValue: 180000,
     defaultTriage: "ROUTINE",
     likelyCauses: ["apinamiento", "malposicion dental", "mordida abierta/cruzada", "recidiva tras ortodoncia"],
     clinicalReading:
-      "La ortodoncia invisible requiere estudio digital para confirmar si el caso es apto, duracion aproximada y presupuesto cerrado; los alineadores son removibles (se quitan para comer y limpiar). En ninos puede valorarse ortopedia funcional para guiar el crecimiento.",
-    priceNote: "La ortodoncia invisible parte desde 1.800 EUR y se confirma tras estudio digital."
+      "La ortodoncia requiere estudio digital para confirmar si encajan alineadores invisibles, brackets Damon u otra opcion, duracion aproximada y presupuesto cerrado. En ninos puede valorarse ortopedia funcional para guiar el crecimiento.",
+    priceNote:
+      "La ortodoncia parte desde 1.800 EUR en casos sencillos; brackets, Damon u ortodoncia invisible se confirman tras estudio digital."
   },
   endodontics: {
     title: "Endodoncia / nervio",
@@ -249,9 +268,9 @@ const signalPatterns = [
   { label: "dolor pulsatil/nocturno", pattern: /(late|pulsatil|palpita|por la noche|me despierta|espontaneo|sin tocar)/ },
   { label: "dolor al morder", pattern: /(al morder|cuando mastico|masticar|presion|al cerrar)/ },
   { label: "sensibilidad al frio/calor", pattern: /(frio|calor|helado|bebida fria|bebida caliente|sensibilidad)/ },
-  { label: "inflamacion", pattern: /(inflamad|hinchad|bulto|flemon|absceso|pus|mal sabor)/ },
-  { label: "sangrado de encias", pattern: /(sangran las encias|sangrado de encias|encia sangra|sangra al cepillar)/ },
-  { label: "movilidad dental", pattern: /(se mueve|movilidad|diente flojo)/ },
+  { label: "inflamacion", pattern: /(inflamad|inflamacion|hinchad|bulto|flemon|absceso|pus|mal sabor)/ },
+  { label: "sangrado de encias", pattern: /(sangran las encias|sangrado de encias|encia sangra|sangra al cepillar|sangrado|sangra)/ },
+  { label: "movilidad dental", pattern: /(se me mueve|se mueve|movilidad|diente flojo|muela floja)/ },
   { label: "pieza rota o funda", pattern: /(roto|fractur|funda|corona|empaste|se ha caido|caido)/ },
   { label: "pieza ausente", pattern: /(me falta|perdi una pieza|sin muela|sin diente|implante)/ },
   { label: "estetica", pattern: /(blanque|estetica|boda|sonrisa|dientes blancos)/ },
@@ -300,17 +319,27 @@ export function runDentalSeniorTurn(current: DentalAgentState, rawText: string):
   // Si la pregunta pendiente era el nombre, aceptar una respuesta que sea
   // solo el nombre ("Alejandro Marti"), sin exigir "soy" o "me llamo"; una
   // pregunta de identidad no cuenta como nombre aunque sea una frase corta.
-  const name =
-    current.name || extractName(text) || (wasAskedForName(current) && !asksIdentity ? extractBareName(text) : "");
+  const incomingName =
+    extractName(text) ||
+    extractNameNextToPhone(text) ||
+    (wasAskedForName(current) && !asksIdentity ? extractBareName(text) : "");
+  const name = current.name ? completeNameWithSurname(current.name, incomingName) : incomingName;
   const phone = current.phone || extractPhone(text);
+  const email = current.email || extractEmail(text);
   const location = current.location || extractLocation(normalized);
-  const availability = current.availability || extractAvailability(normalized, text);
-  const consent = current.consent || acceptsConsent(normalized);
-  const safetyScreened = current.safetyScreened || detectSafetyScreen(normalized, redFlags);
+  const selectedAvailability = extractSelectedAvailabilityOption(current, normalized);
+  const asksForAvailabilityOptions = Boolean(requestedSlotOptionsPeriod(text));
+  const availability = current.availability || selectedAvailability || (asksForAvailabilityOptions ? "" : extractAvailability(normalized, text));
+  const consent = current.consent || acceptsExplicitConsent(normalized) || (wasAskedForConsent(current) && acceptsConsent(normalized));
+  const safetyScreened =
+    current.safetyScreened ||
+    (intent === "trauma"
+      ? detectTraumaSafetyScreen(normalized, redFlags)
+      : detectSafetyScreen(normalized, redFlags));
   const triageLevel = getTriageLevel(intent, redFlags, detectedSignals);
   const missingClinicalData = getMissingClinicalData(intent, detectedSignals, safetyScreened);
 
-  const nextState = completeDentalState({
+  let nextState = completeDentalState({
     ...current,
     ...(profile
       ? {
@@ -334,9 +363,29 @@ export function runDentalSeniorTurn(current: DentalAgentState, rawText: string):
     consent,
     name,
     phone,
+    email,
     location,
-    availability
+    availability,
+    offeredAvailabilityOptions: selectedAvailability ? [] : current.offeredAvailabilityOptions
   });
+
+  const requestedPeriod = requestedSlotOptionsPeriod(text);
+  if (requestedPeriod && nextState.location && !nextState.availability) {
+    nextState = {
+      ...nextState,
+      offeredAvailabilityOptions: fallbackAvailabilityOptions(requestedPeriod)
+    };
+  }
+  if (
+    !requestedPeriod &&
+    canOfferAvailabilityOptions(nextState) &&
+    nextState.offeredAvailabilityOptions.length === 0
+  ) {
+    nextState = {
+      ...nextState,
+      offeredAvailabilityOptions: fallbackAvailabilityOptions("manana")
+    };
+  }
 
   // Peticion de presupuesto sin tratamiento concreto: marcarla para que el
   // siguiente turno de al grano con el rango de precio del tratamiento.
@@ -371,9 +420,9 @@ export function buildDentalSummary(state: DentalAgentState) {
 // anterior dice que se comunico ya: la orientacion clinica solo se da la
 // primera vez que se detecta la intencion.
 const EMPATHY_PAIN = [
-  "Vaya, siento que estes asi.",
-  "Uf, entiendo lo molesto que es eso.",
-  "Siento que lo estes pasando mal."
+  "Entiendo, es molesto.",
+  "Vale, vamos con calma.",
+  "Gracias por contarlo."
 ];
 
 const PAIN_INTENTS: DentalIntentId[] = [
@@ -386,12 +435,41 @@ const PAIN_INTENTS: DentalIntentId[] = [
 ];
 
 // Intenciones donde el precio orientativo se adelanta sin que lo pidan.
-const PRICE_FORWARD_INTENTS: DentalIntentId[] = ["implant_price", "whitening", "orthodontics", "first_visit"];
+const PRICE_FORWARD_INTENTS: DentalIntentId[] = ["implant_price", "whitening", "cosmetic_dentistry", "orthodontics", "first_visit"];
 
 // El paciente pidio presupuesto pero aun no sabemos de que tratamiento.
 const BUDGET_PENDING_INTENT = "PRESUPUESTO_PENDIENTE";
 
 function buildDentalReply(state: DentalAgentState, previous: DentalAgentState, latestPatientText: string) {
+  const healthCardReply = buildHealthCardReply(latestPatientText);
+  if (healthCardReply) {
+    return healthCardReply;
+  }
+  const addressReply = buildAddressReply(latestPatientText);
+  if (addressReply) {
+    return addressReply;
+  }
+  const teamReply = buildTeamReply(latestPatientText);
+  if (teamReply) {
+    return teamReply;
+  }
+  const appointmentManagementReply = buildAppointmentManagementReply(latestPatientText);
+  if (appointmentManagementReply) {
+    return appointmentManagementReply;
+  }
+  const clinicInfoReply = buildClinicInfoReply(latestPatientText);
+  if (clinicInfoReply) {
+    return clinicInfoReply;
+  }
+  const postCareReply = buildPostCareReply(latestPatientText);
+  if (postCareReply) {
+    return postCareReply;
+  }
+  const courtesyReply = buildCourtesyReply(latestPatientText);
+  if (courtesyReply && !state.intent) {
+    return courtesyReply;
+  }
+
   if (!state.intent) {
     // Quien pide presupuesto viene a comprar, no con dolor: se le pregunta
     // directamente por el tratamiento del catalogo, sin menu de sintomas.
@@ -460,9 +538,144 @@ function buildDentalReply(state: DentalAgentState, previous: DentalAgentState, l
   // cuanto se conoce el tratamiento aunque este mensaje ya no lo mencione.
   const cameFromBudget = previous.intentCode === BUDGET_PENDING_INTENT;
   const intro = isNewIntent ? buildIntro(state, profile, latestPatientText, cameFromBudget) : buildAck(state, previous);
-  const question = nextStep(state, latestPatientText);
+  const question = intro.trim().endsWith("?") ? "" : nextStep(state, latestPatientText);
   const reply = [intro, question].filter(Boolean).join("\n\n").trim();
   return reply || "Cuentame un poco mas para orientarte bien.";
+}
+
+function buildCourtesyReply(latestPatientText: string) {
+  const normalized = normalize(latestPatientText).trim();
+  if (/^(hola|buenas|buenos dias|buenas tardes|buenas noches)[!.? ]*$/.test(normalized)) {
+    return "Hola.\n\nCuentame que necesitas y te oriento.";
+  }
+  if (/^(gracias|muchas gracias|ok gracias|vale gracias)[!.? ]*$/.test(normalized)) {
+    return "A ti. Si necesitas algo mas, aqui estoy.";
+  }
+  return "";
+}
+
+function buildHealthCardReply(latestPatientText: string) {
+  const normalized = normalize(latestPatientText);
+  if (!/(tarjeta sanitaria|tarjeta de la seguridad social|tarjeta sip|\bsip\b)/.test(normalized)) {
+    return "";
+  }
+
+  return "No hace falta traer tarjeta sanitaria. Con tu nombre y telefono podemos gestionar la visita.\n\nQuieres que miremos una cita?";
+}
+
+function buildAddressReply(latestPatientText: string) {
+  const normalized = normalize(latestPatientText);
+  if (!asksClinicAddress(normalized)) {
+    return "";
+  }
+
+  const addresses = demoKnowledge.clinic.addresses;
+  if (normalized.includes("elche")) {
+    return [
+      `La clinica de Elche esta en ${addresses["Elche - Altabix"]}.`,
+      "Quieres que te cuente nuestros servicios o prefieres que miremos una cita en Elche?"
+    ].join("\n\n");
+  }
+  if (normalized.includes("murcia")) {
+    return [
+      `La clinica de Murcia esta en ${addresses["Murcia centro"]}.`,
+      "Quieres que te cuente nuestros servicios o prefieres que miremos una cita en Murcia?"
+    ].join("\n\n");
+  }
+  return [
+    `La clinica de Murcia esta en ${addresses["Murcia centro"]}.`,
+    `La clinica de Elche esta en ${addresses["Elche - Altabix"]}.`,
+    "Quieres que te cuente nuestros servicios o prefieres que miremos una cita?"
+  ].join("\n\n");
+}
+
+function asksClinicAddress(normalized: string) {
+  return /(\bdonde estais\b|\bdonde estan\b|\bdonde sois\b|\bdonde teneis\b|\bdonde queda\b|\bdonde esta\b|\bdonde se encuentra\b|direccion|ubicacion|calle|como llego|localizacion|ubicados|ubicadas|en que zona|por donde queda)/.test(normalized);
+}
+
+function buildTeamReply(latestPatientText: string) {
+  const normalized = normalize(latestPatientText);
+  if (!asksTeamOrSpecialties(normalized)) {
+    return "";
+  }
+
+  const team = demoKnowledge.clinic.team.map(member => `${member.name}: ${member.specialty}.`).join("\n");
+  return [
+    "Claro. El equipo trabaja por especialidades:",
+    team,
+    "Quieres que te oriente por alguna molestia, buscas una urgencia o prefieres que miremos cita con algun doctor en concreto?"
+  ].join("\n\n");
+}
+
+function asksTeamOrSpecialties(normalized: string) {
+  return /(especialidades|especialidad|especialistas|doctores|doctoras|odontologos|dentistas|equipo|quien atiende|quien lleva|quien hace)/.test(normalized);
+}
+
+function buildAppointmentManagementReply(latestPatientText: string) {
+  const normalized = normalize(latestPatientText);
+  if (!asksAppointmentManagement(normalized)) {
+    return "";
+  }
+  if (/(cancel|anular)/.test(normalized)) {
+    return "Te ayudo a cancelarla. Para localizar la cita, dime nombre completo y telefono de contacto.";
+  }
+  return "Te ayudo a cambiarla. Para localizar la cita, dime nombre completo, telefono y que dia o franja te vendria mejor.";
+}
+
+function asksAppointmentManagement(normalized: string) {
+  return /(cancelar|cancelo|anular|anulo|cambiar|cambio|mover|reprogramar|modificar).{0,30}\bcita\b|\bcita\b.{0,30}(cancelar|anular|cambiar|mover|reprogramar|modificar)/.test(normalized);
+}
+
+function buildClinicInfoReply(latestPatientText: string) {
+  const normalized = normalize(latestPatientText);
+  if (/(quiero hablar con una persona|hablar con alguien|hablar con recepcion|pasame con recepcion|humano|persona real)/.test(normalized)) {
+    return "Claro. Puedo avisar a recepcion para que te atienda una persona. Dime brevemente el motivo y un telefono de contacto.";
+  }
+  if (/(horario|hora abris|hora cerrais|cuando abris|cuando cerrais)/.test(normalized)) {
+    return `${demoKnowledge.clinic.hours}\n\nQuieres que miremos una cita?`;
+  }
+  if (/(telefono de la clinica|telefono teneis|ten[eé]is telefono|numero de telefono|llamaros|llamar a la clinica)/.test(normalized)) {
+    return `El telefono de la clinica es ${demoKnowledge.clinic.phone}.\n\nTambien puedo ayudarte por aqui a mirar cita, presupuesto o urgencia.`;
+  }
+  if (/(clinica privada|sois privados|sois privada|privada)/.test(normalized)) {
+    return "Si, somos una clinica dental privada.\n\nQuieres que te oriente con algun tratamiento o prefieres que miremos una cita?";
+  }
+  if (/(seguro|mutua|adeslas|sanitas|asisa|dkv)/.test(normalized)) {
+    return "Para seguros o mutuas concretas es mejor confirmarlo con recepcion, porque depende de la poliza y del tratamiento.\n\nSi quieres, dime que necesitas y te orientamos.";
+  }
+  if (
+    /(pago con tarjeta|tarjeta bancaria|bizum|forma de pago|formas de pago|financiar|financiacion)/.test(normalized) &&
+    !/(implante|ortodoncia|invisalign|bracket|blanqueamiento|carilla|endodoncia)/.test(normalized)
+  ) {
+    return "Para tratamientos con presupuesto cerrado se puede estudiar financiacion hasta 24 meses segun aprobacion. Las formas de pago concretas te las confirman en recepcion.\n\nQuieres que te oriente con algun tratamiento?";
+  }
+  if (/(atendeis ninos|atend[eé]is niños|odontopediatria|dentista infantil|mi hijo|mi hija)/.test(normalized) && !/(ortodoncia|dolor|duele|muela|diente)/.test(normalized)) {
+    return "Si, atendemos ninos. Tenemos odontopediatria con Dra. Laura Herencia Lizaran y Dra. Paula Garcia Garcia.\n\nQuieres que miremos una primera visita o es por alguna molestia?";
+  }
+  if (/(parking|aparcamiento|aparcar)/.test(normalized)) {
+    return "No quiero inventarte el aparcamiento exacto. Dime si vienes a Murcia o a Elche y te indico la direccion de la sede para que puedas calcularlo bien.";
+  }
+  if (/(silla de ruedas|accesible|acceso|movilidad reducida)/.test(normalized)) {
+    return "Para accesibilidad concreta de la sede, lo mejor es confirmarlo con recepcion antes de venir.\n\nDime si seria Murcia o Elche y te ayudamos a organizarlo.";
+  }
+  if (/(do you speak english|speak english|english please|hablais ingles|habl[aá]is ingles)/.test(normalized)) {
+    return "Yes, I can help you in English. Tell me what you need: appointment, budget, dental pain, or clinic information.";
+  }
+  if (/(llevo esperando|nadie me contesta|no me respondeis|reclamacion|queja)/.test(normalized)) {
+    return "Lo siento. Para pasarlo a recepcion y que lo revisen, dime tu nombre y un telefono de contacto.";
+  }
+  return "";
+}
+
+function buildPostCareReply(latestPatientText: string) {
+  const normalized = normalize(latestPatientText);
+  if (/(me han hecho|me hicieron|me quitaron|me sacaron).{0,40}(empaste|endodoncia|extraccion|muela|diente)/.test(normalized)) {
+    if (/(sangra mucho|no para de sangrar|hemorragia|no puedo tragar|me cuesta respirar)/.test(normalized)) {
+      return "Eso conviene revisarlo con prioridad. Si el sangrado no cede o te cuesta respirar o tragar, acude a urgencias. Si puedes, dime nombre y telefono y aviso a recepcion.";
+    }
+    return "Tras un tratamiento reciente, sigue la pauta que te dio el doctor. Si hay dolor fuerte, inflamacion, fiebre o sangrado que no cede, avisanos para revisarlo con prioridad.\n\nQue tratamiento te hicieron y cuando fue?";
+  }
+  return "";
 }
 
 // Senales que expresan deseo de tratamiento, no un sintoma clinico: nombrar
@@ -470,6 +683,13 @@ function buildDentalReply(state: DentalAgentState, previous: DentalAgentState, l
 const NON_SYMPTOM_SIGNALS = new Set(["pieza ausente", "estetica", "ortodoncia", "pieza rota o funda"]);
 
 function buildIntro(state: DentalAgentState, profile: IntentProfile, latestPatientText: string, cameFromBudget = false) {
+  const normalized = normalize(latestPatientText);
+  if (/(miedo|panico|ansiedad).{0,30}(dentista|clinica|doctor)/.test(normalized)) {
+    return "Lo entiendo, a muchas personas les pasa. Lo anotamos para que el equipo lo tenga en cuenta y te expliquen todo con calma.";
+  }
+  if (/(se me mueve|se mueve|movilidad).{0,30}implante|implante.{0,30}(se me mueve|se mueve|movilidad)/.test(normalized)) {
+    return "Un implante que se mueve conviene revisarlo cuanto antes para valorar encia, tornillo, corona y soporte.";
+  }
   const expressesPain = /(duele|dolor|molest|me mata|horrible|fatal)/.test(normalize(latestPatientText));
   const empathy =
     state.intent && PAIN_INTENTS.includes(state.intent) && (expressesPain || state.escalated)
@@ -485,10 +705,26 @@ function buildIntro(state: DentalAgentState, profile: IntentProfile, latestPatie
   const asksPriceNow = mentionsPrice(latestPatientText);
   const hasSymptoms = state.detectedSignals.some(signal => !NON_SYMPTOM_SIGNALS.has(signal));
   if ((cameFromBudget || asksPriceNow) && !expressesPain && !hasSymptoms && !state.escalated) {
+    if (state.intent === "cosmetic_dentistry") {
+      return "Tenemos varias opciones de estetica dental.\n\nBlanqueamiento, carillas, composite estetico y Digital Smile Design.\n\nCual te interesa mas?";
+    }
+    if (state.intent === "orthodontics") {
+      return `Claro, te oriento. ${profile.priceNote} La valoracion inicial es sin coste y ahi te dicen duracion, opciones y financiacion.`;
+    }
+    if (state.intent === "reactivation") {
+      return `Claro. ${profile.priceNote} Si al verte hubiera encia inflamada o mucha acumulacion, te avisamos antes de hacer nada.`;
+    }
     return `Buena eleccion. ${profile.priceNote} El doctor te confirma el presupuesto cerrado en la valoracion, que es sin coste.`;
   }
 
   const causes = profile.likelyCauses.slice(0, 2).join(" o ");
+  if (
+    state.intent === "periodontics" &&
+    state.detectedSignals.includes("movilidad dental") &&
+    !state.detectedSignals.some(signal => ["sangrado de encias", "inflamacion", "dolor intenso"].includes(signal))
+  ) {
+    return "Que una muela se mueva conviene revisarlo pronto para valorar la encia y el soporte de la pieza.";
+  }
   return `${empathy}Por lo que me cuentas podria ser ${causes}; te lo confirmara el doctor al verte.${alarm}${price}`;
 }
 
@@ -518,6 +754,16 @@ const CONSENT_ASKS = [
 ];
 
 function nextStep(state: DentalAgentState, latestPatientText: string) {
+  if (state.intent === "trauma" && state.redFlags.length === 0 && !state.safetyScreened) {
+    const normalized = normalize(latestPatientText);
+    if (mentionsSwallowingAnswer(normalized) && !mentionsOpeningAnswer(normalized)) {
+      return "Y puedes abrir la boca bien?";
+    }
+    if (mentionsOpeningAnswer(normalized) && !mentionsSwallowingAnswer(normalized)) {
+      return "Y puedes tragar bien?";
+    }
+    return "Cuando te diste el golpe y cuanto te duele del 0 al 10? Puedes abrir la boca y tragar bien?";
+  }
   if (
     state.redFlags.length === 0 &&
     !state.safetyScreened &&
@@ -533,28 +779,36 @@ function nextStep(state: DentalAgentState, latestPatientText: string) {
       ? "Quiero que recepcion te llame con prioridad. Aceptas que guardemos tus datos para gestionarlo?"
       : pickVariant(CONSENT_ASKS, latestPatientText);
   }
-  if (!state.name && !state.phone) {
-    return state.escalated
-      ? "Dime tu nombre y un telefono y te llamamos enseguida."
-      : "Dime tu nombre y un telefono para la reserva.";
-  }
   if (!state.name) {
     return "Y tu nombre y apellidos?";
+  }
+  if (!hasFullName(state.name)) {
+    return `Gracias, ${firstName(state.name)}. Me faltan tus apellidos.`;
+  }
+  if (!state.escalated && !state.email) {
+    if (looksLikeInvalidEmail(latestPatientText)) {
+      return "Ese email no me encaja. Me lo puedes escribir completo? Por ejemplo, nombre@dominio.com.";
+    }
+    return "Y tu email para enviarte la confirmacion de la cita?";
   }
   if (!state.phone) {
     return `Y un telefono de contacto, ${firstName(state.name)}?`;
   }
-  if (state.escalated) {
-    return "";
-  }
   if (!state.location && !state.availability) {
-    return `Te viene mejor ${demoKnowledge.clinic.locations.join(" o ")}? Y por la manana o por la tarde?`;
+    return `Te viene mejor ${demoKnowledge.clinic.locations.join(" o ")}?`;
   }
   if (!state.location) {
     return `Te viene mejor ${demoKnowledge.clinic.locations.join(" o ")}?`;
   }
   if (!state.availability) {
-    return "Prefieres por la manana o por la tarde?";
+    const requestedPeriod = requestedSlotOptionsPeriod(latestPatientText);
+    if (requestedPeriod) {
+      return buildGuidedAvailabilityReply(state.location, requestedPeriod, state.offeredAvailabilityOptions);
+    }
+    if (state.offeredAvailabilityOptions.length > 0) {
+      return buildGuidedAvailabilityReply(state.location, "", state.offeredAvailabilityOptions);
+    }
+    return "Que dia y hora o franja te encaja? Por ejemplo, viernes por la manana o lunes a las 10:00.";
   }
   return "";
 }
@@ -574,6 +828,22 @@ function firstName(fullName: string) {
   return fullName.trim().split(/\s+/)[0] || "";
 }
 
+function hasFullName(name: string) {
+  return name.trim().split(/\s+/).filter(Boolean).length >= 2;
+}
+
+function completeNameWithSurname(currentName: string, incomingName: string) {
+  if (!incomingName || hasFullName(currentName)) {
+    return currentName;
+  }
+  const currentNormalized = normalize(currentName);
+  const incomingNormalized = normalize(incomingName);
+  if (!incomingNormalized || currentNormalized === incomingNormalized || currentNormalized.includes(incomingNormalized)) {
+    return currentName;
+  }
+  return `${currentName.trim()} ${incomingName.trim()}`.replace(/\s+/g, " ").slice(0, 48);
+}
+
 // Variacion determinista (testeable) a partir del texto del paciente, para que
 // las aperturas no suenen siempre identicas.
 function pickVariant(options: string[], seed: string) {
@@ -584,29 +854,119 @@ function pickVariant(options: string[], seed: string) {
   return options[hash % options.length];
 }
 
+function requestedSlotOptionsPeriod(text: string) {
+  const normalized = normalize(text);
+  const asksForOptions = /(que dias|que dia|que huecos|que horas|tienes|teneis|disponible|disponibilidad|opciones|hueco|huecos)/.test(normalized);
+  if (!asksForOptions) {
+    return "";
+  }
+  if (/\b(tarde|tardes|por la tarde|por las tardes)\b/.test(normalized)) {
+    return "tarde";
+  }
+  if (/\b(manana|mananas|por la manana|por las mananas)\b/.test(normalized)) {
+    return "manana";
+  }
+  return "";
+}
+
+function buildGuidedAvailabilityReply(location: string, period: string, offeredOptions: string[] = []) {
+  const options = offeredOptions.length > 0 ? offeredOptions : fallbackAvailabilityOptions(period);
+  const lines = options.map((slot, index) => `${index + 1}. ${slot}`);
+  const periodText = period ? ` de ${period}` : "";
+  return [`Te puedo proponer estos huecos${periodText} en ${location}:`, ...lines, "Responde con 1, 2 o 3 y te la dejo pre-reservada."].join("\n\n");
+}
+
+function extractSelectedAvailabilityOption(current: DentalAgentState, normalized: string) {
+  const option = normalized.trim().match(/^[123]$/)?.[0];
+  if (!option || current.offeredAvailabilityOptions.length === 0 || current.availability) {
+    return "";
+  }
+  return current.offeredAvailabilityOptions[Number(option) - 1] ?? "";
+}
+
+function fallbackAvailabilityOptions(period: string) {
+  const hour = period === "tarde" ? [17, 18, 17] : [10, 11, 10];
+  const start = new Date();
+  const slots: string[] = [];
+  for (let offset = 1; offset <= 10 && slots.length < 3; offset += 1) {
+    const candidate = new Date(start);
+    candidate.setDate(start.getDate() + offset);
+    if (candidate.getDay() === 0 || candidate.getDay() === 6) {
+      continue;
+    }
+    candidate.setHours(hour[slots.length] ?? hour[0], 0, 0, 0);
+    slots.push(
+      new Intl.DateTimeFormat("es-ES", {
+        weekday: "long",
+        day: "2-digit",
+        month: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit"
+      }).format(candidate)
+    );
+  }
+  return slots;
+}
+
+function canOfferAvailabilityOptions(state: DentalAgentState) {
+  return Boolean(
+    state.intent &&
+    state.consent &&
+    hasFullName(state.name) &&
+    state.phone &&
+    state.email &&
+    state.location &&
+    !state.availability
+  );
+}
+
 function completeDentalState(state: DentalAgentState): DentalAgentState {
-  const ready = state.escalated
-    ? Boolean(state.intent && state.consent && state.name && state.phone)
-    : Boolean(state.intent && state.consent && state.name && state.phone && state.location && state.availability);
+  const ready = Boolean(
+    state.intent &&
+    state.consent &&
+    hasFullName(state.name) &&
+    state.phone &&
+    (state.escalated || state.email) &&
+    state.location &&
+    hasAppointmentAvailability(state.availability)
+  );
   return { ...state, ready };
 }
 
 function inferIntent(current: DentalIntentId | undefined, normalized: string, signals: string[], redFlags: string[]): DentalIntentId | undefined {
-  if (redFlags.length > 0) {
-    return /golpe|trauma|accidente|caida|roto/.test(normalized) ? "trauma" : "urgent_pain";
+  if (asksAppointmentManagement(normalized)) {
+    return current;
   }
-  if (/(golpe|trauma|accidente|caida|se ha salido|diente fuera)/.test(normalized)) return "trauma";
-  if (/(muela del juicio|cordal|tercer molar|dolor atras|zona de atras)/.test(normalized)) return "wisdom_tooth";
+  const mentionsWisdomTooth = /(muela del juicio|cordal|tercer molar|dolor atras|zona de atras)/.test(normalized);
+  if (redFlags.length > 0) {
+    if (/(golpe|trauma|accidente|caida|roto)/.test(normalized) && !isTraumaNegated(normalized)) {
+      return "trauma";
+    }
+    if (mentionsWisdomTooth) {
+      return "wisdom_tooth";
+    }
+    return "urgent_pain";
+  }
+  if (/(golpe|trauma|accidente|caida|se ha salido|diente fuera)/.test(normalized) && !isTraumaNegated(normalized)) return "trauma";
+  if (current === "trauma" && looksLikeTraumaFollowUp(normalized)) return "trauma";
+  if (mentionsWisdomTooth) return "wisdom_tooth";
   if (/(implante|me falta|perdi una pieza|sin muela|sin diente)/.test(normalized)) return "implant_price";
-  if (/(ortodoncia|alineador|invisible|brackets|apin|mordida)/.test(normalized)) return "orthodontics";
-  if (/(blanque|boda|estetica|sonrisa|dientes blancos)/.test(normalized)) return "whitening";
-  if (/(sangran las encias|encia|encias|periodon|mal aliento|movilidad|sarro)/.test(normalized)) return "periodontics";
-  if (/(funda|corona|protesis|empaste.*caido|se me ha caido|se mueve la funda)/.test(normalized)) return "prosthetics";
+  if (/(ortodoncia|alineador|invisible|invisalign|brackets|aparato|retenedor|retencion|apin|mordida)/.test(normalized)) return "orthodontics";
+  if (/(blanque|dientes blancos)/.test(normalized)) return "whitening";
+  if (/(estetica|sonrisa|carilla|carillas|diseno de sonrisa|smile design|composite estetico|mejorar sonrisa)/.test(normalized)) return "cosmetic_dentistry";
+  if (
+    /(sangran las encias|encia|encias|periodon|mal aliento|movilidad|se me mueve|se mueve|mueve un diente|diente se mueve|diente flojo|muela floja)/.test(
+      normalized
+    ) ||
+    signals.includes("sangrado de encias")
+  ) return "periodontics";
+  if (/(funda|corona|protesis|empaste.*caido|se me ha caido|se mueve la funda|diente roto|muela rota|pieza rota|roto un diente|rota una muela)/.test(normalized)) return "prosthetics";
   if (/(bruxismo|aprieto|rechino|chasquido|mandibula|atm|dolor de cabeza)/.test(normalized)) return "tmj_bruxism";
   if (/(late|pulsatil|por la noche|me despierta|calor|dolor espontaneo|nervio)/.test(normalized)) return "endodontics";
   if (/(frio|dulce|agujero|mancha|caries|empaste|sensibilidad|al morder)/.test(normalized)) return "caries_restoration";
   if ((/(dolor|duele|hinchad|inflamad|pus|flemon|urgencia)/.test(normalized) && !isPainNegated(normalized)) || signals.includes("dolor intenso")) return "urgent_pain";
-  if (/(limpieza|higiene|revision|revisar|primera visita|cita|valoracion)/.test(normalized)) return current ?? "first_visit";
+  if (/(limpieza|limpiar|higiene|quitar sarro|sarro)/.test(normalized)) return "reactivation";
+  if (/(revision|revisar|primera visita|cita|valoracion)/.test(normalized)) return current ?? "first_visit";
   return current;
 }
 
@@ -620,7 +980,7 @@ function getTriageLevel(intent: DentalIntentId | undefined, redFlags: string[], 
   if (intent === "caries_restoration" || intent === "periodontics" || intent === "prosthetics" || intent === "implant_price") {
     return "PRIORITY_72H";
   }
-  if (intent === "whitening") {
+  if (intent === "whitening" || intent === "cosmetic_dentistry") {
     return "ESTHETIC";
   }
   return "ROUTINE";
@@ -634,8 +994,17 @@ function getMissingClinicalData(intent: DentalIntentId | undefined, signals: str
       missing.push("El dolor aparece con frio/calor, al morder o aparece solo sin tocar la pieza?");
     }
   }
-  if (["urgent_pain", "endodontics", "wisdom_tooth", "trauma"].includes(intent) && !safetyScreened) {
+  if (intent === "trauma" && !safetyScreened) {
+    missing.push("Cuando te diste el golpe y cuanto te duele del 0 al 10? Puedes abrir la boca y tragar bien?");
+  }
+  if (["urgent_pain", "endodontics", "wisdom_tooth"].includes(intent) && !safetyScreened) {
     missing.push("Desde cuando ocurre y que intensidad tiene del 0 al 10?");
+  }
+  if (intent === "periodontics" && signals.includes("sangrado de encias") && !safetyScreened) {
+    missing.push("El sangrado es leve o abundante, y ha empezado tras un golpe?");
+  }
+  if (intent === "periodontics" && signals.includes("movilidad dental") && !safetyScreened) {
+    missing.push("Te duele, notas inflamacion, sangrado o ha sido por un golpe?");
   }
   if (intent === "periodontics" && !signals.some(signal => ["sangrado de encias", "movilidad dental"].includes(signal))) {
     missing.push("Hay sangrado al cepillar, mal aliento, movilidad o encia retraida?");
@@ -677,11 +1046,35 @@ function detectLabels(normalized: string, rules: Array<{ label: string; pattern:
 
 function detectSafetyScreen(normalized: string, redFlags: string[]) {
   if (redFlags.length > 0) return true;
-  return /(no tengo fiebre|sin fiebre|no hay fiebre|no esta hinchad|sin hinchazon|no tengo hinchazon|puedo tragar|puedo respirar|no sangra|no hay pus|dolor [0-7])/.test(normalized);
+  return /(no tengo fiebre|sin fiebre|no hay fiebre|no esta hinchad|sin hinchazon|no tengo hinchazon|noto inflamacion|tengo inflamacion|hay inflamacion|puedo tragar|puedo respirar|no sangra|sangrado leve|sangra poco|leve|no hay pus|sin golpe|no ha sido golpe|dolor [0-7])/.test(normalized);
+}
+
+function detectTraumaSafetyScreen(normalized: string, redFlags: string[]) {
+  if (redFlags.length > 0) return true;
+  return (
+    /(sin dificultad|con normalidad|todo normal)/.test(normalized) ||
+    (mentionsOpeningAnswer(normalized) && mentionsSwallowingAnswer(normalized))
+  );
+}
+
+function looksLikeTraumaFollowUp(normalized: string) {
+  return /(ayer|hoy|anoche|esta manana|esta tarde|hace|me duele|dolor|del 0 al 10|[0-9]\s*(de|\/)\s*10|puedo abrir|puedo tragar|abrir la boca|tragar)/.test(normalized);
+}
+
+function mentionsOpeningAnswer(normalized: string) {
+  return /(puedo abrir|abro bien|abrir la boca|sin dificultad.*abrir|abrir.*sin dificultad|no me cuesta abrir)/.test(normalized);
+}
+
+function mentionsSwallowingAnswer(normalized: string) {
+  return /(puedo tragar|trago bien|tragar bien|sin dificultad.*tragar|tragar.*sin dificultad|no me cuesta tragar)/.test(normalized);
 }
 
 function isPainNegated(normalized: string) {
   return /(no hay dolor|no tengo dolor|sin dolor|no me duele|no duele|no es dolor)/.test(normalized);
+}
+
+function isTraumaNegated(normalized: string) {
+  return /(sin golpe|no ha sido golpe|no fue golpe|no me he golpeado|no me di golpe|no hubo golpe)/.test(normalized);
 }
 
 function isNegatedLabel(label: string, normalized: string) {
@@ -695,7 +1088,7 @@ function isNegatedLabel(label: string, normalized: string) {
     return /(sin hinchazon|no tengo hinchazon|no hay hinchazon|no esta hinchad|sin inflamacion|no tengo inflamacion)/.test(normalized);
   }
   if (label.includes("sangrado")) {
-    return /(no sangra|no hay sangrado|sin sangrado|no me sangra)/.test(normalized);
+    return /(no sangra|no hay sangrado|sin sangrado|ni sangrado|no me sangra)/.test(normalized);
   }
   if (label.includes("pus")) {
     return /(no hay pus|sin pus)/.test(normalized);
@@ -719,7 +1112,14 @@ function extractName(text: string) {
   if (!match?.[1]) {
     return "";
   }
-  return match[1].replace(/\s+y\s+.*/i, "").trim().slice(0, 48);
+  return cleanNameCandidate(match[1].replace(/\s+y\s+.*/i, ""), { allowReservedWords: true });
+}
+
+function extractNameNextToPhone(text: string) {
+  if (!PHONE_PATTERN.test(text)) {
+    return "";
+  }
+  return cleanNameCandidate(text);
 }
 
 function extractPhone(text: string) {
@@ -728,6 +1128,15 @@ function extractPhone(text: string) {
 }
 
 const PHONE_PATTERN = /(?:\+?34[\s.-]?)?[6789](?:[\s.-]?\d){8}/;
+
+function extractEmail(text: string) {
+  const match = text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
+  return match?.[0]?.toLowerCase() ?? "";
+}
+
+function looksLikeInvalidEmail(text: string) {
+  return text.includes("@") && !extractEmail(text);
+}
 
 // Palabras que descartan que una respuesta corta sea un nombre.
 const NON_NAME_WORDS = new Set([
@@ -762,10 +1171,38 @@ function wasAskedForName(state: DentalAgentState): boolean {
   return true;
 }
 
+function wasAskedForConsent(state: DentalAgentState): boolean {
+  if (!state.intent || state.consent) {
+    return false;
+  }
+  if (state.triageLevel === "EMERGENCY") {
+    return true;
+  }
+  const safetyPending =
+    state.redFlags.length === 0 &&
+    !state.safetyScreened &&
+    ["urgent_pain", "endodontics", "wisdom_tooth", "trauma"].includes(state.intent);
+  if (safetyPending) {
+    return false;
+  }
+  if (!state.escalated && state.missingClinicalData.length > 0) {
+    return false;
+  }
+  return true;
+}
+
 function extractBareName(raw: string) {
+  return cleanNameCandidate(raw);
+}
+
+function cleanNameCandidate(raw: string, options: { allowReservedWords?: boolean } = {}) {
   const candidate = raw
     .replace(new RegExp(PHONE_PATTERN.source, "g"), "")
-    .replace(/[,;.!?]/g, " ")
+    .replace(/\b(?:telefono|tel|movil|contacto|numero)\b/gi, " ")
+    .replace(/[,;.!?:/|]+/g, " ")
+    .replace(/\s*[-–—]+\s*$/g, " ")
+    .replace(/^\s*[-–—]+\s*/g, " ")
+    .replace(/\s+[-–—]+\s+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 
@@ -773,7 +1210,7 @@ function extractBareName(raw: string) {
     return "";
   }
   const words = candidate.split(" ");
-  if (words.length > 4 || words.some(word => NON_NAME_WORDS.has(normalize(word)))) {
+  if (words.length > 4 || (!options.allowReservedWords && words.some(word => NON_NAME_WORDS.has(normalize(word))))) {
     return "";
   }
   return candidate.slice(0, 48);
@@ -790,15 +1227,80 @@ function extractLocation(normalized: string) {
 }
 
 function extractAvailability(normalized: string, raw: string) {
-  const dayMatch = normalized.match(/\b(lunes|martes|miercoles|jueves|viernes|manana|tarde|esta semana|proxima semana)\b/);
-  const timeMatch = raw.match(/\b([01]?\d|2[0-3])[:.][0-5]\d\b/);
-  const parts = [dayMatch?.[0], timeMatch?.[0]].filter(Boolean);
-  return parts.join(" ").trim();
+  const day = extractPreferredDay(normalized, raw);
+  const timePreference = extractPreferredTimePreference(normalized, raw, day);
+  if (!day || !timePreference) {
+    return "";
+  }
+  if (day === "manana" && timePreference === "manana" && !/(por la manana|por las mananas|a la manana|de manana|temprano|primera hora|matinal)/.test(normalized)) {
+    return "";
+  }
+  return `${day} ${timePreference}`.trim();
+}
+
+function hasAppointmentAvailability(availability: string) {
+  const normalized = normalize(availability);
+  return Boolean(extractAvailability(normalized, availability));
+}
+
+function extractPreferredDay(normalized: string, raw: string) {
+  const explicitDate = raw.match(/\b(?:[0-3]?\d[/-][01]?\d(?:[/-]\d{2,4})?)\b/)?.[0];
+  if (explicitDate) {
+    return explicitDate;
+  }
+  return normalized.match(/\b(hoy|manana|pasado manana|lunes|martes|miercoles|jueves|viernes|esta semana|proxima semana)\b/)?.[0] ?? "";
+}
+
+function extractPreferredTimePreference(normalized: string, raw: string, day = "") {
+  const timeMatch = raw.match(/\b([01]?\d|2[0-3])(?::|\.|h)([0-5]\d)?\b/)?.[0];
+  if (timeMatch) {
+    return timeMatch.replace(/\.$/, "");
+  }
+  const bareHour = day ? extractBareHourNearDay(normalized, day) : "";
+  if (bareHour) {
+    return bareHour;
+  }
+  return extractPreferredDayPeriod(normalized);
+}
+
+function extractBareHourNearDay(normalized: string, day: string) {
+  const escapedDay = day.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const patterns = [
+    new RegExp(`\\b${escapedDay}\\b\\s*(?:a\\s+las?|sobre\\s+las?|a\\s+)?([01]?\\d|2[0-3])\\b`),
+    new RegExp(`\\b([01]?\\d|2[0-3])\\b\\s*(?:el\\s+)?\\b${escapedDay}\\b`)
+  ];
+  const match = patterns.map(pattern => normalized.match(pattern)).find(Boolean);
+  if (!match) {
+    return "";
+  }
+  return `${match[1].padStart(2, "0")}:00`;
+}
+
+function extractPreferredDayPeriod(normalized: string) {
+  if (
+    /\b(tarde|tardes|por la tarde|por las tardes|a la tarde|despues de comer)\b/.test(normalized) ||
+    /\b(vespertino|ultima hora)\b/.test(normalized)
+  ) {
+    return "tarde";
+  }
+
+  if (
+    /\b(manana|mananas|por la manana|por las mananas|a la manana|de manana)\b/.test(normalized) ||
+    /\b(temprano|primera hora|matinal)\b/.test(normalized)
+  ) {
+    return "manana";
+  }
+
+  return "";
 }
 
 function acceptsConsent(normalized: string) {
   const value = normalized.trim();
   return /(\bacepto\b|\bautorizo\b|\bconsiento\b|de acuerdo|\bok\b|\bvale\b)/.test(value) || /^si[,.! ]?$/.test(value);
+}
+
+function acceptsExplicitConsent(normalized: string) {
+  return /\b(acepto|autorizo|consiento)\b.{0,50}\b(datos|guardar|guarde|gestionarla|gestionarlo|cita)\b/.test(normalized);
 }
 
 function unique(values: string[]) {

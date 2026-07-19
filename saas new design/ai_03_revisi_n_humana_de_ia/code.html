@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+
+<html class="light" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>DENTIA - Revisión Humana de IA</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
+            font-size: 18px;
+        }
+        .diff-added { background-color: rgba(39, 133, 97, 0.1); border-bottom: 1px dashed #278561; }
+        .diff-removed { background-color: rgba(197, 48, 48, 0.1); text-decoration: line-through; color: #C53030; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #D9DEE3; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #bcc8d4; }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "secondary-fixed": "#d8e4f1",
+                        "error": "#C53030",
+                        "on-surface": "#191c1f",
+                        "on-primary-fixed": "#001d32",
+                        "border-subtle": "#E8EBEE",
+                        "success": "#278561",
+                        "on-background": "#191c1f",
+                        "error-container": "#ffdad6",
+                        "inverse-on-surface": "#eff1f5",
+                        "warning": "#B37D00",
+                        "secondary": "#54606b",
+                        "outline": "#717880",
+                        "on-surface-variant": "#41474f",
+                        "tertiary-fixed-dim": "#ffb779",
+                        "on-primary-container": "#9fd0ff",
+                        "on-error": "#ffffff",
+                        "surface-bright": "#f8f9fe",
+                        "surface-container-lowest": "#ffffff",
+                        "secondary-fixed-dim": "#bcc8d4",
+                        "primary": "#004268",
+                        "on-secondary-fixed-variant": "#3c4852",
+                        "surface-container-low": "#f2f3f8",
+                        "primary-container": "#005a8c",
+                        "surface-container": "#eceef2",
+                        "surface-alt": "#F0F2F4",
+                        "border-base": "#D9DEE3",
+                        "inverse-primary": "#95ccff",
+                        "on-secondary-container": "#58646f",
+                        "inverse-surface": "#2e3134",
+                        "on-tertiary-fixed": "#2e1500",
+                        "on-primary-fixed-variant": "#004a75",
+                        "on-tertiary": "#ffffff",
+                        "surface-container-high": "#e7e8ed",
+                        "on-error-container": "#93000a",
+                        "surface-dim": "#d8dadf",
+                        "on-secondary-fixed": "#111d26",
+                        "on-secondary": "#ffffff",
+                        "primary-fixed": "#cde5ff",
+                        "outline-variant": "#c1c7d0",
+                        "surface-container-highest": "#e1e2e7",
+                        "tertiary-container": "#824701",
+                        "on-primary": "#ffffff",
+                        "text-primary": "#17212B",
+                        "tertiary": "#613300",
+                        "surface": "#FFFFFF",
+                        "secondary-container": "#d5e1ee",
+                        "on-tertiary-container": "#ffbe87",
+                        "background": "#F5F6F7",
+                        "tertiary-fixed": "#ffdcc1",
+                        "surface-tint": "#166395",
+                        "primary-fixed-dim": "#95ccff",
+                        "surface-variant": "#e1e2e7",
+                        "on-tertiary-fixed-variant": "#6c3a00"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "padding-base": "1rem",
+                        "sidebar-collapsed": "64px",
+                        "sidebar-width": "224px",
+                        "gutter": "1rem",
+                        "header-height": "52px",
+                        "padding-compact": "0.75rem"
+                    },
+                    "fontFamily": {
+                        "label-xs": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "headline-lg": ["Inter"],
+                        "body-sm": ["Inter"],
+                        "body-md": ["Inter"]
+                    },
+                    "fontSize": {
+                        "label-xs": ["10px", {"lineHeight": "14px", "letterSpacing": "0.02em", "fontWeight": "500"}],
+                        "headline-md": ["16px", {"lineHeight": "24px", "fontWeight": "600"}],
+                        "headline-lg": ["22px", {"lineHeight": "32px", "fontWeight": "600"}],
+                        "body-sm": ["11px", {"lineHeight": "16px", "fontWeight": "400"}],
+                        "body-md": ["12px", {"lineHeight": "18px", "fontWeight": "400"}]
+                    }
+                },
+            },
+        }
+    </script>
+</head>
+<body class="bg-background font-body-md text-on-surface antialiased overflow-hidden">
+<!-- SIDEBAR NAVIGATION -->
+<aside class="w-sidebar-width h-screen fixed left-0 top-0 border-r border-border-base bg-surface flex flex-col h-full py-4 overflow-y-auto">
+<div class="px-6 mb-8">
+<h1 class="font-headline-md text-headline-md font-bold text-primary">DENTIA</h1>
+<p class="font-label-xs text-label-xs text-secondary opacity-70">Dental Software</p>
+</div>
+<nav class="flex-1">
+<ul class="space-y-0.5">
+<li><a class="flex items-center gap-3 px-6 py-2.5 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors duration-150 ease-in-out" href="#"><span class="material-symbols-outlined">home</span><span>Inicio</span></a></li>
+<li><a class="flex items-center gap-3 px-6 py-2.5 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors duration-150 ease-in-out" href="#"><span class="material-symbols-outlined">calendar_month</span><span>Agenda</span></a></li>
+<li><a class="flex items-center gap-3 px-6 py-2.5 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors duration-150 ease-in-out" href="#"><span class="material-symbols-outlined">group</span><span>Pacientes</span></a></li>
+<li><a class="flex items-center gap-3 px-6 py-2.5 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors duration-150 ease-in-out" href="#"><span class="material-symbols-outlined">medical_services</span><span>Clínica</span></a></li>
+<li><a class="flex items-center gap-3 px-6 py-2.5 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors duration-150 ease-in-out" href="#"><span class="material-symbols-outlined">dentistry</span><span>Tratamientos</span></a></li>
+<li><a class="flex items-center gap-3 px-6 py-2.5 text-primary font-semibold border-r-2 border-primary bg-surface-alt" href="#"><span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">auto_mode</span><span>Automatizaciones</span></a></li>
+<li><a class="flex items-center gap-3 px-6 py-2.5 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors duration-150 ease-in-out" href="#"><span class="material-symbols-outlined">settings</span><span>Configuración</span></a></li>
+</ul>
+</nav>
+<div class="px-6 mt-auto">
+<div class="bg-surface-container rounded-lg p-3 border border-border-base">
+<div class="flex items-center gap-2 mb-2">
+<span class="material-symbols-outlined text-primary text-sm" style="font-variation-settings: 'FILL' 1;">bolt</span>
+<span class="font-label-xs text-label-xs text-primary font-bold">IA DENTIA ACTIVA</span>
+</div>
+<div class="w-full bg-border-base h-1.5 rounded-full overflow-hidden">
+<div class="bg-primary h-full w-4/5"></div>
+</div>
+<p class="font-label-xs text-label-xs mt-2 text-secondary">80% de cuota mensual</p>
+</div>
+</div>
+</aside>
+<!-- HEADER -->
+<header class="h-header-height fixed top-0 right-0 left-sidebar-width z-50 bg-surface border-b border-border-base flex items-center justify-between px-gutter">
+<div class="flex items-center gap-4">
+<div class="relative">
+<span class="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-secondary opacity-50">search</span>
+<input class="bg-surface-container-low border border-border-base rounded-lg pl-10 pr-4 py-1.5 text-body-md w-64 focus:outline-none focus:border-primary transition-colors" placeholder="Buscar paciente o registro..." type="text"/>
+</div>
+<div class="flex gap-4">
+<span class="text-primary font-bold border-b-2 border-primary pb-1 cursor-pointer font-body-md">Sede Centro</span>
+<span class="text-on-surface-variant hover:text-primary transition-colors cursor-pointer font-body-md">Sede Playa</span>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="bg-primary text-on-primary px-4 py-1.5 rounded-lg font-body-md font-semibold hover:bg-primary-container transition-colors active:scale-95 flex items-center gap-2">
+<span class="material-symbols-outlined">add</span>
+                + Crear
+            </button>
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-on-surface-variant hover:text-primary cursor-pointer transition-colors">notifications</span>
+<div class="w-8 h-8 rounded-full bg-secondary-fixed border border-border-base flex items-center justify-center overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="A professional dental surgeon portrait, wearing clinical attire with a soft blue surgical mask around the neck, neutral laboratory background, clinical high-key lighting, highly detailed medical professional headshot." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDrqo3GIGnv_cCO1hPCuJUlm7b2u6WnFm5D1YyeCF5pqhZRRiJldHnQ9y8uAtotBtcmetUKRan7f21d2cSjANFM7ljTDx2JeDUKC5Pmrx9ncboRzToHtTQ_6FfnvFjieQ_86BVsXXIarqyX8rkewepz31TrbagEDy8mtjayaLRgTzZmV0ZhzLxvj5icfNOYt_s5KOHgzCcg9y6UAHAzPrmDL8i9S9KuVzbdu86wn1La_2SvyMgrB9Tg"/>
+</div>
+</div>
+</div>
+</header>
+<!-- TOP APP BAR (Contextual) -->
+<div class="w-full h-10 flex items-center px-4 fixed top-header-height left-sidebar-width z-40 bg-surface-container-low border-b border-border-subtle">
+<div class="flex items-center gap-4 text-on-surface">
+<span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1;">person</span>
+<span class="font-headline-md text-headline-md">Paciente: Juan Pérez</span>
+<span class="bg-primary-fixed text-on-primary-fixed px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">Historial Clínico</span>
+</div>
+<div class="ml-auto flex items-center gap-4">
+<span class="material-symbols-outlined text-secondary cursor-pointer hover:bg-surface-variant p-1 rounded transition-all">warning</span>
+<span class="material-symbols-outlined text-secondary cursor-pointer hover:bg-surface-variant p-1 rounded transition-all">account_balance_wallet</span>
+<span class="material-symbols-outlined text-secondary cursor-pointer hover:bg-surface-variant p-1 rounded transition-all">quick_reference_all</span>
+</div>
+</div>
+<!-- MAIN CONTENT AREA -->
+<main class="fixed top-[92px] left-sidebar-width right-0 bottom-0 overflow-hidden bg-background flex flex-col">
+<!-- TOOLBAR / STATUS -->
+<div class="px-gutter py-4 border-b border-border-base bg-surface flex items-center justify-between">
+<div>
+<h2 class="font-headline-md text-headline-md flex items-center gap-2 text-primary">
+<span class="material-symbols-outlined">auto_awesome</span>
+                    Validación de Sugerencia IA: Nota de Evolución
+                </h2>
+<p class="text-body-sm text-secondary mt-0.5">Identificador de sesión: AI-REV-20231027-042</p>
+</div>
+<div class="flex items-center gap-6">
+<!-- Confidence Score -->
+<div class="flex flex-col items-end">
+<div class="flex items-center gap-2">
+<span class="font-label-xs text-label-xs text-secondary uppercase tracking-tight">Nivel de confianza</span>
+<span class="text-success font-bold font-headline-md">94%</span>
+</div>
+<div class="w-32 h-1 bg-surface-container-high rounded-full overflow-hidden mt-1">
+<div class="bg-success h-full" style="width: 94%"></div>
+</div>
+</div>
+<div class="h-10 w-[1px] bg-border-base"></div>
+<div class="flex gap-2">
+<button class="h-8 px-3 rounded-lg border border-error text-error flex items-center gap-2 font-body-md hover:bg-error-container transition-colors">
+<span class="material-symbols-outlined text-[16px]">close</span>
+                        Rechazar con motivo
+                    </button>
+<button class="h-8 px-3 rounded-lg border border-border-base text-secondary flex items-center gap-2 font-body-md hover:bg-surface-alt transition-colors">
+<span class="material-symbols-outlined text-[16px]">edit_note</span>
+                        Editar
+                    </button>
+<button class="h-8 px-4 rounded-lg bg-primary text-on-primary flex items-center gap-2 font-body-md font-semibold hover:bg-primary-container transition-colors shadow-sm">
+<span class="material-symbols-outlined text-[16px]">check_circle</span>
+                        Aceptar sugerencia
+                    </button>
+</div>
+</div>
+</div>
+<!-- TWO COLUMN COMPARATOR -->
+<div class="flex-1 flex overflow-hidden">
+<!-- LEFT COLUMN: AI PROPOSAL -->
+<div class="flex-1 border-r border-border-base bg-surface-alt/50 flex flex-col">
+<div class="h-8 flex items-center px-4 bg-surface-container-high/50 border-b border-border-base">
+<span class="font-label-xs text-label-xs text-on-surface-variant font-bold uppercase tracking-widest flex items-center gap-2">
+<span class="material-symbols-outlined text-[14px]">smart_toy</span>
+                        Propuesta de IA (Original)
+                    </span>
+</div>
+<div class="flex-1 p-6 overflow-y-auto leading-relaxed text-secondary opacity-70 italic font-body-md">
+<p class="mb-4">Se presenta el paciente de 45 años para revisión de implante en pieza 36. Refiere ligera molestia a la presión, pero sin signos inflamatorios externos evidentes.</p>
+<p class="mb-4">A la exploración clínica, se observa encía estable, cicatrización completa. La radiografía periapical muestra oseointegración positiva sin radiotransparencias periaicales.</p>
+<p class="mb-4">Se recomienda seguimiento en 6 meses y limpieza profesional. Se prescribe ibuprofeno 600mg solo en caso de dolor persistente.</p>
+</div>
+</div>
+<!-- RIGHT COLUMN: FINAL EDITOR -->
+<div class="flex-[1.2] bg-surface flex flex-col">
+<div class="h-8 flex items-center px-4 bg-primary/5 border-b border-border-base justify-between">
+<span class="font-label-xs text-label-xs text-primary font-bold uppercase tracking-widest flex items-center gap-2">
+<span class="material-symbols-outlined text-[14px]" style="font-variation-settings: 'FILL' 1;">verified_user</span>
+                        Editor Final (Validado por Humano)
+                    </span>
+<span class="text-[10px] text-secondary flex items-center gap-1">
+<span class="w-2 h-2 rounded-full bg-success"></span> Guardado automático activo
+                    </span>
+</div>
+<div class="flex-1 p-6 overflow-y-auto leading-relaxed text-on-surface font-body-md relative">
+<!-- DIFF HIGHLIGHTING SIMULATION -->
+<p class="mb-4">
+                        Paciente masculino de 45 años acude a consulta para <span class="diff-added">seguimiento post-operatorio</span> de implante en pieza 36. Refiere ligera molestia a la <span class="diff-removed">presión</span> <span class="diff-added">masticación</span>, pero sin signos inflamatorios externos evidentes <span class="diff-added">ni supuración</span>.
+                    </p>
+<p class="mb-4">
+                        A la exploración clínica, se observa encía estable <span class="diff-added">(perfil de emergencia preservado)</span>, cicatrización completa. La radiografía periapical muestra oseointegración positiva sin radiotransparencias <span class="diff-removed">periaicales</span> <span class="diff-added">perimplantarias</span>.
+                    </p>
+<p class="mb-4">
+                        Se recomienda <span class="diff-removed">seguimiento en 6 meses y limpieza profesional</span> <span class="diff-added">nueva cita en 3 meses para carga protésica definitiva</span>. Se prescribe ibuprofeno 600mg <span class="diff-added">cada 8 horas por 3 días</span> solo en caso de dolor persistente.
+                    </p>
+<!-- Floating Formatting Bar (Compact) -->
+<div class="absolute bottom-6 right-6 flex items-center gap-1 bg-surface-container-highest/90 backdrop-blur border border-border-base p-1 rounded-lg shadow-xl">
+<button class="w-8 h-8 flex items-center justify-center hover:bg-surface-variant rounded transition-colors"><span class="material-symbols-outlined">format_bold</span></button>
+<button class="w-8 h-8 flex items-center justify-center hover:bg-surface-variant rounded transition-colors"><span class="material-symbols-outlined">format_italic</span></button>
+<button class="w-8 h-8 flex items-center justify-center hover:bg-surface-variant rounded transition-colors"><span class="material-symbols-outlined">format_list_bulleted</span></button>
+<div class="w-[1px] h-4 bg-border-base mx-1"></div>
+<button class="w-8 h-8 flex items-center justify-center hover:bg-surface-variant rounded transition-colors text-primary"><span class="material-symbols-outlined">history</span></button>
+</div>
+</div>
+</div>
+<!-- SIDE INFO / ACTIONS -->
+<div class="w-72 border-l border-border-base bg-surface-container-low flex flex-col">
+<div class="h-8 flex items-center px-4 border-b border-border-base">
+<span class="font-label-xs text-label-xs text-on-surface-variant font-bold uppercase tracking-widest">Metadata de IA</span>
+</div>
+<div class="p-4 space-y-6">
+<section>
+<h4 class="text-[10px] font-bold text-secondary uppercase mb-2">Fuentes Consultadas</h4>
+<ul class="space-y-2">
+<li class="flex items-center gap-2 p-2 bg-surface border border-border-subtle rounded text-body-sm">
+<span class="material-symbols-outlined text-primary">description</span>
+<span class="truncate">Historia Clínica v2.1</span>
+</li>
+<li class="flex items-center gap-2 p-2 bg-surface border border-border-subtle rounded text-body-sm">
+<span class="material-symbols-outlined text-primary">image</span>
+<span class="truncate">RX Periapical (20/10/23)</span>
+</li>
+</ul>
+</section>
+<section>
+<h4 class="text-[10px] font-bold text-secondary uppercase mb-2">Análisis de Cambios</h4>
+<div class="space-y-3">
+<div class="flex items-center justify-between text-body-sm">
+<span class="text-secondary">Adiciones</span>
+<span class="text-success font-bold font-label-xs bg-success/10 px-1.5 rounded">+12</span>
+</div>
+<div class="flex items-center justify-between text-body-sm">
+<span class="text-secondary">Eliminaciones</span>
+<span class="text-error font-bold font-label-xs bg-error/10 px-1.5 rounded">-4</span>
+</div>
+<div class="flex items-center justify-between text-body-sm">
+<span class="text-secondary">Tiempo de revisión</span>
+<span class="text-on-surface font-mono">01:24s</span>
+</div>
+</div>
+</section>
+<section class="pt-4 border-t border-border-base">
+<div class="p-3 bg-secondary-container rounded-lg border border-border-base">
+<p class="font-label-xs text-label-xs text-on-secondary-container mb-2">¿Cómo mejorar la IA?</p>
+<div class="flex gap-1">
+<button class="flex-1 py-1.5 bg-surface text-secondary border border-border-base rounded text-body-sm flex items-center justify-center hover:bg-surface-alt"><span class="material-symbols-outlined">thumb_up</span></button>
+<button class="flex-1 py-1.5 bg-surface text-secondary border border-border-base rounded text-body-sm flex items-center justify-center hover:bg-surface-alt"><span class="material-symbols-outlined">thumb_down</span></button>
+</div>
+</div>
+</section>
+</div>
+<!-- Footer-like helper in sidebar -->
+<div class="mt-auto p-4 bg-surface-container">
+<p class="text-[10px] text-on-surface-variant leading-tight">
+                        Este documento ha sido generado mediante un modelo de lenguaje. La responsabilidad clínica final recae sobre el odontólogo firmante.
+                    </p>
+</div>
+</div>
+</div>
+<!-- FOOTER / AUDIT TRAIL -->
+<footer class="h-10 bg-surface border-t border-border-base px-gutter flex items-center justify-between">
+<div class="flex items-center gap-4">
+<span class="text-body-sm text-secondary flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">info</span>
+                    Atajos de teclado: <strong>Alt + A</strong> (Aceptar), <strong>Alt + R</strong> (Rechazar)
+                </span>
+</div>
+<div class="flex items-center gap-2 text-body-sm text-secondary">
+<span class="material-symbols-outlined text-[14px]">history_edu</span>
+                Última revisión: Hoy 11:32 por Dr. M. Arriaga
+            </div>
+</footer>
+</main>
+<!-- REJECTION MODAL (Hidden by default) -->
+<div class="fixed inset-0 bg-on-surface/40 backdrop-blur-sm z-[100] flex items-center justify-center hidden" id="rejectionModal">
+<div class="bg-surface w-[400px] border border-border-base rounded-lg shadow-2xl overflow-hidden">
+<div class="p-4 border-b border-border-base flex items-center justify-between">
+<h3 class="font-headline-md text-headline-md text-primary">Motivo de Rechazo</h3>
+<button class="material-symbols-outlined text-secondary hover:text-on-surface">close</button>
+</div>
+<div class="p-6 space-y-4">
+<div class="space-y-2">
+<label class="font-label-xs text-label-xs uppercase text-secondary">Seleccione una categoría</label>
+<select class="w-full bg-surface-container-low border-border-base rounded text-body-md py-2 px-3">
+<option>Información incorrecta</option>
+<option>Tono inadecuado</option>
+<option>Faltan datos clínicos críticos</option>
+<option>Alucinación de IA</option>
+<option>Otro</option>
+</select>
+</div>
+<div class="space-y-2">
+<label class="font-label-xs text-label-xs uppercase text-secondary">Comentarios adicionales</label>
+<textarea class="w-full bg-surface-container-low border-border-base rounded text-body-md py-2 px-3 h-24 resize-none" placeholder="Escriba aquí..."></textarea>
+</div>
+</div>
+<div class="p-4 bg-surface-alt flex justify-end gap-2 border-t border-border-base">
+<button class="px-4 py-1.5 rounded font-body-md text-secondary hover:bg-border-base">Cancelar</button>
+<button class="px-4 py-1.5 rounded font-body-md bg-error text-on-error font-semibold shadow-sm">Confirmar Rechazo</button>
+</div>
+</div>
+</div>
+<script>
+        // Simple Interaction logic
+        const rejectionBtn = document.querySelector('button.text-error');
+        const modal = document.getElementById('rejectionModal');
+        const closeBtn = modal.querySelector('button.material-symbols-outlined');
+        const cancelBtn = modal.querySelector('button.hover\\:bg-border-base');
+
+        rejectionBtn.addEventListener('click', () => {
+            modal.classList.remove('hidden');
+        });
+
+        const closeModal = () => modal.classList.add('hidden');
+        closeBtn.addEventListener('click', closeModal);
+        cancelBtn.addEventListener('click', closeModal);
+
+        // Diff toggling micro-interaction
+        document.querySelectorAll('.diff-added, .diff-removed').forEach(el => {
+            el.addEventListener('mouseenter', () => {
+                el.style.filter = 'brightness(0.95)';
+            });
+            el.addEventListener('mouseleave', () => {
+                el.style.filter = 'none';
+            });
+        });
+    </script>
+</body></html>

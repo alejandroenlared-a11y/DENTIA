@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+
+<html class="light" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
+            font-size: 18px;
+        }
+        body { font-family: 'Inter', sans-serif; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #D9DEE3; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #c1c7d0; }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-surface-variant": "#41474f",
+                        "border-subtle": "#E8EBEE",
+                        "on-secondary": "#ffffff",
+                        "outline": "#717880",
+                        "surface-container-lowest": "#ffffff",
+                        "on-tertiary-fixed": "#2e1500",
+                        "on-primary-container": "#9fd0ff",
+                        "on-background": "#191c1f",
+                        "on-secondary-fixed-variant": "#3c4852",
+                        "surface-container": "#eceef2",
+                        "border-base": "#D9DEE3",
+                        "tertiary-fixed": "#ffdcc1",
+                        "surface-container-high": "#e7e8ed",
+                        "on-primary-fixed-variant": "#004a75",
+                        "secondary-fixed": "#d8e4f1",
+                        "warning": "#B37D00",
+                        "secondary-container": "#d5e1ee",
+                        "on-primary-fixed": "#001d32",
+                        "surface-container-low": "#f2f3f8",
+                        "on-surface": "#191c1f",
+                        "on-secondary-fixed": "#111d26",
+                        "surface": "#FFFFFF",
+                        "primary-container": "#005a8c",
+                        "on-tertiary-fixed-variant": "#6c3a00",
+                        "inverse-on-surface": "#eff1f5",
+                        "tertiary": "#613300",
+                        "surface-tint": "#166395",
+                        "success": "#278561",
+                        "surface-dim": "#d8dadf",
+                        "on-tertiary": "#ffffff",
+                        "secondary-fixed-dim": "#bcc8d4",
+                        "surface-alt": "#F0F2F4",
+                        "surface-container-highest": "#e1e2e7",
+                        "tertiary-container": "#824701",
+                        "primary": "#004268",
+                        "secondary": "#54606b",
+                        "outline-variant": "#c1c7d0",
+                        "on-error": "#ffffff",
+                        "on-error-container": "#93000a",
+                        "inverse-surface": "#2e3134",
+                        "surface-bright": "#f8f9fe",
+                        "primary-fixed": "#cde5ff",
+                        "inverse-primary": "#95ccff",
+                        "tertiary-fixed-dim": "#ffb779",
+                        "on-tertiary-container": "#ffbe87",
+                        "background": "#F5F6F7",
+                        "primary-fixed-dim": "#95ccff",
+                        "surface-variant": "#e1e2e7",
+                        "error-container": "#ffdad6",
+                        "text-primary": "#17212B",
+                        "on-primary": "#ffffff",
+                        "error": "#C53030",
+                        "on-secondary-container": "#58646f"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "sidebar-collapsed": "64px",
+                        "gutter": "1rem",
+                        "sidebar-width": "224px",
+                        "padding-compact": "0.75rem",
+                        "padding-base": "1rem",
+                        "header-height": "52px"
+                    },
+                    "fontFamily": {
+                        "headline-md": ["Inter"],
+                        "headline-lg": ["Inter"],
+                        "label-xs": ["Inter"],
+                        "body-sm": ["Inter"],
+                        "body-md": ["Inter"]
+                    },
+                    "fontSize": {
+                        "headline-md": ["16px", {"lineHeight": "24px", "fontWeight": "600"}],
+                        "headline-lg": ["22px", {"lineHeight": "32px", "fontWeight": "600"}],
+                        "label-xs": ["10px", {"lineHeight": "14px", "letterSpacing": "0.02em", "fontWeight": "500"}],
+                        "body-sm": ["11px", {"lineHeight": "16px", "fontWeight": "400"}],
+                        "body-md": ["12px", {"lineHeight": "18px", "fontWeight": "400"}]
+                    }
+                },
+            },
+        }
+    </script>
+</head>
+<body class="bg-background text-on-surface">
+<!-- SideNavBar (Shared Component) -->
+<aside class="w-sidebar-width h-screen fixed left-0 top-0 border-r border-border-base bg-surface flex flex-col py-4 overflow-y-auto z-50">
+<div class="px-6 mb-8">
+<h1 class="font-headline-md text-headline-md font-bold text-primary">DENTIA</h1>
+<p class="text-[10px] uppercase tracking-wider text-on-surface-variant font-semibold">Dental Software</p>
+</div>
+<nav class="flex-1 space-y-1">
+<!-- Nav Item: Inicio -->
+<a class="flex items-center px-6 py-2 gap-3 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors duration-150 ease-in-out font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined" data-icon="home">home</span>
+<span>Inicio</span>
+</a>
+<!-- Nav Item: Agenda -->
+<a class="flex items-center px-6 py-2 gap-3 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors duration-150 ease-in-out font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined" data-icon="calendar_month">calendar_month</span>
+<span>Agenda</span>
+</a>
+<!-- Nav Item: Clinica (ACTIVE for this view) -->
+<a class="flex items-center px-6 py-2 gap-3 text-primary font-semibold border-r-2 border-primary bg-surface-alt font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined" data-icon="medical_services">medical_services</span>
+<span>Clínica</span>
+</a>
+<a class="flex items-center px-6 py-2 gap-3 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors duration-150 ease-in-out font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined" data-icon="group">group</span>
+<span>Pacientes</span>
+</a>
+<a class="flex items-center px-6 py-2 gap-3 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors duration-150 ease-in-out font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined" data-icon="dentistry">dentistry</span>
+<span>Tratamientos</span>
+</a>
+<a class="flex items-center px-6 py-2 gap-3 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors duration-150 ease-in-out font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined" data-icon="payments">payments</span>
+<span>Finanzas</span>
+</a>
+<a class="flex items-center px-6 py-2 gap-3 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors duration-150 ease-in-out font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined" data-icon="account_tree">account_tree</span>
+<span>CRM</span>
+</a>
+<a class="flex items-center px-6 py-2 gap-3 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors duration-150 ease-in-out font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined" data-icon="inventory_2">inventory_2</span>
+<span>Inventario</span>
+</a>
+<a class="flex items-center px-6 py-2 gap-3 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors duration-150 ease-in-out font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined" data-icon="query_stats">query_stats</span>
+<span>Analítica</span>
+</a>
+<a class="flex items-center px-6 py-2 gap-3 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors duration-150 ease-in-out font-body-md text-body-md mt-auto" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span>Configuración</span>
+</a>
+</nav>
+</aside>
+<!-- TopNavBar (Shared Component) -->
+<header class="h-header-height fixed top-0 right-0 left-sidebar-width z-50 bg-surface border-b border-border-base flex items-center justify-between px-gutter">
+<div class="flex items-center gap-6">
+<div class="relative group">
+<span class="absolute inset-y-0 left-0 pl-3 flex items-center text-outline pointer-events-none">
+<span class="material-symbols-outlined" data-icon="search">search</span>
+</span>
+<input class="block w-64 pl-10 pr-3 py-1.5 border border-border-base rounded bg-surface-container-low text-body-md focus:ring-0 focus:border-primary transition-all" placeholder="Buscar paciente o cita..." type="text"/>
+</div>
+<nav class="flex gap-4">
+<span class="text-primary font-bold border-b-2 border-primary pb-1 cursor-pointer font-body-md text-body-md">Sede Centro</span>
+<span class="text-on-surface-variant hover:text-primary transition-colors cursor-pointer font-body-md text-body-md">Sede Playa</span>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<button class="bg-primary text-on-primary px-4 py-1.5 rounded font-bold text-body-md flex items-center gap-2 hover:opacity-90 active:scale-95 transition-all">
+<span class="material-symbols-outlined text-[16px]" data-icon="add">add</span>
+                Crear
+            </button>
+<span class="material-symbols-outlined text-on-surface-variant cursor-pointer hover:text-primary" data-icon="notifications">notifications</span>
+<div class="w-8 h-8 rounded-full bg-secondary-fixed flex items-center justify-center text-primary font-bold cursor-pointer border border-border-base">
+                JD
+            </div>
+</div>
+</header>
+<!-- Main Content Area -->
+<main class="pl-sidebar-width pt-header-height min-h-screen">
+<!-- TopAppBar (Specific for Context) -->
+<div class="w-full h-10 flex items-center px-4 sticky top-header-height z-40 bg-surface-container-low border-b border-border-subtle text-on-surface font-label-xs text-label-xs">
+<div class="flex items-center gap-4 flex-1">
+<span class="material-symbols-outlined" data-icon="today">today</span>
+<span class="font-headline-md text-headline-md">Encuentros del día — <span class="font-normal opacity-70">Vieres, 24 Mayo</span></span>
+</div>
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-2 px-2 py-0.5 rounded bg-surface border border-border-base cursor-pointer hover:bg-surface-variant transition-all">
+<span class="material-symbols-outlined text-[14px]" data-icon="filter_list">filter_list</span>
+<span>Filtrar</span>
+</div>
+<div class="flex items-center gap-2 px-2 py-0.5 rounded bg-surface border border-border-base cursor-pointer hover:bg-surface-variant transition-all">
+<span class="material-symbols-outlined text-[14px]" data-icon="download">download</span>
+<span>Exportar</span>
+</div>
+</div>
+</div>
+<div class="p-gutter space-y-gutter">
+<!-- Bento Layout Stats -->
+<div class="grid grid-cols-12 gap-4">
+<div class="col-span-3 bg-surface border border-border-base p-4">
+<p class="text-label-xs uppercase text-on-surface-variant font-semibold mb-1">Total Citas</p>
+<h3 class="text-headline-lg font-black text-primary">24</h3>
+<p class="text-[10px] text-success flex items-center gap-1 mt-1 font-medium">
+<span class="material-symbols-outlined text-[12px]" data-icon="trending_up">trending_up</span>
+                        +12% vs ayer
+                    </p>
+</div>
+<div class="col-span-3 bg-surface border border-border-base p-4">
+<p class="text-label-xs uppercase text-on-surface-variant font-semibold mb-1">Esperando</p>
+<h3 class="text-headline-lg font-black text-warning">08</h3>
+<div class="w-full bg-surface-container rounded-full h-1 mt-2">
+<div class="bg-warning h-1 rounded-full" style="width: 33%"></div>
+</div>
+</div>
+<div class="col-span-3 bg-surface border border-border-base p-4">
+<p class="text-label-xs uppercase text-on-surface-variant font-semibold mb-1">En Clínica</p>
+<h3 class="text-headline-lg font-black text-primary">04</h3>
+<div class="w-full bg-surface-container rounded-full h-1 mt-2">
+<div class="bg-primary h-1 rounded-full" style="width: 16%"></div>
+</div>
+</div>
+<div class="col-span-3 bg-surface border border-border-base p-4">
+<p class="text-label-xs uppercase text-on-surface-variant font-semibold mb-1">Finalizados</p>
+<h3 class="text-headline-lg font-black text-success">12</h3>
+<div class="w-full bg-surface-container rounded-full h-1 mt-2">
+<div class="bg-success h-1 rounded-full" style="width: 50%"></div>
+</div>
+</div>
+</div>
+<!-- Operative Table -->
+<div class="bg-surface border border-border-base overflow-hidden">
+<div class="px-4 py-3 bg-surface-container-low border-b border-border-subtle flex justify-between items-center">
+<h4 class="font-headline-md text-primary">Listado Operativo</h4>
+<div class="flex gap-2">
+<span class="text-label-xs bg-surface-alt px-2 py-1 rounded border border-border-base">Vista: General</span>
+</div>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-surface-container-lowest border-b border-border-subtle">
+<th class="px-4 py-2 font-label-xs text-label-xs text-on-surface-variant uppercase bg-surface-container-low/50">Hora</th>
+<th class="px-4 py-2 font-label-xs text-label-xs text-on-surface-variant uppercase bg-surface-container-low/50">Paciente</th>
+<th class="px-4 py-2 font-label-xs text-label-xs text-on-surface-variant uppercase bg-surface-container-low/50">Estado</th>
+<th class="px-4 py-2 font-label-xs text-label-xs text-on-surface-variant uppercase bg-surface-container-low/50">Profesional</th>
+<th class="px-4 py-2 font-label-xs text-label-xs text-on-surface-variant uppercase bg-surface-container-low/50">Gabinete</th>
+<th class="px-4 py-2 font-label-xs text-label-xs text-on-surface-variant uppercase bg-surface-container-low/50">Motivo / Tratamiento</th>
+<th class="px-4 py-2 font-label-xs text-label-xs text-on-surface-variant uppercase bg-surface-container-low/50 text-right">Acciones</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-border-subtle">
+<!-- Row 1: Waiting -->
+<tr class="hover:bg-surface-bright transition-colors">
+<td class="px-4 py-3 font-body-md text-primary font-semibold">09:00</td>
+<td class="px-4 py-3">
+<div class="flex items-center gap-3">
+<div class="w-7 h-7 rounded bg-primary-fixed flex items-center justify-center text-[10px] text-on-primary-fixed-variant font-bold">JP</div>
+<div>
+<p class="font-body-md text-text-primary font-semibold">Juan Pérez</p>
+<p class="text-[10px] text-on-surface-variant">ID: 45293 • 45 años</p>
+</div>
+</div>
+</td>
+<td class="px-4 py-3">
+<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-warning/10 text-warning border border-warning/20">
+                                        Esperando
+                                    </span>
+</td>
+<td class="px-4 py-3 font-body-md text-on-surface">Dr. Manuel Torres</td>
+<td class="px-4 py-3 font-body-md text-on-surface-variant">Gabinete 02</td>
+<td class="px-4 py-3">
+<span class="px-2 py-0.5 rounded-lg bg-surface-alt border border-border-base text-[10px] text-on-surface-variant">Limpieza Profunda</span>
+</td>
+<td class="px-4 py-3 text-right">
+<button class="bg-primary text-on-primary px-3 py-1 rounded text-label-xs font-bold hover:opacity-90 transition-all">Abrir encuentro</button>
+</td>
+</tr>
+<!-- Row 2: In Clinic -->
+<tr class="hover:bg-surface-bright transition-colors bg-primary-container/5">
+<td class="px-4 py-3 font-body-md text-primary font-semibold">09:15</td>
+<td class="px-4 py-3">
+<div class="flex items-center gap-3">
+<div class="w-7 h-7 rounded bg-secondary-fixed flex items-center justify-center text-[10px] text-on-secondary-fixed-variant font-bold">MC</div>
+<div>
+<p class="font-body-md text-text-primary font-semibold">María Canal</p>
+<p class="text-[10px] text-on-surface-variant">ID: 12048 • 29 años</p>
+</div>
+</div>
+</td>
+<td class="px-4 py-3">
+<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-primary/10 text-primary border border-primary/20">
+                                        En clínica
+                                    </span>
+</td>
+<td class="px-4 py-3 font-body-md text-on-surface">Dra. Elena Ruiz</td>
+<td class="px-4 py-3 font-body-md text-on-surface-variant">Gabinete 01</td>
+<td class="px-4 py-3">
+<span class="px-2 py-0.5 rounded-lg bg-surface-alt border border-border-base text-[10px] text-on-surface-variant">Endodoncia pieza 34</span>
+</td>
+<td class="px-4 py-3 text-right">
+<button class="border border-primary text-primary px-3 py-1 rounded text-label-xs font-bold hover:bg-primary/5 transition-all">Gestionar</button>
+</td>
+</tr>
+<!-- Row 3: Waiting (Actionable) -->
+<tr class="hover:bg-surface-bright transition-colors">
+<td class="px-4 py-3 font-body-md text-primary font-semibold">09:30</td>
+<td class="px-4 py-3">
+<div class="flex items-center gap-3">
+<div class="w-7 h-7 rounded bg-tertiary-fixed flex items-center justify-center text-[10px] text-on-tertiary-fixed-variant font-bold">RL</div>
+<div>
+<p class="font-body-md text-text-primary font-semibold">Roberto López</p>
+<p class="text-[10px] text-on-surface-variant">ID: 88201 • 54 años</p>
+</div>
+</div>
+</td>
+<td class="px-4 py-3">
+<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-warning/10 text-warning border border-warning/20">
+                                        Esperando
+                                    </span>
+</td>
+<td class="px-4 py-3 font-body-md text-on-surface">Dr. Manuel Torres</td>
+<td class="px-4 py-3 font-body-md text-on-surface-variant">Gabinete 02</td>
+<td class="px-4 py-3">
+<span class="px-2 py-0.5 rounded-lg bg-surface-alt border border-border-base text-[10px] text-on-surface-variant">Revisión Post-op</span>
+</td>
+<td class="px-4 py-3 text-right">
+<button class="bg-primary text-on-primary px-3 py-1 rounded text-label-xs font-bold hover:opacity-90 transition-all">Abrir encuentro</button>
+</td>
+</tr>
+<!-- Row 4: Finished -->
+<tr class="hover:bg-surface-bright transition-colors opacity-70 grayscale-[0.3]">
+<td class="px-4 py-3 font-body-md text-on-surface-variant line-through">08:30</td>
+<td class="px-4 py-3">
+<div class="flex items-center gap-3">
+<div class="w-7 h-7 rounded bg-surface-container-highest flex items-center justify-center text-[10px] text-on-surface font-bold">AS</div>
+<div>
+<p class="font-body-md text-text-primary font-semibold">Ana Silva</p>
+<p class="text-[10px] text-on-surface-variant">ID: 11022 • 41 años</p>
+</div>
+</div>
+</td>
+<td class="px-4 py-3">
+<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-success/10 text-success border border-success/20">
+                                        Finalizado
+                                    </span>
+</td>
+<td class="px-4 py-3 font-body-md text-on-surface">Dra. Elena Ruiz</td>
+<td class="px-4 py-3 font-body-md text-on-surface-variant">Gabinete 01</td>
+<td class="px-4 py-3">
+<span class="px-2 py-0.5 rounded-lg bg-surface-alt border border-border-base text-[10px] text-on-surface-variant">Ortodoncia Control</span>
+</td>
+<td class="px-4 py-3 text-right">
+<button class="text-on-surface-variant p-1 hover:bg-surface-variant rounded transition-all">
+<span class="material-symbols-outlined text-[16px]" data-icon="more_vert">more_vert</span>
+</button>
+</td>
+</tr>
+<!-- Row 5: Waiting -->
+<tr class="hover:bg-surface-bright transition-colors">
+<td class="px-4 py-3 font-body-md text-primary font-semibold">10:00</td>
+<td class="px-4 py-3">
+<div class="flex items-center gap-3">
+<div class="w-7 h-7 rounded bg-primary-fixed-dim flex items-center justify-center text-[10px] text-on-primary-fixed-variant font-bold">SM</div>
+<div>
+<p class="font-body-md text-text-primary font-semibold">Sonia Martín</p>
+<p class="text-[10px] text-on-surface-variant">ID: 33214 • 19 años</p>
+</div>
+</div>
+</td>
+<td class="px-4 py-3">
+<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-warning/10 text-warning border border-warning/20">
+                                        Esperando
+                                    </span>
+</td>
+<td class="px-4 py-3 font-body-md text-on-surface">Dr. Manuel Torres</td>
+<td class="px-4 py-3 font-body-md text-on-surface-variant">Gabinete 03</td>
+<td class="px-4 py-3">
+<span class="px-2 py-0.5 rounded-lg bg-surface-alt border border-border-base text-[10px] text-on-surface-variant">Exodoncia Simple</span>
+</td>
+<td class="px-4 py-3 text-right">
+<button class="bg-primary text-on-primary px-3 py-1 rounded text-label-xs font-bold hover:opacity-90 transition-all">Abrir encuentro</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="px-4 py-2 bg-surface border-t border-border-subtle flex justify-between items-center text-label-xs">
+<span class="text-on-surface-variant">Mostrando 5 de 24 encuentros</span>
+<div class="flex gap-1">
+<button class="p-1 border border-border-base rounded bg-surface-alt text-outline cursor-not-allowed">
+<span class="material-symbols-outlined text-[14px]" data-icon="chevron_left">chevron_left</span>
+</button>
+<button class="p-1 border border-border-base rounded bg-surface hover:bg-surface-variant">
+<span class="material-symbols-outlined text-[14px]" data-icon="chevron_right">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Asymmetric Support Panel -->
+<div class="flex gap-4">
+<div class="flex-1 bg-surface border border-border-base p-4">
+<div class="flex items-center justify-between mb-4">
+<h5 class="font-headline-md text-primary flex items-center gap-2">
+<span class="material-symbols-outlined" data-icon="pending_actions">pending_actions</span>
+                            Alertas Clínicas
+                        </h5>
+<span class="text-[10px] text-error font-bold flex items-center gap-1">
+<span class="material-symbols-outlined text-[12px]" data-icon="error">error</span>
+                            2 Críticas
+                        </span>
+</div>
+<div class="space-y-3">
+<div class="p-3 bg-error/5 border-l-4 border-error rounded-r">
+<p class="font-body-md text-text-primary font-semibold">Retraso en Gabinete 01</p>
+<p class="text-[10px] text-on-surface-variant mt-1">Dra. Elena Ruiz lleva 15 min de retraso sobre la cita de las 09:15.</p>
+</div>
+<div class="p-3 bg-warning/5 border-l-4 border-warning rounded-r">
+<p class="font-body-md text-text-primary font-semibold">Consentimiento Pendiente</p>
+<p class="text-[10px] text-on-surface-variant mt-1">Paciente Juan Pérez requiere firma de consentimiento para cirugía menor.</p>
+</div>
+</div>
+</div>
+<div class="w-80 bg-inverse-surface text-inverse-on-surface p-4 flex flex-col justify-between">
+<div>
+<h5 class="font-headline-md mb-2">Resumen de Día</h5>
+<p class="text-[11px] opacity-70 mb-4">Progreso de facturación estimada para hoy basado en tratamientos citados.</p>
+<div class="text-[24px] font-black mb-1">€2,450.00</div>
+<p class="text-[10px] text-success font-bold">↑ 8% de objetivo diario</p>
+</div>
+<div class="mt-6">
+<div class="w-full h-1 bg-white/10 rounded-full overflow-hidden">
+<div class="h-full bg-primary-fixed-dim" style="width: 65%"></div>
+</div>
+<div class="flex justify-between text-[10px] mt-2 opacity-70">
+<span>Completado</span>
+<span>65%</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<script>
+        // Simple micro-interaction for rows
+        document.querySelectorAll('tbody tr').forEach(row => {
+            row.addEventListener('click', () => {
+                // Future implementation: Navigate to patient file
+                console.log('Fila clickeada');
+            });
+        });
+
+        // Auto-refresh simulation for "Current Time"
+        setInterval(() => {
+            const now = new Date();
+            // In a real app we would update a clock element
+        }, 60000);
+    </script>
+</body></html>

@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+
+<html class="light" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>DENTIA - Arqueo de Caja Diaria</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "success": "#278561",
+                        "on-primary": "#ffffff",
+                        "on-primary-fixed-variant": "#004a75",
+                        "secondary": "#54606b",
+                        "on-tertiary": "#ffffff",
+                        "tertiary-fixed-dim": "#ffb779",
+                        "surface-container": "#eceef2",
+                        "on-background": "#191c1f",
+                        "primary-fixed": "#cde5ff",
+                        "on-tertiary-container": "#ffbe87",
+                        "primary-container": "#005a8c",
+                        "error-container": "#ffdad6",
+                        "on-tertiary-fixed": "#2e1500",
+                        "outline": "#717880",
+                        "tertiary-fixed": "#ffdcc1",
+                        "on-primary-fixed": "#001d32",
+                        "on-error-container": "#93000a",
+                        "surface-bright": "#f8f9fe",
+                        "border-base": "#D9DEE3",
+                        "surface-container-low": "#f2f3f8",
+                        "on-surface-variant": "#41474f",
+                        "surface-variant": "#e1e2e7",
+                        "surface-container-high": "#e7e8ed",
+                        "on-secondary-container": "#58646f",
+                        "inverse-surface": "#2e3134",
+                        "tertiary": "#613300",
+                        "surface-tint": "#166395",
+                        "background": "#F5F6F7",
+                        "error": "#C53030",
+                        "outline-variant": "#c1c7d0",
+                        "on-secondary-fixed-variant": "#3c4852",
+                        "inverse-primary": "#95ccff",
+                        "secondary-container": "#d5e1ee",
+                        "text-primary": "#17212B",
+                        "border-subtle": "#E8EBEE",
+                        "primary-fixed-dim": "#95ccff",
+                        "warning": "#B37D00",
+                        "on-tertiary-fixed-variant": "#6c3a00",
+                        "primary": "#004268",
+                        "on-surface": "#191c1f",
+                        "surface-container-highest": "#e1e2e7",
+                        "surface-alt": "#F0F2F4",
+                        "on-primary-container": "#9fd0ff",
+                        "tertiary-container": "#824701",
+                        "secondary-fixed": "#d8e4f1",
+                        "surface-container-lowest": "#ffffff",
+                        "surface-dim": "#d8dadf",
+                        "on-error": "#ffffff",
+                        "on-secondary": "#ffffff",
+                        "inverse-on-surface": "#eff1f5",
+                        "surface": "#FFFFFF",
+                        "secondary-fixed-dim": "#bcc8d4",
+                        "on-secondary-fixed": "#111d26"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "sidebar-collapsed": "64px",
+                        "header-height": "52px",
+                        "sidebar-width": "224px",
+                        "padding-compact": "0.75rem",
+                        "gutter": "1rem",
+                        "padding-base": "1rem"
+                    },
+                    "fontFamily": {
+                        "headline-lg": ["Inter"],
+                        "body-md": ["Inter"],
+                        "label-xs": ["Inter"],
+                        "body-sm": ["Inter"],
+                        "headline-md": ["Inter"]
+                    },
+                    "fontSize": {
+                        "headline-lg": ["22px", {"lineHeight": "32px", "fontWeight": "600"}],
+                        "body-md": ["12px", {"lineHeight": "18px", "fontWeight": "400"}],
+                        "label-xs": ["10px", {"lineHeight": "14px", "letterSpacing": "0.02em", "fontWeight": "500"}],
+                        "body-sm": ["11px", {"lineHeight": "16px", "fontWeight": "400"}],
+                        "headline-md": ["16px", {"lineHeight": "24px", "fontWeight": "600"}]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            background-color: #F5F6F7;
+            font-family: 'Inter', sans-serif;
+            color: #191C1F;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
+            font-size: 18px;
+        }
+        .sidebar-item { transition: all 0.15s ease-in-out; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #D9DEE3; border-radius: 10px; }
+    </style>
+</head>
+<body class="overflow-hidden">
+<!-- SideNavBar -->
+<aside class="w-sidebar-width h-screen fixed left-0 top-0 border-r border-border-base bg-surface flex flex-col py-4 overflow-y-auto z-50">
+<div class="px-6 mb-8">
+<h1 class="font-headline-md text-headline-md font-bold text-primary">DENTIA</h1>
+<p class="text-[10px] uppercase tracking-widest text-on-surface-variant font-semibold">Dental Software</p>
+</div>
+<nav class="flex-1 space-y-0.5">
+<!-- Nav Items Mapping -->
+<a class="sidebar-item flex items-center px-6 py-2.5 text-on-surface-variant hover:bg-surface-alt hover:text-primary" href="#">
+<span class="material-symbols-outlined mr-3">home</span>
+<span class="font-body-md text-body-md">Inicio</span>
+</a>
+<a class="sidebar-item flex items-center px-6 py-2.5 text-on-surface-variant hover:bg-surface-alt hover:text-primary" href="#">
+<span class="material-symbols-outlined mr-3">calendar_month</span>
+<span class="font-body-md text-body-md">Agenda</span>
+</a>
+<a class="sidebar-item flex items-center px-6 py-2.5 text-on-surface-variant hover:bg-surface-alt hover:text-primary" href="#">
+<span class="material-symbols-outlined mr-3">group</span>
+<span class="font-body-md text-body-md">Pacientes</span>
+</a>
+<a class="sidebar-item flex items-center px-6 py-2.5 text-on-surface-variant hover:bg-surface-alt hover:text-primary" href="#">
+<span class="material-symbols-outlined mr-3">medical_services</span>
+<span class="font-body-md text-body-md">Clínica</span>
+</a>
+<a class="sidebar-item flex items-center px-6 py-2.5 text-on-surface-variant hover:bg-surface-alt hover:text-primary" href="#">
+<span class="material-symbols-outlined mr-3">dentistry</span>
+<span class="font-body-md text-body-md">Tratamientos</span>
+</a>
+<!-- Active State: Finanzas -->
+<a class="sidebar-item flex items-center px-6 py-2.5 text-primary font-semibold border-r-2 border-primary bg-surface-alt" href="#">
+<span class="material-symbols-outlined mr-3">payments</span>
+<span class="font-body-md text-body-md">Finanzas</span>
+</a>
+<a class="sidebar-item flex items-center px-6 py-2.5 text-on-surface-variant hover:bg-surface-alt hover:text-primary" href="#">
+<span class="material-symbols-outlined mr-3">account_tree</span>
+<span class="font-body-md text-body-md">CRM</span>
+</a>
+<a class="sidebar-item flex items-center px-6 py-2.5 text-on-surface-variant hover:bg-surface-alt hover:text-primary" href="#">
+<span class="material-symbols-outlined mr-3">folder_open</span>
+<span class="font-body-md text-body-md">Documentos</span>
+</a>
+<a class="sidebar-item flex items-center px-6 py-2.5 text-on-surface-variant hover:bg-surface-alt hover:text-primary" href="#">
+<span class="material-symbols-outlined mr-3">inventory_2</span>
+<span class="font-body-md text-body-md">Inventario</span>
+</a>
+<a class="sidebar-item flex items-center px-6 py-2.5 text-on-surface-variant hover:bg-surface-alt hover:text-primary" href="#">
+<span class="material-symbols-outlined mr-3">badge</span>
+<span class="font-body-md text-body-md">Equipo</span>
+</a>
+<a class="sidebar-item flex items-center px-6 py-2.5 text-on-surface-variant hover:bg-surface-alt hover:text-primary" href="#">
+<span class="material-symbols-outlined mr-3">query_stats</span>
+<span class="font-body-md text-body-md">Analítica</span>
+</a>
+<a class="sidebar-item flex items-center px-6 py-2.5 text-on-surface-variant hover:bg-surface-alt hover:text-primary" href="#">
+<span class="material-symbols-outlined mr-3">auto_mode</span>
+<span class="font-body-md text-body-md">Automatizaciones</span>
+</a>
+<a class="sidebar-item flex items-center px-6 py-2.5 text-on-surface-variant hover:bg-surface-alt hover:text-primary" href="#">
+<span class="material-symbols-outlined mr-3">settings</span>
+<span class="font-body-md text-body-md">Configuración</span>
+</a>
+</nav>
+<div class="px-6 pt-4 mt-auto border-t border-border-subtle">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center font-bold text-[10px]">AD</div>
+<div>
+<p class="font-label-xs text-label-xs font-bold">Admin Dentia</p>
+<p class="text-[9px] text-on-surface-variant">Sede Centro</p>
+</div>
+</div>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="ml-sidebar-width h-screen flex flex-col relative">
+<!-- TopNavBar -->
+<header class="h-header-height bg-surface border-b border-border-base flex items-center justify-between px-gutter sticky top-0 z-50">
+<div class="flex items-center gap-6">
+<div class="flex items-center bg-surface-alt px-3 py-1.5 rounded-lg border border-border-base">
+<span class="material-symbols-outlined text-outline mr-2">search</span>
+<input class="bg-transparent border-none focus:ring-0 text-body-md font-body-md w-64 p-0" placeholder="Buscar paciente, factura..." type="text"/>
+</div>
+<nav class="flex items-center gap-4">
+<span class="text-primary font-bold border-b-2 border-primary pb-1 font-body-md text-body-md cursor-pointer">Sede Centro</span>
+<span class="text-on-surface-variant hover:text-primary transition-colors font-body-md text-body-md cursor-pointer">Sede Playa</span>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<button class="bg-primary text-on-primary px-4 py-1.5 rounded-lg font-body-md text-body-md font-semibold active:scale-95 transition-all">
+                    + Crear
+                </button>
+<div class="flex items-center gap-2">
+<button class="p-2 text-outline hover:bg-surface-alt rounded-lg transition-colors"><span class="material-symbols-outlined">notifications</span></button>
+<button class="p-2 text-outline hover:bg-surface-alt rounded-lg transition-colors"><span class="material-symbols-outlined">account_circle</span></button>
+</div>
+</div>
+</header>
+<!-- TopAppBar (Specific Screen Title) -->
+<section class="flex items-center px-6 h-10 bg-surface-container-low border-b border-border-subtle sticky top-header-height z-40">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary" style="font-size: 16px;">account_balance_wallet</span>
+<h2 class="font-label-xs text-label-xs font-bold text-on-surface uppercase tracking-wider">Caja Diaria — Arqueo 24 Oct 2023</h2>
+</div>
+<div class="ml-auto flex items-center gap-4">
+<span class="flex items-center gap-1 text-[10px] text-success font-bold"><span class="w-1.5 h-1.5 rounded-full bg-success"></span> CAJA ABIERTA</span>
+<span class="material-symbols-outlined text-outline cursor-pointer hover:text-primary">warning</span>
+<span class="material-symbols-outlined text-outline cursor-pointer hover:text-primary">quick_reference_all</span>
+</div>
+</section>
+<!-- Page Canvas -->
+<div class="flex-1 overflow-y-auto p-6 space-y-6">
+<!-- Financial Overview Bento Grid -->
+<div class="grid grid-cols-12 gap-6">
+<!-- Left Column: Totals & Payments -->
+<div class="col-span-8 space-y-6">
+<!-- Top Summary Cards -->
+<div class="grid grid-cols-3 gap-4">
+<div class="bg-surface p-4 border border-border-base rounded-lg shadow-sm">
+<p class="text-label-xs font-label-xs text-on-surface-variant uppercase mb-1">Saldo Inicial</p>
+<p class="text-headline-lg font-headline-lg text-primary">$150.00</p>
+<p class="text-[10px] text-on-surface-variant mt-1">Apertura: 08:30 AM</p>
+</div>
+<div class="bg-surface p-4 border border-border-base rounded-lg shadow-sm">
+<p class="text-label-xs font-label-xs text-on-surface-variant uppercase mb-1">Total Entradas</p>
+<p class="text-headline-lg font-headline-lg text-success">$2,450.50</p>
+<p class="text-[10px] text-success mt-1">12 Transacciones</p>
+</div>
+<div class="bg-surface p-4 border border-border-base rounded-lg shadow-sm">
+<p class="text-label-xs font-label-xs text-on-surface-variant uppercase mb-1">Total Salidas</p>
+<p class="text-headline-lg font-headline-lg text-error">-$45.00</p>
+<p class="text-[10px] text-error mt-1">Gasto: Papelería</p>
+</div>
+</div>
+<!-- Breakdown by Method -->
+<div class="bg-surface border border-border-base rounded-lg overflow-hidden">
+<div class="px-4 py-3 bg-surface-alt border-b border-border-base flex justify-between items-center">
+<h3 class="font-headline-md text-headline-md">Entradas por Método de Pago</h3>
+<span class="material-symbols-outlined text-outline">analytics</span>
+</div>
+<div class="divide-y divide-border-subtle">
+<div class="flex items-center justify-between p-4 hover:bg-surface-bright transition-colors">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 bg-surface-container rounded-lg flex items-center justify-center"><span class="material-symbols-outlined text-secondary">payments</span></div>
+<div>
+<p class="font-body-md text-body-md font-semibold">Efectivo</p>
+<p class="text-[10px] text-on-surface-variant">4 Pagos recibidos</p>
+</div>
+</div>
+<p class="font-headline-md text-headline-md">$850.50</p>
+</div>
+<div class="flex items-center justify-between p-4 hover:bg-surface-bright transition-colors">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 bg-surface-container rounded-lg flex items-center justify-center"><span class="material-symbols-outlined text-secondary">credit_card</span></div>
+<div>
+<p class="font-body-md text-body-md font-semibold">Tarjeta Débito/Crédito</p>
+<p class="text-[10px] text-on-surface-variant">6 Pagos procesados</p>
+</div>
+</div>
+<p class="font-headline-md text-headline-md">$1,200.00</p>
+</div>
+<div class="flex items-center justify-between p-4 hover:bg-surface-bright transition-colors">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 bg-surface-container rounded-lg flex items-center justify-center"><span class="material-symbols-outlined text-secondary">account_balance</span></div>
+<div>
+<p class="font-body-md text-body-md font-semibold">Transferencia</p>
+<p class="text-[10px] text-on-surface-variant">2 Pagos confirmados</p>
+</div>
+</div>
+<p class="font-headline-md text-headline-md">$400.00</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Right Column: Arqueo / Reconciliation -->
+<div class="col-span-4 flex flex-col">
+<div class="bg-primary text-on-primary rounded-lg p-6 shadow-sm flex-1 flex flex-col">
+<h3 class="font-headline-md text-headline-md mb-4 flex items-center gap-2">
+<span class="material-symbols-outlined">calculate</span>
+                            Arqueo de Efectivo
+                        </h3>
+<div class="space-y-4 mb-8">
+<div>
+<label class="block text-[10px] uppercase font-bold text-on-primary-container mb-1">Efectivo Esperado</label>
+<div class="text-3xl font-black">$1,000.50</div>
+<p class="text-[10px] opacity-70">(Saldo Inicial + Entradas Ef. - Salidas)</p>
+</div>
+<div class="pt-4 border-t border-white/20">
+<label class="block text-[10px] uppercase font-bold text-on-primary-container mb-2">Efectivo Contado (Físico)</label>
+<div class="relative">
+<span class="absolute left-3 top-1/2 -translate-y-1/2 font-bold text-primary">$</span>
+<input class="w-full bg-white text-primary rounded-lg border-none focus:ring-2 focus:ring-secondary py-3 pl-8 font-headline-md text-headline-md" id="counted-cash" placeholder="0.00" type="number"/>
+</div>
+</div>
+<div class="p-3 bg-white/10 rounded-lg border border-white/10">
+<div class="flex justify-between items-center">
+<span class="text-body-md font-body-md">Diferencia</span>
+<span class="font-headline-md text-headline-md text-warning" id="diff-value">--</span>
+</div>
+</div>
+</div>
+<div class="mt-auto space-y-3">
+<button class="w-full bg-success text-white py-3 rounded-lg font-bold flex items-center justify-center gap-2 hover:bg-success/90 transition-all active:scale-95">
+<span class="material-symbols-outlined">lock</span>
+                                CERRAR CAJA
+                            </button>
+<p class="text-center text-[10px] opacity-70">El cierre de caja generará un reporte automático para administración.</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Bottom Section: Detailed Transactions History -->
+<div class="bg-surface border border-border-base rounded-lg">
+<div class="px-4 py-3 bg-surface-alt border-b border-border-base flex justify-between items-center">
+<h3 class="font-headline-md text-headline-md">Historial de Movimientos</h3>
+<div class="flex items-center gap-2">
+<button class="flex items-center gap-1 px-3 py-1 bg-surface border border-border-base text-body-md rounded-lg hover:bg-surface-alt">
+<span class="material-symbols-outlined" style="font-size: 14px;">filter_list</span> Filtrar
+                        </button>
+<button class="flex items-center gap-1 px-3 py-1 bg-surface border border-border-base text-body-md rounded-lg hover:bg-surface-alt">
+<span class="material-symbols-outlined" style="font-size: 14px;">download</span> Exportar
+                        </button>
+</div>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-surface-container-low border-b border-border-base">
+<th class="px-4 py-2.5 text-label-xs font-label-xs text-on-surface-variant uppercase">Hora</th>
+<th class="px-4 py-2.5 text-label-xs font-label-xs text-on-surface-variant uppercase">Tipo</th>
+<th class="px-4 py-2.5 text-label-xs font-label-xs text-on-surface-variant uppercase">Paciente / Concepto</th>
+<th class="px-4 py-2.5 text-label-xs font-label-xs text-on-surface-variant uppercase">Método</th>
+<th class="px-4 py-2.5 text-label-xs font-label-xs text-on-surface-variant uppercase text-right">Monto</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-border-subtle">
+<!-- Movement 1 -->
+<tr class="hover:bg-surface-bright transition-colors">
+<td class="px-4 py-3 text-body-md font-body-md text-on-surface-variant">11:45</td>
+<td class="px-4 py-3">
+<span class="px-2 py-0.5 rounded text-[9px] font-bold bg-green-100 text-success border border-success/20 uppercase">Entrada</span>
+</td>
+<td class="px-4 py-3 text-body-md font-body-md">Juan Pérez — Limpieza Dental</td>
+<td class="px-4 py-3 text-body-md font-body-md">Efectivo</td>
+<td class="px-4 py-3 text-body-md font-body-md text-right font-bold text-success">$50.50</td>
+</tr>
+<!-- Movement 2 -->
+<tr class="hover:bg-surface-bright transition-colors">
+<td class="px-4 py-3 text-body-md font-body-md text-on-surface-variant">10:30</td>
+<td class="px-4 py-3">
+<span class="px-2 py-0.5 rounded text-[9px] font-bold bg-green-100 text-success border border-success/20 uppercase">Entrada</span>
+</td>
+<td class="px-4 py-3 text-body-md font-body-md">María García — Endodoncia</td>
+<td class="px-4 py-3 text-body-md font-body-md">Tarjeta</td>
+<td class="px-4 py-3 text-body-md font-body-md text-right font-bold text-success">$450.00</td>
+</tr>
+<!-- Movement 3 -->
+<tr class="hover:bg-surface-bright transition-colors">
+<td class="px-4 py-3 text-body-md font-body-md text-on-surface-variant">09:15</td>
+<td class="px-4 py-3">
+<span class="px-2 py-0.5 rounded text-[9px] font-bold bg-red-100 text-error border border-error/20 uppercase">Salida</span>
+</td>
+<td class="px-4 py-3 text-body-md font-body-md">Gasto Menor — Papelería (Hojas)</td>
+<td class="px-4 py-3 text-body-md font-body-md">Efectivo</td>
+<td class="px-4 py-3 text-body-md font-body-md text-right font-bold text-error">-$45.00</td>
+</tr>
+<!-- Movement 4 -->
+<tr class="hover:bg-surface-bright transition-colors">
+<td class="px-4 py-3 text-body-md font-body-md text-on-surface-variant">08:30</td>
+<td class="px-4 py-3">
+<span class="px-2 py-0.5 rounded text-[9px] font-bold bg-blue-100 text-primary border border-primary/20 uppercase">Apertura</span>
+</td>
+<td class="px-4 py-3 text-body-md font-body-md">Fondo de Caja Inicial</td>
+<td class="px-4 py-3 text-body-md font-body-md">Efectivo</td>
+<td class="px-4 py-3 text-body-md font-body-md text-right font-bold text-primary">$150.00</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</main>
+<!-- Micro-interaction for cash counting -->
+<script>
+        const countedInput = document.getElementById('counted-cash');
+        const diffDisplay = document.getElementById('diff-value');
+        const expectedCash = 1000.50;
+
+        countedInput.addEventListener('input', (e) => {
+            const counted = parseFloat(e.target.value) || 0;
+            const diff = counted - expectedCash;
+
+            if (diff === 0) {
+                diffDisplay.innerText = "$0.00";
+                diffDisplay.className = "font-headline-md text-headline-md text-white";
+            } else if (diff > 0) {
+                diffDisplay.innerText = "+$" + diff.toFixed(2);
+                diffDisplay.className = "font-headline-md text-headline-md text-success bg-white px-2 rounded-full";
+            } else {
+                diffDisplay.innerText = "-$" + Math.abs(diff).toFixed(2);
+                diffDisplay.className = "font-headline-md text-headline-md text-error bg-white px-2 rounded-full font-bold";
+            }
+        });
+    </script>
+</body></html>

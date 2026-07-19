@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+
+<html class="light" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>DENTIA - Agenda Diaria</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "surface": "#FFFFFF",
+                    "warning": "#B37D00",
+                    "error-container": "#ffdad6",
+                    "on-primary": "#ffffff",
+                    "surface-container": "#eceef2",
+                    "on-tertiary-container": "#ffbe87",
+                    "on-secondary-fixed-variant": "#3c4852",
+                    "on-surface": "#191c1f",
+                    "primary-fixed-dim": "#95ccff",
+                    "surface-container-highest": "#e1e2e7",
+                    "on-tertiary-fixed": "#2e1500",
+                    "surface-container-lowest": "#ffffff",
+                    "on-error": "#ffffff",
+                    "primary-container": "#005a8c",
+                    "tertiary-fixed-dim": "#ffb779",
+                    "primary-fixed": "#cde5ff",
+                    "on-secondary-fixed": "#111d26",
+                    "on-primary-fixed": "#001d32",
+                    "on-surface-variant": "#41474f",
+                    "inverse-primary": "#95ccff",
+                    "border-base": "#D9DEE3",
+                    "surface-alt": "#F0F2F4",
+                    "surface-tint": "#166395",
+                    "on-tertiary": "#ffffff",
+                    "on-primary-container": "#9fd0ff",
+                    "tertiary-fixed": "#ffdcc1",
+                    "on-error-container": "#93000a",
+                    "surface-dim": "#d8dadf",
+                    "inverse-surface": "#2e3134",
+                    "outline-variant": "#c1c7d0",
+                    "secondary-container": "#d5e1ee",
+                    "success": "#278561",
+                    "tertiary": "#613300",
+                    "surface-container-low": "#f2f3f8",
+                    "primary": "#004268",
+                    "inverse-on-surface": "#eff1f5",
+                    "surface-container-high": "#e7e8ed",
+                    "on-primary-fixed-variant": "#004a75",
+                    "on-background": "#191c1f",
+                    "text-primary": "#17212B",
+                    "error": "#C53030",
+                    "on-secondary": "#ffffff",
+                    "background": "#F5F6F7",
+                    "surface-variant": "#e1e2e7",
+                    "secondary-fixed-dim": "#bcc8d4",
+                    "border-subtle": "#E8EBEE",
+                    "outline": "#717880",
+                    "tertiary-container": "#824701",
+                    "secondary": "#54606b",
+                    "on-tertiary-fixed-variant": "#6c3a00",
+                    "secondary-fixed": "#d8e4f1",
+                    "surface-bright": "#f8f9fe",
+                    "on-secondary-container": "#58646f"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "sidebar-collapsed": "64px",
+                    "padding-compact": "0.75rem",
+                    "header-height": "52px",
+                    "gutter": "1rem",
+                    "padding-base": "1rem",
+                    "sidebar-width": "224px"
+            },
+            "fontFamily": {
+                    "body-sm": ["Inter"],
+                    "label-xs": ["Inter"],
+                    "headline-md": ["Inter"],
+                    "body-md": ["Inter"],
+                    "headline-lg": ["Inter"]
+            },
+            "fontSize": {
+                    "body-sm": ["11px", {"lineHeight": "16px", "fontWeight": "400"}],
+                    "label-xs": ["10px", {"lineHeight": "14px", "letterSpacing": "0.02em", "fontWeight": "500"}],
+                    "headline-md": ["16px", {"lineHeight": "24px", "fontWeight": "600"}],
+                    "body-md": ["12px", {"lineHeight": "18px", "fontWeight": "400"}],
+                    "headline-lg": ["22px", {"lineHeight": "32px", "fontWeight": "600"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; background-color: #F5F6F7; color: #191c1f; }
+        .material-symbols-outlined { font-size: 18px; vertical-align: middle; }
+        .sidebar-item-active { background-color: #F0F2F4; border-right: 2px solid #004268; font-weight: 600; color: #004268; }
+        .calendar-grid { grid-template-columns: 60px repeat(3, 1fr); }
+        .hour-row { height: 60px; }
+        .time-line { top: 320px; } /* Simulated current time position */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #F5F6F7; }
+        ::-webkit-scrollbar-thumb { background: #D9DEE3; border-radius: 3px; }
+        .appointment-card { transition: transform 0.1s ease; cursor: pointer; }
+        .appointment-card:hover { transform: scale(0.99); }
+    </style>
+</head>
+<body class="flex min-h-screen overflow-hidden">
+<!-- SideNavBar Anchor -->
+<aside class="w-sidebar-width h-screen fixed left-0 top-0 border-r border-border-base bg-surface flex flex-col py-4 overflow-y-auto z-50">
+<div class="px-6 mb-8 flex items-center gap-3">
+<div class="w-8 h-8 bg-primary rounded flex items-center justify-center text-on-primary">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">dentistry</span>
+</div>
+<div>
+<h1 class="font-headline-md text-headline-md font-bold text-primary">DENTIA</h1>
+<p class="text-[10px] leading-tight text-outline uppercase tracking-wider font-bold">Dental Software</p>
+</div>
+</div>
+<nav class="flex-1 space-y-0.5">
+<a class="flex items-center px-6 py-2.5 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined mr-3">home</span> Inicio
+            </a>
+<a class="flex items-center px-6 py-2.5 sidebar-item-active font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined mr-3" style="font-variation-settings: 'FILL' 1;">calendar_month</span> Agenda
+            </a>
+<a class="flex items-center px-6 py-2.5 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined mr-3">group</span> Pacientes
+            </a>
+<a class="flex items-center px-6 py-2.5 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined mr-3">medical_services</span> Clínica
+            </a>
+<a class="flex items-center px-6 py-2.5 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined mr-3">dentistry</span> Tratamientos
+            </a>
+<a class="flex items-center px-6 py-2.5 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined mr-3">payments</span> Finanzas
+            </a>
+<a class="flex items-center px-6 py-2.5 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined mr-3">account_tree</span> CRM
+            </a>
+<a class="flex items-center px-6 py-2.5 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined mr-3">folder_open</span> Documentos
+            </a>
+<a class="flex items-center px-6 py-2.5 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined mr-3">inventory_2</span> Inventario
+            </a>
+<a class="flex items-center px-6 py-2.5 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined mr-3">badge</span> Equipo
+            </a>
+<a class="flex items-center px-6 py-2.5 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined mr-3">query_stats</span> Analítica
+            </a>
+<div class="pt-4 mt-4 border-t border-border-subtle">
+<a class="flex items-center px-6 py-2.5 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined mr-3">settings</span> Configuración
+                </a>
+</div>
+</nav>
+</aside>
+<!-- Main Content Shell -->
+<main class="ml-sidebar-width flex-1 flex flex-col min-h-screen relative overflow-hidden">
+<!-- TopNavBar Anchor -->
+<header class="h-header-height fixed top-0 right-0 left-sidebar-width z-50 bg-surface border-b border-border-base flex items-center justify-between px-gutter">
+<div class="flex items-center gap-6">
+<div class="flex items-center bg-surface-alt rounded px-3 py-1.5 border border-border-base w-80">
+<span class="material-symbols-outlined text-outline mr-2">search</span>
+<input class="bg-transparent border-none focus:ring-0 text-body-md w-full p-0" placeholder="Buscar paciente o cita..." type="text"/>
+</div>
+<div class="flex gap-4">
+<span class="text-primary font-bold border-b-2 border-primary pb-1 font-body-md cursor-pointer">Sede Centro</span>
+<span class="text-on-surface-variant hover:text-primary transition-colors font-body-md cursor-pointer">Sede Playa</span>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="bg-primary text-on-primary px-4 py-1.5 rounded text-body-md font-semibold active:scale-95 transition-all flex items-center gap-1">
+<span class="material-symbols-outlined">add</span> Crear
+                </button>
+<div class="w-px h-6 bg-border-base mx-1"></div>
+<button class="text-on-surface-variant hover:text-primary transition-all">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<div class="flex items-center gap-2 cursor-pointer group">
+<span class="material-symbols-outlined text-outline group-hover:text-primary">account_circle</span>
+<span class="font-body-md text-on-surface-variant group-hover:text-on-surface">Dr. Martínez</span>
+</div>
+</div>
+</header>
+<!-- Page Sub-Header (Agenda Controls) -->
+<section class="mt-header-height bg-surface-container-low border-b border-border-subtle px-4 py-2 flex items-center justify-between sticky top-header-height z-40">
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-1 text-on-surface">
+<span class="material-symbols-outlined">calendar_today</span>
+<h2 class="font-headline-md text-headline-md">Hoy, 15 Oct 2023</h2>
+</div>
+<div class="flex bg-surface border border-border-base rounded overflow-hidden">
+<button class="px-3 py-1 text-label-xs bg-primary text-on-primary font-bold uppercase tracking-tight">Día</button>
+<button class="px-3 py-1 text-label-xs border-l border-border-base hover:bg-surface-alt uppercase tracking-tight">Semana</button>
+<button class="px-3 py-1 text-label-xs border-l border-border-base hover:bg-surface-alt uppercase tracking-tight">Lista</button>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<div class="flex gap-1.5">
+<select class="bg-surface border-border-base text-label-xs rounded py-1 px-2 focus:ring-0">
+<option>Todos los Doctores</option>
+<option>Dr. Martínez</option>
+<option>Dra. Gómez</option>
+</select>
+<select class="bg-surface border-border-base text-label-xs rounded py-1 px-2 focus:ring-0">
+<option>Todos los Gabinetes</option>
+<option>Gab 1</option>
+<option>Gab 2</option>
+</select>
+</div>
+<button class="bg-surface border border-border-base p-1.5 rounded hover:bg-surface-alt flex items-center">
+<span class="material-symbols-outlined">filter_list</span>
+</button>
+</div>
+</section>
+<!-- Calendar Body -->
+<div class="flex-1 overflow-auto bg-background p-4 relative">
+<div class="bg-surface border border-border-base rounded-lg min-w-[800px] shadow-sm relative">
+<!-- Grid Header -->
+<div class="grid calendar-grid border-b border-border-base bg-surface-container sticky top-0 z-30">
+<div class="p-2 border-r border-border-base"></div>
+<div class="p-2 border-r border-border-base text-center font-bold text-label-xs uppercase text-outline">Gabinete 1</div>
+<div class="p-2 border-r border-border-base text-center font-bold text-label-xs uppercase text-outline">Gabinete 2</div>
+<div class="p-2 text-center font-bold text-label-xs uppercase text-outline">Gabinete 3</div>
+</div>
+<!-- Calendar Content -->
+<div class="relative">
+<!-- Current Time Line -->
+<div class="absolute w-full time-line border-t-2 border-error z-20 pointer-events-none flex items-center">
+<div class="bg-error text-white text-[9px] px-1 py-0.5 rounded-r font-bold">13:15</div>
+<div class="w-full border-t-2 border-error border-dashed opacity-50"></div>
+</div>
+<!-- Hour Slots -->
+<div class="divide-y divide-border-subtle">
+<!-- 08:00 to 20:00 slots -->
+<div class="grid calendar-grid hour-row">
+<div class="p-2 text-right text-label-xs text-outline font-medium border-r border-border-base">08:00</div>
+<div class="border-r border-border-subtle relative"></div>
+<div class="border-r border-border-subtle relative"></div>
+<div class="relative"></div>
+</div>
+<div class="grid calendar-grid hour-row">
+<div class="p-2 text-right text-label-xs text-outline font-medium border-r border-border-base">09:00</div>
+<div class="border-r border-border-subtle relative">
+<!-- Appointment 1 -->
+<div class="absolute top-0 left-1 right-1 h-[58px] bg-primary-fixed border border-primary-container rounded p-1.5 appointment-card z-10">
+<div class="flex justify-between items-start">
+<span class="font-bold text-[11px] text-primary truncate">JUAN PÉREZ</span>
+<span class="material-symbols-outlined text-[14px] text-primary" style="font-variation-settings: 'FILL' 1;">warning</span>
+</div>
+<div class="text-[10px] text-primary-container font-medium uppercase mt-0.5">HIGIENE BUCAL</div>
+<div class="mt-1 flex items-center gap-1">
+<span class="w-1.5 h-1.5 bg-success rounded-full"></span>
+<span class="text-[9px] text-primary-container uppercase font-bold">Confirmado</span>
+</div>
+</div>
+</div>
+<div class="border-r border-border-subtle relative">
+<!-- Appointment 2 -->
+<div class="absolute top-10 left-1 right-1 h-[80px] bg-secondary-fixed border border-secondary rounded p-1.5 appointment-card z-10">
+<div class="flex justify-between items-start">
+<span class="font-bold text-[11px] text-on-secondary-fixed truncate">ELENA SOLER</span>
+</div>
+<div class="text-[10px] text-on-secondary-fixed-variant font-medium uppercase mt-0.5">REVISIÓN ANUAL</div>
+<div class="mt-1 flex items-center gap-1">
+<span class="w-1.5 h-1.5 bg-warning rounded-full"></span>
+<span class="text-[9px] text-on-secondary-fixed-variant uppercase font-bold">Llegado</span>
+</div>
+</div>
+</div>
+<div class="relative"></div>
+</div>
+<div class="grid calendar-grid hour-row">
+<div class="p-2 text-right text-label-xs text-outline font-medium border-r border-border-base">10:00</div>
+<div class="border-r border-border-subtle relative"></div>
+<div class="border-r border-border-subtle relative"></div>
+<div class="relative">
+<!-- Appointment 3 -->
+<div class="absolute top-0 left-1 right-1 h-[115px] bg-tertiary-fixed border border-tertiary rounded p-1.5 appointment-card z-10">
+<div class="flex justify-between items-start">
+<span class="font-bold text-[11px] text-tertiary truncate">CARLOS RUIZ</span>
+</div>
+<div class="text-[10px] text-on-tertiary-fixed-variant font-medium uppercase mt-0.5">ENDODONCIA</div>
+<div class="mt-1 flex items-center gap-1">
+<span class="w-1.5 h-1.5 bg-success rounded-full"></span>
+<span class="text-[9px] text-on-tertiary-fixed-variant uppercase font-bold">En Sala</span>
+</div>
+</div>
+</div>
+</div>
+<div class="grid calendar-grid hour-row">
+<div class="p-2 text-right text-label-xs text-outline font-medium border-r border-border-base">11:00</div>
+<div class="border-r border-border-subtle relative"></div>
+<div class="border-r border-border-subtle relative"></div>
+<div class="relative"></div>
+</div>
+<div class="grid calendar-grid hour-row">
+<div class="p-2 text-right text-label-xs text-outline font-medium border-r border-border-base">12:00</div>
+<div class="border-r border-border-subtle relative"></div>
+<div class="border-r border-border-subtle relative"></div>
+<div class="relative"></div>
+</div>
+<div class="grid calendar-grid hour-row">
+<div class="p-2 text-right text-label-xs text-outline font-medium border-r border-border-base">13:00</div>
+<div class="border-r border-border-subtle relative bg-surface-alt/50">
+<div class="absolute inset-0 flex items-center justify-center pointer-events-none opacity-20">
+<span class="material-symbols-outlined text-[40px]">lock</span>
+</div>
+</div>
+<div class="border-r border-border-subtle relative bg-surface-alt/50"></div>
+<div class="relative bg-surface-alt/50"></div>
+</div>
+<div class="grid calendar-grid hour-row">
+<div class="p-2 text-right text-label-xs text-outline font-medium border-r border-border-base">14:00</div>
+<div class="border-r border-border-subtle relative"></div>
+<div class="border-r border-border-subtle relative"></div>
+<div class="relative"></div>
+</div>
+<div class="grid calendar-grid hour-row">
+<div class="p-2 text-right text-label-xs text-outline font-medium border-r border-border-base">15:00</div>
+<div class="border-r border-border-subtle relative"></div>
+<div class="border-r border-border-subtle relative"></div>
+<div class="relative"></div>
+</div>
+<div class="grid calendar-grid hour-row">
+<div class="p-2 text-right text-label-xs text-outline font-medium border-r border-border-base">16:00</div>
+<div class="border-r border-border-subtle relative"></div>
+<div class="border-r border-border-subtle relative"></div>
+<div class="relative"></div>
+</div>
+<div class="grid calendar-grid hour-row">
+<div class="p-2 text-right text-label-xs text-outline font-medium border-r border-border-base">17:00</div>
+<div class="border-r border-border-subtle relative"></div>
+<div class="border-r border-border-subtle relative"></div>
+<div class="relative"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Floating Action Button (FAB) suppression on agenda might not be needed, but logic says only on primary purpose. Here agenda is primary. -->
+<button class="fixed bottom-8 right-8 w-14 h-14 bg-primary text-on-primary rounded-full shadow-lg flex items-center justify-center hover:scale-105 active:scale-95 transition-all z-50">
+<span class="material-symbols-outlined" style="font-size: 28px;">add</span>
+</button>
+</main>
+<!-- Side Legend / Today Summary -->
+<aside class="w-64 border-l border-border-base bg-surface p-4 overflow-y-auto hidden xl:flex flex-col">
+<h3 class="font-headline-md text-body-md font-bold mb-4">Resumen Diario</h3>
+<div class="space-y-4">
+<div class="p-3 bg-surface-container-low rounded border border-border-subtle">
+<p class="text-label-xs text-outline font-bold uppercase mb-1">Citas Hoy</p>
+<div class="flex items-end justify-between">
+<span class="text-2xl font-black text-primary">24</span>
+<span class="text-success text-[10px] font-bold flex items-center">
+<span class="material-symbols-outlined text-[12px]">trending_up</span> +12%
+                    </span>
+</div>
+</div>
+<div class="p-3 bg-surface-container-low rounded border border-border-subtle">
+<p class="text-label-xs text-outline font-bold uppercase mb-1">Confirmación</p>
+<div class="w-full bg-border-base h-1.5 rounded-full mt-2">
+<div class="bg-success h-1.5 rounded-full" style="width: 75%;"></div>
+</div>
+<div class="flex justify-between mt-1 text-[10px] font-bold">
+<span>18 Confirmadas</span>
+<span>75%</span>
+</div>
+</div>
+<div class="pt-4 border-t border-border-subtle">
+<h4 class="text-label-xs text-outline font-bold uppercase mb-3">Siguientes Pacientes</h4>
+<div class="space-y-3">
+<div class="flex items-start gap-2">
+<div class="w-8 h-8 rounded-full bg-secondary-container flex items-center justify-center text-primary font-bold text-[10px]">ML</div>
+<div>
+<p class="text-body-md font-bold leading-tight">Marta López</p>
+<p class="text-label-xs text-outline">13:30 - Gabinete 1</p>
+</div>
+</div>
+<div class="flex items-start gap-2">
+<div class="w-8 h-8 rounded-full bg-primary-container flex items-center justify-center text-on-primary font-bold text-[10px]">JG</div>
+<div>
+<p class="text-body-md font-bold leading-tight">Jorge García</p>
+<p class="text-label-xs text-outline">14:00 - Gabinete 2</p>
+</div>
+</div>
+</div>
+</div>
+<div class="mt-auto pt-4">
+<div class="p-3 bg-error-container text-on-error-container rounded border border-error/20 flex gap-2 items-start">
+<span class="material-symbols-outlined text-error">info</span>
+<div>
+<p class="text-label-xs font-bold uppercase">3 Alertas Médicas</p>
+<p class="text-[10px] mt-0.5">Revisar protocolos COVID en Gabinete 3.</p>
+</div>
+</div>
+</div>
+</div>
+</aside>
+<script>
+        // Micro-interactions and simple logic
+        document.querySelectorAll('.appointment-card').forEach(card => {
+            card.addEventListener('mouseenter', () => {
+                card.style.zIndex = '50';
+                card.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)';
+            });
+            card.addEventListener('mouseleave', () => {
+                card.style.zIndex = '10';
+                card.style.boxShadow = 'none';
+            });
+        });
+
+        // Time line update simulation
+        function updateTimeLine() {
+            const now = new Date();
+            const startHour = 8;
+            const hourHeight = 60;
+            const headerHeight = 40; // Grid header offset
+
+            const currentHour = now.getHours();
+            const currentMinutes = now.getMinutes();
+
+            if (currentHour >= startHour && currentHour <= 20) {
+                const minutesFromStart = (currentHour - startHour) * 60 + currentMinutes;
+                const topPos = (minutesFromStart / 60) * hourHeight + headerHeight;
+                const line = document.querySelector('.time-line');
+                if (line) {
+                    line.style.top = `${topPos}px`;
+                    line.querySelector('div').innerText = `${currentHour.toString().padStart(2, '0')}:${currentMinutes.toString().padStart(2, '0')}`;
+                }
+            }
+        }
+        setInterval(updateTimeLine, 60000);
+        updateTimeLine();
+    </script>
+</body></html>

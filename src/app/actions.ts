@@ -6,8 +6,13 @@ import {
   ConsentKind,
   ConversationChannel,
   ConversationStatus,
+  ElectronicInvoiceStatus,
   PatientStatus,
+  PatientIntakeStatus,
+  InvoiceReceiverType,
+  InvoiceStatus,
   MessageDirection,
+  SifMode,
   TaskPriority,
   TaskStatus,
   UserRole,
@@ -17,7 +22,9 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { hasRole } from "@/lib/auth";
 import { runDemoScenario } from "@/lib/agent/demo";
+import { buildFacturaePreviewXml, buildFiscalInvoiceHash, buildQrPayload, calculateInvoiceTax } from "@/lib/billing";
 import { hashPassword } from "@/lib/password";
+import { notifyAppointmentEvent } from "@/lib/notifications/appointment-notifications";
 import { prisma } from "@/lib/prisma";
 import { getCurrentContext } from "@/lib/tenant";
 import {
@@ -39,9 +46,14 @@ import {
   firstErrorMessage,
   inviteUserSchema,
   interactiveDemoSchema,
+  invoiceElectronicStatusSchema,
+  invoiceInputSchema,
+  patientIntakeStatusSchema,
   patientInputSchema,
+  patientStatusSchema,
   settingsInputSchema,
   taskFromConversationSchema,
+  taskFromPatientIntakeSchema,
   taskIdSchema,
   taskInputSchema,
   treatmentInputSchema
@@ -78,6 +90,9 @@ export async function createPatientAction(formData: FormData) {
         name: parsed.data.name,
         phone: parsed.data.phone,
         email: parsed.data.email || null,
+        fiscalName: parsed.data.fiscalName || null,
+        taxId: parsed.data.taxId || null,
+        fiscalAddress: parsed.data.fiscalAddress || null,
         status: PatientStatus.NEW_LEAD,
         source: parsed.data.source,
         preferredChannel: ConversationChannel.WHATSAPP,
@@ -154,6 +169,36 @@ export async function toggleConsentAction(formData: FormData) {
   succeed("patients", "Consentimiento actualizado.");
 }
 
+export async function updatePatientStatusAction(formData: FormData) {
+  const parsed = patientStatusSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) {
+    backTo("patients", { error: firstErrorMessage(parsed.error) });
+  }
+
+  const { user, tenant } = await getCurrentContext();
+  try {
+    const existing = await prisma.patient.findFirstOrThrow({
+      where: { id: parsed.data.patientId, tenantId: tenant.id },
+      select: { id: true, status: true }
+    });
+
+    const patient = await prisma.patient.update({
+      where: { id: existing.id },
+      data: { status: parsed.data.status }
+    });
+
+    await audit(tenant.id, user.id, "patient.status_updated", "Patient", patient.id, {
+      from: existing.status,
+      to: patient.status
+    });
+  } catch (error) {
+    console.error("updatePatientStatusAction failed", error);
+    backTo("patients", { error: "No se pudo actualizar el estado del paciente." });
+  }
+
+  succeed("patients", "Estado del paciente actualizado.");
+}
+
 export async function createAppointmentAction(formData: FormData) {
   const parsed = appointmentInputSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) {
@@ -167,13 +212,20 @@ export async function createAppointmentAction(formData: FormData) {
   }
 
   try {
+    const [patient, treatmentId, providerId, operatoryId] = await Promise.all([
+      requireTenantPatient(tenant.id, parsed.data.patientId),
+      requireOptionalTenantTreatment(tenant.id, parsed.data.treatmentId),
+      requireOptionalTenantProvider(tenant.id, parsed.data.providerId),
+      requireOptionalTenantOperatory(tenant.id, parsed.data.operatoryId)
+    ]);
+
     const appointment = await prisma.appointment.create({
       data: {
         tenantId: tenant.id,
-        patientId: parsed.data.patientId,
-        treatmentId: parsed.data.treatmentId || null,
-        providerId: parsed.data.providerId || null,
-        operatoryId: parsed.data.operatoryId || null,
+        patientId: patient.id,
+        treatmentId,
+        providerId,
+        operatoryId,
         title: parsed.data.title,
         startsAt,
         status: parsed.data.status,
@@ -183,6 +235,12 @@ export async function createAppointmentAction(formData: FormData) {
     });
 
     await audit(tenant.id, user.id, "appointment.created", "Appointment", appointment.id);
+    await notifyAppointmentEvent({
+      tenantId: tenant.id,
+      appointmentId: appointment.id,
+      eventType: "created",
+      actor: { type: "staff", userId: user.id }
+    });
   } catch (error) {
     console.error("createAppointmentAction failed", error);
     backTo("calendar", { error: "No se pudo crear la cita. Revisa el paciente seleccionado." });
@@ -247,11 +305,16 @@ export async function createCalendarEventAction(formData: FormData) {
   }
 
   try {
+    const [providerId, operatoryId] = await Promise.all([
+      requireOptionalTenantProvider(tenant.id, parsed.data.providerId),
+      requireOptionalTenantOperatory(tenant.id, parsed.data.operatoryId)
+    ]);
+
     await createCalendarEvent(
       tenant.id,
       {
-        providerId: parsed.data.providerId || null,
-        operatoryId: parsed.data.operatoryId || null,
+        providerId,
+        operatoryId,
         title: parsed.data.title,
         type: parsed.data.type,
         startsAt,
@@ -350,10 +413,14 @@ export async function createTaskAction(formData: FormData) {
 
   const { user, tenant } = await getCurrentContext();
   try {
+    const patientId = parsed.data.patientId
+      ? (await requireTenantPatient(tenant.id, parsed.data.patientId)).id
+      : null;
+
     const task = await prisma.task.create({
       data: {
         tenantId: tenant.id,
-        patientId: parsed.data.patientId || null,
+        patientId,
         title: parsed.data.title,
         type: parsed.data.type,
         priority: parsed.data.priority,
@@ -391,6 +458,81 @@ export async function completeTaskAction(formData: FormData) {
   }
 
   succeed("tasks", "Tarea completada.");
+}
+
+export async function updatePatientIntakeStatusAction(formData: FormData) {
+  const parsed = patientIntakeStatusSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) {
+    backTo("patients", { error: firstErrorMessage(parsed.error) });
+  }
+
+  const { user, tenant } = await getCurrentContext();
+  try {
+    const intake = await prisma.patientIntake.findFirstOrThrow({
+      where: { id: parsed.data.intakeId, tenantId: tenant.id },
+      select: { id: true, patientId: true, status: true }
+    });
+
+    if (parsed.data.targetStatus === PatientIntakeStatus.LINKED && !intake.patientId) {
+      backTo("patients", { error: "No se puede marcar como vinculada una pre-ficha sin paciente asociado." });
+    }
+
+    const updated = await prisma.patientIntake.update({
+      where: { id: intake.id },
+      data: { status: parsed.data.targetStatus }
+    });
+
+    await audit(tenant.id, user.id, "patient_intake.status_updated", "PatientIntake", updated.id, {
+      from: intake.status,
+      to: updated.status
+    });
+  } catch (error) {
+    console.error("updatePatientIntakeStatusAction failed", error);
+    backTo("patients", { error: "No se pudo actualizar la pre-ficha." });
+  }
+
+  succeed("patients", "Pre-ficha actualizada.");
+}
+
+export async function createTaskFromPatientIntakeAction(formData: FormData) {
+  const parsed = taskFromPatientIntakeSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) {
+    backTo("patients", { error: firstErrorMessage(parsed.error) });
+  }
+
+  const { user, tenant } = await getCurrentContext();
+  try {
+    const intake = await prisma.patientIntake.findFirstOrThrow({
+      where: { id: parsed.data.intakeId, tenantId: tenant.id },
+      select: { id: true, patientId: true, name: true, phone: true, email: true, status: true }
+    });
+
+    const task = await prisma.task.create({
+      data: {
+        tenantId: tenant.id,
+        patientId: intake.patientId,
+        title: parsed.data.title,
+        type: "Revision pre-ficha",
+        priority: parsed.data.priority,
+        status: TaskStatus.PENDING,
+        linkedType: "PatientIntake",
+        linkedId: intake.id
+      }
+    });
+
+    await audit(tenant.id, user.id, "patient_intake.task_created", "PatientIntake", intake.id, {
+      taskId: task.id,
+      status: intake.status,
+      patient: intake.name,
+      phone: intake.phone,
+      email: intake.email
+    });
+  } catch (error) {
+    console.error("createTaskFromPatientIntakeAction failed", error);
+    backTo("patients", { error: "No se pudo crear la tarea desde la pre-ficha." });
+  }
+
+  succeed("patients", "Tarea de recepcion creada desde la pre-ficha.");
 }
 
 export async function markConversationReadAction(formData: FormData) {
@@ -529,6 +671,157 @@ export async function createTreatmentAction(formData: FormData) {
   }
 
   succeed("treatments", "Tratamiento creado correctamente.");
+}
+
+export async function createInvoiceAction(formData: FormData) {
+  const parsed = invoiceInputSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) {
+    backTo("billing", { error: firstErrorMessage(parsed.error) });
+  }
+
+  const { user, tenant } = await getCurrentContext();
+  const dueAt = new Date(`${parsed.data.dueAt}T00:00:00.000Z`);
+  if (Number.isNaN(dueAt.getTime())) {
+    backTo("billing", { error: "Fecha de vencimiento no valida." });
+  }
+
+  try {
+    const patient = await prisma.patient.findFirstOrThrow({
+      where: { id: parsed.data.patientId, tenantId: tenant.id },
+      select: { id: true, name: true, email: true, fiscalName: true, taxId: true, fiscalAddress: true }
+    });
+    const issuedAt = new Date();
+    const series = normalizeInvoiceSeries(tenant.invoiceSeries);
+    const sequence = await getNextInvoiceSequence(tenant.id, series, issuedAt.getFullYear());
+    const number = `${series}-${issuedAt.getFullYear()}-${String(sequence).padStart(3, "0")}`;
+    const tax = calculateInvoiceTax(Math.round(parsed.data.amount * 100), parsed.data.taxRate);
+    const receiverName = parsed.data.receiverName || patient.fiscalName || patient.name;
+    const receiverTaxId = parsed.data.receiverTaxId || patient.taxId || null;
+    const issuerLegalName = tenant.legalName || tenant.name;
+    const issuerTaxId = tenant.taxId || "";
+    const previousInvoice = await prisma.invoice.findFirst({
+      where: { tenantId: tenant.id, fiscalHash: { not: null } },
+      orderBy: { issuedAt: "desc" },
+      select: { fiscalHash: true }
+    });
+    const fiscalHash = buildFiscalInvoiceHash({
+      tenantId: tenant.id,
+      number,
+      issuedAt,
+      amountCents: tax.amountCents,
+      taxBaseCents: tax.taxBaseCents,
+      taxCents: tax.taxCents,
+      receiverTaxId,
+      previousFiscalHash: previousInvoice?.fiscalHash
+    });
+    const requiresElectronicInvoice = parsed.data.receiverType !== InvoiceReceiverType.PATIENT;
+    const electronicPayload =
+      requiresElectronicInvoice && issuerTaxId && receiverTaxId
+        ? buildFacturaePreviewXml({
+            invoiceNumber: number,
+            issuedAt,
+            issuerLegalName,
+            issuerTaxId,
+            receiverName,
+            receiverTaxId,
+            treatmentName: parsed.data.treatmentName,
+            tax
+          })
+        : null;
+
+    const invoice = await prisma.invoice.create({
+      data: {
+        tenantId: tenant.id,
+        patientId: patient.id,
+        number,
+        series,
+        sequence,
+        documentType: parsed.data.documentType,
+        receiverType: parsed.data.receiverType,
+        receiverName,
+        receiverTaxId,
+        receiverAddress: parsed.data.receiverAddress || patient.fiscalAddress || null,
+        receiverEmail: parsed.data.receiverEmail || patient.email || null,
+        issuerLegalName,
+        issuerTaxId: issuerTaxId || null,
+        issuerAddress: tenant.fiscalAddress || tenant.address || null,
+        treatmentName: parsed.data.treatmentName,
+        amountCents: tax.amountCents,
+        taxBaseCents: tax.taxBaseCents,
+        taxCents: tax.taxCents,
+        taxRateBasisPoints: tax.taxRateBasisPoints,
+        taxExemptionReason: parsed.data.taxExemptionReason || (tax.taxCents === 0 ? "Operacion sanitaria exenta o no sujeta a IVA segun configuracion de la clinica." : null),
+        status: InvoiceStatus.SENT,
+        electronicStatus: requiresElectronicInvoice ? ElectronicInvoiceStatus.READY : ElectronicInvoiceStatus.NOT_REQUIRED,
+        electronicProvider: tenant.electronicInvoiceProvider || null,
+        electronicPayload,
+        sifMode: tenant.sifMode,
+        fiscalHash,
+        previousFiscalHash: previousInvoice?.fiscalHash ?? null,
+        qrPayload: buildQrPayload({ issuerTaxId, number, issuedAt, amountCents: tax.amountCents }),
+        immutableIssued: true,
+        notes: parsed.data.notes || null,
+        issuedAt,
+        dueAt
+      }
+    });
+
+    await audit(tenant.id, user.id, "invoice.created", "Invoice", invoice.id, {
+      number,
+      receiverType: parsed.data.receiverType,
+      electronicStatus: invoice.electronicStatus
+    });
+  } catch (error) {
+    console.error("createInvoiceAction failed", error);
+    backTo("billing", { error: "No se pudo emitir la factura. Revisa numeracion, paciente y datos fiscales." });
+  }
+
+  succeed("billing", "Factura fiscal emitida y registrada.");
+}
+
+export async function updateInvoiceElectronicStatusAction(formData: FormData) {
+  const parsed = invoiceElectronicStatusSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) {
+    backTo("billing", { error: firstErrorMessage(parsed.error) });
+  }
+
+  const { user, tenant } = await getCurrentContext();
+  try {
+    const now = new Date();
+    const data: Prisma.InvoiceUpdateInput = {
+      electronicStatus: parsed.data.electronicStatus,
+      electronicRejectReason: parsed.data.rejectReason || null
+    };
+
+    if (parsed.data.electronicStatus === ElectronicInvoiceStatus.SENT) {
+      data.electronicSubmittedAt = now;
+    }
+    if (parsed.data.electronicStatus === ElectronicInvoiceStatus.ACCEPTED) {
+      data.electronicAcceptedAt = now;
+    }
+    if (parsed.data.electronicStatus === ElectronicInvoiceStatus.REJECTED) {
+      data.electronicRejectedAt = now;
+    }
+    if (parsed.data.electronicStatus === ElectronicInvoiceStatus.PAID) {
+      data.status = InvoiceStatus.PAID;
+      data.paidAt = now;
+    }
+
+    const invoice = await prisma.invoice.update({
+      where: { id: parsed.data.invoiceId, tenantId: tenant.id },
+      data
+    });
+
+    await audit(tenant.id, user.id, "invoice.electronic_status_updated", "Invoice", invoice.id, {
+      number: invoice.number,
+      electronicStatus: invoice.electronicStatus
+    });
+  } catch (error) {
+    console.error("updateInvoiceElectronicStatusAction failed", error);
+    backTo("billing", { error: "No se pudo actualizar el estado electronico de la factura." });
+  }
+
+  succeed("billing", "Estado electronico actualizado.");
 }
 
 export async function toggleAssistantAction(formData: FormData) {
@@ -794,8 +1087,14 @@ export async function updateSettingsAction(formData: FormData) {
       where: { id: tenant.id },
       data: {
         name: parsed.data.name,
+        legalName: parsed.data.legalName || null,
+        taxId: parsed.data.taxId || null,
+        fiscalAddress: parsed.data.fiscalAddress || null,
         assistantName: parsed.data.assistantName,
         phone: parsed.data.phone,
+        invoiceSeries: normalizeInvoiceSeries(parsed.data.invoiceSeries),
+        electronicInvoiceProvider: parsed.data.electronicInvoiceProvider || null,
+        sifMode: parsed.data.sifMode as SifMode,
         pmsProvider: parsed.data.pmsProvider,
         retentionDays: parsed.data.retentionDays,
         settings: {
@@ -844,6 +1143,68 @@ async function audit(
       metadata
     }
   });
+}
+
+async function requireTenantPatient(tenantId: string, patientId: string) {
+  const patient = await prisma.patient.findFirst({ where: { id: patientId, tenantId }, select: { id: true } });
+  if (!patient) {
+    throw new Error("Paciente no encontrado en esta clinica.");
+  }
+  return patient;
+}
+
+async function requireOptionalTenantTreatment(tenantId: string, treatmentId: string | undefined) {
+  if (!treatmentId) {
+    return null;
+  }
+  const treatment = await prisma.treatment.findFirst({ where: { id: treatmentId, tenantId }, select: { id: true } });
+  if (!treatment) {
+    throw new Error("Tratamiento no encontrado en esta clinica.");
+  }
+  return treatment.id;
+}
+
+async function requireOptionalTenantProvider(tenantId: string, providerId: string | undefined) {
+  if (!providerId) {
+    return null;
+  }
+  const provider = await prisma.provider.findFirst({ where: { id: providerId, tenantId }, select: { id: true } });
+  if (!provider) {
+    throw new Error("Profesional no encontrado en esta clinica.");
+  }
+  return provider.id;
+}
+
+async function requireOptionalTenantOperatory(tenantId: string, operatoryId: string | undefined) {
+  if (!operatoryId) {
+    return null;
+  }
+  const operatory = await prisma.operatory.findFirst({ where: { id: operatoryId, tenantId }, select: { id: true } });
+  if (!operatory) {
+    throw new Error("Gabinete no encontrado en esta clinica.");
+  }
+  return operatory.id;
+}
+
+function normalizeInvoiceSeries(value: string | null | undefined): string {
+  const normalized = (value || "F").trim().toUpperCase().replace(/[^A-Z0-9-]/g, "");
+  return normalized.slice(0, 8) || "F";
+}
+
+async function getNextInvoiceSequence(tenantId: string, series: string, year: number): Promise<number> {
+  const prefix = `${series}-${year}-`;
+  const lastInvoice = await prisma.invoice.findFirst({
+    where: { tenantId, series, number: { startsWith: prefix } },
+    orderBy: [{ sequence: "desc" }, { issuedAt: "desc" }],
+    select: { sequence: true, number: true }
+  });
+
+  if (lastInvoice?.sequence) {
+    return lastInvoice.sequence + 1;
+  }
+
+  const parsed = lastInvoice?.number.match(/-(\d+)$/)?.[1];
+  return parsed ? Number(parsed) + 1 : 1;
 }
 
 function parseInteractiveTranscript(raw: string) {

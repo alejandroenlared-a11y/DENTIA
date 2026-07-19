@@ -1,0 +1,155 @@
+{
+  "name": "Dentia - Emails de citas",
+  "purpose": "Recibir eventos de citas desde Dentia y enviar emails al paciente. Dentia es la fuente de verdad del calendario; Make solo entrega emails.",
+  "vercelEnvironmentVariable": {
+    "name": "MAKE_APPOINTMENT_WEBHOOK_URL",
+    "example": "https://hook.eu2.make.com/xxxxx"
+  },
+  "sourceOfTruth": "dentia_native_calendar",
+  "makeRole": "email_delivery_only",
+  "webhook": {
+    "module": "Webhooks > Custom webhook",
+    "recommendedName": "Dentia - appointment events",
+    "method": "POST",
+    "contentType": "application/json"
+  },
+  "samplePayload": {
+    "source": "dentia",
+    "sourceOfTruth": "dentia_native_calendar",
+    "eventId": "created:appt_123:2026-07-16T18:00:00.000Z",
+    "eventType": "created",
+    "occurredAt": "2026-07-16T18:00:00.000Z",
+    "shouldEmailPatient": true,
+    "tenant": {
+      "id": "tenant_123",
+      "name": "Clinica Dental Murcia-Elche",
+      "slug": "clinica-murcia-elche"
+    },
+    "patient": {
+      "id": "patient_123",
+      "name": "Ana Perez Lopez",
+      "phone": "654718663",
+      "email": "ana@example.com"
+    },
+    "appointment": {
+      "id": "appt_123",
+      "title": "Revision",
+      "status": "PROPOSED",
+      "startsAt": "2026-07-20T15:30:00.000Z",
+      "endsAt": "2026-07-20T16:00:00.000Z",
+      "durationMinutes": 30,
+      "channel": "WHATSAPP",
+      "createdByAi": true,
+      "treatment": {
+        "id": "treatment_123",
+        "name": "Primera visita"
+      },
+      "provider": {
+        "id": "provider_123",
+        "name": "Dra. Demo",
+        "specialty": "Odontologia"
+      },
+      "operatory": {
+        "id": "operatory_123",
+        "name": "Gabinete 1"
+      }
+    },
+    "change": {
+      "previousStartsAt": null,
+      "newStartsAt": "2026-07-20T15:30:00.000Z",
+      "reason": null
+    },
+    "actor": {
+      "type": "ai",
+      "userId": null
+    },
+    "control": {
+      "calendarOwner": "dentia",
+      "makeRole": "email_delivery_only",
+      "patientEmailRequiredForPatientEmail": true
+    }
+  },
+  "router": {
+    "module": "Tools > Router",
+    "routes": [
+      {
+        "name": "Cita creada",
+        "filter": {
+          "all": [
+            { "field": "eventType", "operator": "equals", "value": "created" },
+            { "field": "shouldEmailPatient", "operator": "equals", "value": true },
+            { "field": "patient.email", "operator": "exists" }
+          ]
+        },
+        "email": {
+          "to": "{{patient.email}}",
+          "subject": "Confirmacion de tu cita en Clinica Dental Murcia-Elche",
+          "bodyText": "Hola {{patient.name}},\n\nTe confirmamos que hemos dejado registrada tu cita en {{tenant.name}}.\n\nFecha y hora: {{formatDate(appointment.startsAt; \"DD/MM/YYYY HH:mm\")}}\nTratamiento/visita: {{appointment.treatment.name}}\nGabinete: {{appointment.operatory.name}}\n\nSi necesitas cambiarla o cancelarla, responde a este mensaje o contacta con la clinica.\n\nGracias,\nClinica Dental Murcia-Elche"
+        }
+      },
+      {
+        "name": "Cita modificada",
+        "filter": {
+          "all": [
+            { "field": "eventType", "operator": "equals", "value": "rescheduled" },
+            { "field": "shouldEmailPatient", "operator": "equals", "value": true },
+            { "field": "patient.email", "operator": "exists" }
+          ]
+        },
+        "email": {
+          "to": "{{patient.email}}",
+          "subject": "Tu cita ha sido modificada",
+          "bodyText": "Hola {{patient.name}},\n\nTe confirmamos que tu cita ha sido modificada.\n\nNueva fecha y hora: {{formatDate(appointment.startsAt; \"DD/MM/YYYY HH:mm\")}}\nFecha anterior: {{formatDate(change.previousStartsAt; \"DD/MM/YYYY HH:mm\")}}\nTratamiento/visita: {{appointment.treatment.name}}\nGabinete: {{appointment.operatory.name}}\n\nSi esta nueva cita no te encaja, contacta con la clinica.\n\nGracias,\nClinica Dental Murcia-Elche"
+        }
+      },
+      {
+        "name": "Cita cancelada",
+        "filter": {
+          "all": [
+            { "field": "eventType", "operator": "equals", "value": "cancelled" },
+            { "field": "shouldEmailPatient", "operator": "equals", "value": true },
+            { "field": "patient.email", "operator": "exists" }
+          ]
+        },
+        "email": {
+          "to": "{{patient.email}}",
+          "subject": "Tu cita ha sido cancelada",
+          "bodyText": "Hola {{patient.name}},\n\nTe confirmamos que tu cita ha sido cancelada.\n\nCita cancelada: {{formatDate(appointment.startsAt; \"DD/MM/YYYY HH:mm\")}}\nTratamiento/visita: {{appointment.treatment.name}}\n\nSi quieres reservar una nueva cita, contacta con la clinica o escribe de nuevo a Clara.\n\nGracias,\nClinica Dental Murcia-Elche"
+        }
+      },
+      {
+        "name": "Sin email de paciente",
+        "filter": {
+          "any": [
+            { "field": "shouldEmailPatient", "operator": "equals", "value": false },
+            { "field": "patient.email", "operator": "does_not_exist" }
+          ]
+        },
+        "recommendedAction": {
+          "module": "Email interno opcional",
+          "to": "recepcion@clinica.com",
+          "subject": "Dentia: evento de cita sin email de paciente",
+          "bodyText": "El paciente {{patient.name}} no tiene email registrado. Evento: {{eventType}}. Telefono: {{patient.phone}}."
+        }
+      }
+    ]
+  },
+  "emailProviderOptions": [
+    "SMTP",
+    "Brevo",
+    "SendGrid",
+    "Mailgun",
+    "Gmail"
+  ],
+  "recommendedProvider": "SMTP/Brevo/SendGrid para produccion; Gmail solo para pruebas",
+  "postImportChecklist": [
+    "Crear o reasignar el Custom webhook.",
+    "Configurar el modulo de email elegido.",
+    "Mapear patient.email en To.",
+    "Mapear asuntos y cuerpos segun eventType.",
+    "Activar el escenario.",
+    "Copiar la URL del webhook a Vercel como MAKE_APPOINTMENT_WEBHOOK_URL.",
+    "Redeploy en Vercel.",
+    "Crear, modificar y cancelar una cita de prueba con paciente que tenga email."
+  ]
+}

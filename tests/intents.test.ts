@@ -62,7 +62,10 @@ describe("buildReply", () => {
   });
 
   it("cita ofrece primera visita a coste cero", () => {
-    expect(buildReply("CITA", ctx)).toContain("coste cero");
+    const reply = buildReply("CITA", ctx);
+    expect(reply).toContain("coste cero");
+    expect(reply.toLowerCase()).not.toContain("recepcion");
+    expect(reply.toLowerCase()).not.toContain("confirmarte la cita");
   });
 
   it("precio solo usa catalogo autorizado", () => {

@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+
+<html class="light" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>DENTIA - Trabajos de Laboratorio</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 20;
+            font-size: 18px;
+        }
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #F5F6F7;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #D9DEE3;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #717880;
+        }
+        .sidebar-active-indicator {
+            position: absolute;
+            right: 0;
+            width: 2px;
+            height: 100%;
+            background-color: #004268;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "border-base": "#D9DEE3",
+                      "success": "#278561",
+                      "surface": "#FFFFFF",
+                      "error-container": "#ffdad6",
+                      "surface-variant": "#e1e2e7",
+                      "on-error-container": "#93000a",
+                      "primary-container": "#005a8c",
+                      "on-secondary": "#ffffff",
+                      "text-primary": "#17212B",
+                      "surface-container-high": "#e7e8ed",
+                      "on-primary-container": "#9fd0ff",
+                      "tertiary-fixed-dim": "#ffb779",
+                      "on-background": "#191c1f",
+                      "background": "#F5F6F7",
+                      "surface-container": "#eceef2",
+                      "surface-container-lowest": "#ffffff",
+                      "surface-bright": "#f8f9fe",
+                      "on-primary-fixed": "#001d32",
+                      "surface-tint": "#166395",
+                      "primary": "#004268",
+                      "on-tertiary-fixed": "#2e1500",
+                      "warning": "#B37D00",
+                      "border-subtle": "#E8EBEE",
+                      "on-tertiary-container": "#ffbe87",
+                      "on-tertiary-fixed-variant": "#6c3a00",
+                      "on-surface-variant": "#41474f",
+                      "outline-variant": "#c1c7d0",
+                      "on-surface": "#191c1f",
+                      "inverse-surface": "#2e3134",
+                      "surface-dim": "#d8dadf",
+                      "on-secondary-container": "#58646f",
+                      "on-tertiary": "#ffffff",
+                      "surface-alt": "#F0F2F4",
+                      "secondary": "#54606b",
+                      "secondary-fixed": "#d8e4f1",
+                      "secondary-container": "#d5e1ee",
+                      "outline": "#717880",
+                      "tertiary": "#613300",
+                      "tertiary-container": "#824701",
+                      "primary-fixed": "#cde5ff",
+                      "inverse-primary": "#95ccff",
+                      "on-primary-fixed-variant": "#004a75",
+                      "on-primary": "#ffffff",
+                      "on-error": "#ffffff",
+                      "error": "#C53030",
+                      "primary-fixed-dim": "#95ccff",
+                      "inverse-on-surface": "#eff1f5",
+                      "on-secondary-fixed-variant": "#3c4852",
+                      "surface-container-low": "#f2f3f8",
+                      "surface-container-highest": "#e1e2e7",
+                      "on-secondary-fixed": "#111d26",
+                      "tertiary-fixed": "#ffdcc1",
+                      "secondary-fixed-dim": "#bcc8d4"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.125rem",
+                      "lg": "0.25rem",
+                      "xl": "0.5rem",
+                      "full": "0.75rem"
+              },
+              "spacing": {
+                      "gutter": "1rem",
+                      "padding-base": "1rem",
+                      "header-height": "52px",
+                      "padding-compact": "0.75rem",
+                      "sidebar-collapsed": "64px",
+                      "sidebar-width": "224px"
+              },
+              "fontFamily": {
+                      "headline-lg": ["Inter"],
+                      "body-sm": ["Inter"],
+                      "headline-md": ["Inter"],
+                      "body-md": ["Inter"],
+                      "label-xs": ["Inter"]
+              },
+              "fontSize": {
+                      "headline-lg": ["22px", {"lineHeight": "32px", "fontWeight": "600"}],
+                      "body-sm": ["11px", {"lineHeight": "16px", "fontWeight": "400"}],
+                      "headline-md": ["16px", {"lineHeight": "24px", "fontWeight": "600"}],
+                      "body-md": ["12px", {"lineHeight": "18px", "fontWeight": "400"}],
+                      "label-xs": ["10px", {"lineHeight": "14px", "letterSpacing": "0.02em", "fontWeight": "500"}]
+              }
+            },
+          },
+        }
+    </script>
+</head>
+<body class="bg-background font-body-md text-text-primary antialiased">
+<!-- SideNavBar -->
+<nav class="w-sidebar-width h-screen fixed left-0 top-0 border-r border-border-base bg-surface flex flex-col py-4 overflow-y-auto z-50">
+<div class="px-6 mb-8 flex items-center gap-3">
+<div class="w-8 h-8 bg-primary rounded flex items-center justify-center text-white">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">dentistry</span>
+</div>
+<div>
+<h1 class="font-headline-md text-headline-md font-bold text-primary">DENTIA</h1>
+<p class="text-[10px] leading-tight text-on-surface-variant uppercase tracking-wider">Dental Software</p>
+</div>
+</div>
+<div class="flex flex-col flex-1 space-y-0.5">
+<a class="flex items-center px-6 py-2.5 transition-colors duration-150 ease-in-out text-on-surface-variant hover:bg-surface-alt hover:text-primary" href="#">
+<span class="material-symbols-outlined mr-3">home</span>
+<span class="font-body-md text-body-md">Inicio</span>
+</a>
+<a class="flex items-center px-6 py-2.5 transition-colors duration-150 ease-in-out text-on-surface-variant hover:bg-surface-alt hover:text-primary" href="#">
+<span class="material-symbols-outlined mr-3">calendar_month</span>
+<span class="font-body-md text-body-md">Agenda</span>
+</a>
+<a class="flex items-center px-6 py-2.5 transition-colors duration-150 ease-in-out text-on-surface-variant hover:bg-surface-alt hover:text-primary" href="#">
+<span class="material-symbols-outlined mr-3">group</span>
+<span class="font-body-md text-body-md">Pacientes</span>
+</a>
+<!-- Active: Clínica (where LAB usually lives in dental ecosystems) -->
+<a class="flex items-center px-6 py-2.5 transition-colors duration-150 ease-in-out text-primary font-semibold border-r-2 border-primary bg-surface-alt relative" href="#">
+<span class="material-symbols-outlined mr-3">medical_services</span>
+<span class="font-body-md text-body-md">Clínica</span>
+</a>
+<a class="flex items-center px-6 py-2.5 transition-colors duration-150 ease-in-out text-on-surface-variant hover:bg-surface-alt hover:text-primary" href="#">
+<span class="material-symbols-outlined mr-3">dentistry</span>
+<span class="font-body-md text-body-md">Tratamientos</span>
+</a>
+<a class="flex items-center px-6 py-2.5 transition-colors duration-150 ease-in-out text-on-surface-variant hover:bg-surface-alt hover:text-primary" href="#">
+<span class="material-symbols-outlined mr-3">payments</span>
+<span class="font-body-md text-body-md">Finanzas</span>
+</a>
+<a class="flex items-center px-6 py-2.5 transition-colors duration-150 ease-in-out text-on-surface-variant hover:bg-surface-alt hover:text-primary" href="#">
+<span class="material-symbols-outlined mr-3">inventory_2</span>
+<span class="font-body-md text-body-md">Inventario</span>
+</a>
+<a class="flex items-center px-6 py-2.5 transition-colors duration-150 ease-in-out text-on-surface-variant hover:bg-surface-alt hover:text-primary" href="#">
+<span class="material-symbols-outlined mr-3">query_stats</span>
+<span class="font-body-md text-body-md">Analítica</span>
+</a>
+<a class="flex items-center px-6 py-2.5 transition-colors duration-150 ease-in-out text-on-surface-variant hover:bg-surface-alt hover:text-primary mt-auto" href="#">
+<span class="material-symbols-outlined mr-3">settings</span>
+<span class="font-body-md text-body-md">Configuración</span>
+</a>
+</div>
+</nav>
+<!-- TopNavBar -->
+<header class="h-header-height fixed top-0 right-0 left-sidebar-width bg-surface border-b border-border-base z-40 flex items-center justify-between px-gutter">
+<div class="flex items-center gap-6">
+<div class="flex items-center bg-surface-alt px-3 py-1.5 rounded border border-border-base w-80">
+<span class="material-symbols-outlined text-on-surface-variant mr-2">search</span>
+<input class="bg-transparent border-none focus:ring-0 text-body-md w-full placeholder:text-outline p-0" placeholder="Buscar paciente, ID o trabajo..." type="text"/>
+</div>
+<div class="flex items-center gap-4">
+<span class="text-primary font-bold border-b-2 border-primary pb-1 cursor-pointer font-body-md text-body-md uppercase tracking-tight">Sede Centro</span>
+<span class="text-on-surface-variant hover:text-primary transition-colors cursor-pointer font-body-md text-body-md uppercase tracking-tight">Sede Playa</span>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="bg-primary text-white h-8 px-4 rounded font-medium flex items-center gap-2 hover:bg-primary-container transition-all active:scale-95 text-body-md">
+<span class="material-symbols-outlined text-[18px]">add</span>
+<span>+ Crear</span>
+</button>
+<div class="w-[1px] h-6 bg-border-base"></div>
+<div class="flex items-center gap-3">
+<button class="text-on-surface-variant hover:text-primary transition-colors relative">
+<span class="material-symbols-outlined">notifications</span>
+<span class="absolute top-0 right-0 w-2 h-2 bg-error rounded-full border-2 border-surface"></span>
+</button>
+<div class="flex items-center gap-2 cursor-pointer group">
+<div class="w-8 h-8 rounded-full bg-secondary-container flex items-center justify-center text-on-secondary-container overflow-hidden border border-border-base">
+<span class="material-symbols-outlined">account_circle</span>
+</div>
+<span class="text-body-md font-medium text-on-surface group-hover:text-primary">Dr. Arrieta</span>
+</div>
+</div>
+</div>
+</header>
+<!-- Main Content Shell -->
+<main class="ml-sidebar-width pt-header-height min-h-screen">
+<!-- TopAppBar (Contextual) -->
+<div class="w-full h-10 bg-surface-container-low border-b border-border-subtle flex items-center px-4 sticky top-header-height z-30 justify-between">
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-on-surface">medical_services</span>
+<h2 class="font-headline-md text-headline-md text-on-surface font-semibold">LAB-01 — Trabajos de Laboratorio</h2>
+</div>
+<div class="flex items-center gap-3">
+<div class="flex items-center gap-1.5 px-2 py-0.5 bg-warning/10 text-warning rounded-sm border border-warning/20">
+<span class="material-symbols-outlined !text-[14px]">warning</span>
+<span class="text-label-xs font-label-xs uppercase">3 Trabajos demorados</span>
+</div>
+<div class="flex items-center gap-3 ml-2">
+<button class="material-symbols-outlined text-on-surface hover:bg-surface-variant p-1 rounded transition-all">account_balance_wallet</button>
+<button class="material-symbols-outlined text-on-surface hover:bg-surface-variant p-1 rounded transition-all">quick_reference_all</button>
+</div>
+</div>
+</div>
+<!-- Dashboard Content -->
+<div class="p-6 max-w-7xl mx-auto space-y-6">
+<!-- Filters & Actions Row -->
+<div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
+<div class="flex flex-wrap items-center gap-3">
+<div class="flex flex-col gap-1">
+<label class="text-label-xs font-label-xs text-on-surface-variant uppercase">Estado</label>
+<select class="h-8 border-border-base rounded text-body-md px-3 bg-surface focus:border-primary focus:ring-0 min-w-[140px]">
+<option>Todos los estados</option>
+<option>Pendiente envío</option>
+<option>En Laboratorio</option>
+<option>Recibido</option>
+<option>En Prueba</option>
+<option>Finalizado</option>
+</select>
+</div>
+<div class="flex flex-col gap-1">
+<label class="text-label-xs font-label-xs text-on-surface-variant uppercase">Laboratorio</label>
+<select class="h-8 border-border-base rounded text-body-md px-3 bg-surface focus:border-primary focus:ring-0 min-w-[180px]">
+<option>Todos los laboratorios</option>
+<option>Pro-Tech Dental</option>
+<option>BioSmile Lab</option>
+<option>Ceramic Art Studio</option>
+<option>Orthodontic Solutions</option>
+</select>
+</div>
+<div class="flex flex-col gap-1">
+<label class="text-label-xs font-label-xs text-on-surface-variant uppercase">Rango Fechas</label>
+<div class="flex items-center h-8 border border-border-base rounded px-2 bg-surface">
+<span class="material-symbols-outlined text-on-surface-variant !text-sm mr-2">calendar_today</span>
+<span class="text-body-md text-on-surface-variant">Últimos 30 días</span>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<button class="h-8 px-3 border border-border-base bg-surface text-body-md hover:bg-surface-alt transition-colors flex items-center gap-2">
+<span class="material-symbols-outlined !text-sm">file_download</span>
+<span>Exportar</span>
+</button>
+<button class="h-8 px-3 border border-border-base bg-surface text-body-md hover:bg-surface-alt transition-colors flex items-center gap-2">
+<span class="material-symbols-outlined !text-sm">print</span>
+<span>Listado</span>
+</button>
+</div>
+</div>
+<!-- Operational Table Card -->
+<div class="bg-surface border border-border-base overflow-hidden">
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-surface-alt border-b border-border-base">
+<th class="px-4 py-2.5 font-label-xs text-label-xs text-on-surface-variant uppercase tracking-wider">ID</th>
+<th class="px-4 py-2.5 font-label-xs text-label-xs text-on-surface-variant uppercase tracking-wider">Paciente</th>
+<th class="px-4 py-2.5 font-label-xs text-label-xs text-on-surface-variant uppercase tracking-wider">Trabajo / Prótesis</th>
+<th class="px-4 py-2.5 font-label-xs text-label-xs text-on-surface-variant uppercase tracking-wider">Laboratorio</th>
+<th class="px-4 py-2.5 font-label-xs text-label-xs text-on-surface-variant uppercase tracking-wider">Profesional</th>
+<th class="px-4 py-2.5 font-label-xs text-label-xs text-on-surface-variant uppercase tracking-wider">Envío</th>
+<th class="px-4 py-2.5 font-label-xs text-label-xs text-on-surface-variant uppercase tracking-wider">Previsto</th>
+<th class="px-4 py-2.5 font-label-xs text-label-xs text-on-surface-variant uppercase tracking-wider">Estado</th>
+<th class="px-4 py-2.5 font-label-xs text-label-xs text-on-surface-variant uppercase tracking-wider text-right">Acciones</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-border-subtle">
+<!-- Row 1 -->
+<tr class="hover:bg-surface-bright transition-colors group">
+<td class="px-4 py-3 text-body-md font-medium text-primary">#LB-4402</td>
+<td class="px-4 py-3">
+<div class="flex flex-col">
+<span class="text-body-md font-semibold text-text-primary">Juan Pérez</span>
+<span class="text-[10px] text-on-surface-variant">DNI: 28.394.XXX</span>
+</div>
+</td>
+<td class="px-4 py-3 text-body-md">Corona Zirconio (14, 15)</td>
+<td class="px-4 py-3 text-body-md">BioSmile Lab</td>
+<td class="px-4 py-3 text-body-md">Dra. Clara M.</td>
+<td class="px-4 py-3 text-body-md">12/05/2024</td>
+<td class="px-4 py-3 text-body-md font-medium text-error">19/05/2024</td>
+<td class="px-4 py-3">
+<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-error-container text-on-error-container border border-error/20">Demorado</span>
+</td>
+<td class="px-4 py-3 text-right">
+<button class="material-symbols-outlined text-outline hover:text-primary transition-colors">edit_square</button>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="hover:bg-surface-bright transition-colors">
+<td class="px-4 py-3 text-body-md font-medium text-primary">#LB-4405</td>
+<td class="px-4 py-3">
+<div class="flex flex-col">
+<span class="text-body-md font-semibold text-text-primary">María García</span>
+<span class="text-[10px] text-on-surface-variant">DNI: 31.002.XXX</span>
+</div>
+</td>
+<td class="px-4 py-3 text-body-md">Pérno y Corona Metal</td>
+<td class="px-4 py-3 text-body-md">Pro-Tech Dental</td>
+<td class="px-4 py-3 text-body-md">Dr. Jorge Arrieta</td>
+<td class="px-4 py-3 text-body-md">15/05/2024</td>
+<td class="px-4 py-3 text-body-md">22/05/2024</td>
+<td class="px-4 py-3">
+<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-secondary-container text-on-secondary-container border border-secondary/20">En Laboratorio</span>
+</td>
+<td class="px-4 py-3 text-right">
+<button class="material-symbols-outlined text-outline hover:text-primary transition-colors">edit_square</button>
+</td>
+</tr>
+<!-- Row 3 -->
+<tr class="hover:bg-surface-bright transition-colors">
+<td class="px-4 py-3 text-body-md font-medium text-primary">#LB-4398</td>
+<td class="px-4 py-3">
+<div class="flex flex-col">
+<span class="text-body-md font-semibold text-text-primary">Ricardo Sosa</span>
+<span class="text-[10px] text-on-surface-variant">DNI: 19.444.XXX</span>
+</div>
+</td>
+<td class="px-4 py-3 text-body-md">Prótesis Flexible Superior</td>
+<td class="px-4 py-3 text-body-md">Ceramic Art Studio</td>
+<td class="px-4 py-3 text-body-md">Dra. Clara M.</td>
+<td class="px-4 py-3 text-body-md">10/05/2024</td>
+<td class="px-4 py-3 text-body-md">20/05/2024</td>
+<td class="px-4 py-3">
+<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-primary-container/10 text-primary border border-primary/20">Recibido</span>
+</td>
+<td class="px-4 py-3 text-right">
+<button class="material-symbols-outlined text-outline hover:text-primary transition-colors">edit_square</button>
+</td>
+</tr>
+<!-- Row 4 -->
+<tr class="hover:bg-surface-bright transition-colors">
+<td class="px-4 py-3 text-body-md font-medium text-primary">#LB-4410</td>
+<td class="px-4 py-3">
+<div class="flex flex-col">
+<span class="text-body-md font-semibold text-text-primary">Elena Torres</span>
+<span class="text-[10px] text-on-surface-variant">DNI: 40.111.XXX</span>
+</div>
+</td>
+<td class="px-4 py-3 text-body-md">Férula de Descarga Mioreljante</td>
+<td class="px-4 py-3 text-body-md">Orthodontic Solutions</td>
+<td class="px-4 py-3 text-body-md">Dr. Jorge Arrieta</td>
+<td class="px-4 py-3 text-body-md">18/05/2024</td>
+<td class="px-4 py-3 text-body-md">25/05/2024</td>
+<td class="px-4 py-3">
+<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-surface-container-high text-on-surface-variant border border-border-base">Pendiente Envío</span>
+</td>
+<td class="px-4 py-3 text-right">
+<button class="material-symbols-outlined text-outline hover:text-primary transition-colors">edit_square</button>
+</td>
+</tr>
+<!-- Row 5 -->
+<tr class="hover:bg-surface-bright transition-colors">
+<td class="px-4 py-3 text-body-md font-medium text-primary">#LB-4412</td>
+<td class="px-4 py-3">
+<div class="flex flex-col">
+<span class="text-body-md font-semibold text-text-primary">Carlos Mendez</span>
+<span class="text-[10px] text-on-surface-variant">DNI: 22.888.XXX</span>
+</div>
+</td>
+<td class="px-4 py-3 text-body-md">Puente 3 elementos (21-23)</td>
+<td class="px-4 py-3 text-body-md">BioSmile Lab</td>
+<td class="px-4 py-3 text-body-md">Dra. Clara M.</td>
+<td class="px-4 py-3 text-body-md">20/05/2024</td>
+<td class="px-4 py-3 text-body-md">27/05/2024</td>
+<td class="px-4 py-3">
+<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-secondary-container text-on-secondary-container border border-secondary/20">En Laboratorio</span>
+</td>
+<td class="px-4 py-3 text-right">
+<button class="material-symbols-outlined text-outline hover:text-primary transition-colors">edit_square</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Pagination Footer -->
+<div class="px-4 py-3 border-t border-border-base flex items-center justify-between bg-surface-container-low">
+<span class="text-label-xs font-label-xs text-on-surface-variant">Mostrando 1 a 5 de 42 trabajos</span>
+<div class="flex items-center gap-1">
+<button class="w-8 h-8 flex items-center justify-center border border-border-base bg-surface text-on-surface-variant rounded-sm hover:bg-surface-alt transition-colors">
+<span class="material-symbols-outlined !text-[16px]">chevron_left</span>
+</button>
+<button class="w-8 h-8 flex items-center justify-center border border-primary bg-primary text-white rounded-sm text-label-xs font-bold">1</button>
+<button class="w-8 h-8 flex items-center justify-center border border-border-base bg-surface text-on-surface-variant rounded-sm hover:bg-surface-alt transition-colors text-label-xs">2</button>
+<button class="w-8 h-8 flex items-center justify-center border border-border-base bg-surface text-on-surface-variant rounded-sm hover:bg-surface-alt transition-colors text-label-xs">3</button>
+<button class="w-8 h-8 flex items-center justify-center border border-border-base bg-surface text-on-surface-variant rounded-sm hover:bg-surface-alt transition-colors">
+<span class="material-symbols-outlined !text-[16px]">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Dashboard Summary Widgets (Asymmetric Layout) -->
+<div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+<div class="bg-surface border border-border-base p-4 flex flex-col gap-2">
+<div class="flex items-center justify-between">
+<span class="text-label-xs font-label-xs text-on-surface-variant uppercase tracking-widest">En Proceso</span>
+<span class="material-symbols-outlined text-primary">biotech</span>
+</div>
+<div class="text-headline-lg font-headline-lg text-primary">24</div>
+<div class="w-full h-1.5 bg-surface-alt rounded-full overflow-hidden">
+<div class="bg-primary h-full w-[65%]"></div>
+</div>
+</div>
+<div class="bg-surface border border-border-base p-4 flex flex-col gap-2">
+<div class="flex items-center justify-between">
+<span class="text-label-xs font-label-xs text-on-surface-variant uppercase tracking-widest">Por Recibir</span>
+<span class="material-symbols-outlined text-success">local_shipping</span>
+</div>
+<div class="text-headline-lg font-headline-lg text-success">08</div>
+<div class="text-[10px] text-on-surface-variant">Próximos 3 días hábiles</div>
+</div>
+<div class="bg-surface border border-border-base p-4 flex flex-col gap-2">
+<div class="flex items-center justify-between">
+<span class="text-label-xs font-label-xs text-on-surface-variant uppercase tracking-widest">Demorados</span>
+<span class="material-symbols-outlined text-error">timer_off</span>
+</div>
+<div class="text-headline-lg font-headline-lg text-error">03</div>
+<div class="text-[10px] text-error font-medium">Requiere acción inmediata</div>
+</div>
+<div class="bg-primary-container text-white p-4 flex flex-col gap-2 border border-primary">
+<div class="flex items-center justify-between">
+<span class="text-label-xs font-label-xs text-white/70 uppercase tracking-widest">Inversión Mes</span>
+<span class="material-symbols-outlined text-white/70">payments</span>
+</div>
+<div class="text-headline-lg font-headline-lg">$1.240,50</div>
+<div class="text-[10px] text-white/70">Devengado laboratorios mayo</div>
+</div>
+</div>
+<!-- High-end Technical Illustration Placeholder -->
+<div class="relative w-full h-48 bg-surface border border-border-base rounded overflow-hidden">
+<div class="absolute inset-0 bg-cover bg-center opacity-20 grayscale mix-blend-multiply" data-alt="A macro photography shot of a high-tech dental laboratory environment with clinical blue lighting. In the foreground, a 3D dental model of teeth sits on a stainless steel workstation next to a precision dental drill. The atmosphere is sterile, professional, and technologically advanced, with a shallow depth of field focusing on the intricate details of the dental prosthetic." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuAoajZC1v3o0_yc9-lqDwp79CkHEXNP7SWHlhxScfbidq-o2JOtT2nTQH1kN8RfepglwXaFl2M61PuPup__qu3yqShNv7q1FyjJpMXldWG2N10h2c5ykUagoUqVvixMaehQt9PihclFJdKJrvTUdB6NrlP1v8p4qUhDlznPG6INngSDOdYEdPg9RhMYabdRqQRmd8o6SYXEgrp5zoh_mZrSf7a2Q9FgOE_AlLLOK4xFlsU0mFxqTS0I')"></div>
+<div class="absolute inset-0 flex items-center justify-center p-8 text-center flex-col">
+<h3 class="font-headline-md text-headline-md text-primary mb-2">Seguimiento de Producción Clínica</h3>
+<p class="text-body-md text-on-surface-variant max-w-lg">Sistema centralizado para el control de trazabilidad entre la clínica y los laboratorios externos. Asegure los tiempos de entrega y la calidad protética.</p>
+</div>
+</div>
+</div>
+</main>
+<!-- Floating Action Button - Only for Home/Dashboards, restricted contextually -->
+<!-- Suppressed on specific detail pages as per instructions, but kept here for the main Lab screen as it's an operational dashboard -->
+<button class="fixed bottom-6 right-6 w-12 h-12 bg-primary text-white rounded-full shadow-lg flex items-center justify-center hover:scale-105 active:scale-95 transition-all z-50">
+<span class="material-symbols-outlined !text-[24px]">add_task</span>
+</button>
+<script>
+        // Simple interactivity for the table rows
+        document.querySelectorAll('tbody tr').forEach(row => {
+            row.addEventListener('click', () => {
+                // Potential navigation to detail
+                console.log('Navegando a detalle de trabajo...');
+            });
+        });
+    </script>
+</body></html>

@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+
+<html class="light" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>DENTIA - Resumen de Configuración (CFG-01)</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind Configuration -->
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                "tertiary": "#613300",
+                "on-secondary": "#ffffff",
+                "secondary-fixed": "#d8e4f1",
+                "on-tertiary-fixed-variant": "#6c3a00",
+                "inverse-surface": "#2e3134",
+                "on-primary-fixed": "#001d32",
+                "tertiary-fixed-dim": "#ffb779",
+                "on-surface": "#191c1f",
+                "on-secondary-container": "#58646f",
+                "on-secondary-fixed-variant": "#3c4852",
+                "surface-bright": "#f8f9fe",
+                "surface-alt": "#F0F2F4",
+                "primary": "#004268",
+                "on-surface-variant": "#41474f",
+                "text-primary": "#17212B",
+                "background": "#F5F6F7",
+                "border-subtle": "#E8EBEE",
+                "surface-variant": "#e1e2e7",
+                "secondary-container": "#d5e1ee",
+                "surface-container": "#eceef2",
+                "primary-fixed-dim": "#95ccff",
+                "surface-container-highest": "#e1e2e7",
+                "surface-container-lowest": "#ffffff",
+                "surface-dim": "#d8dadf",
+                "surface-tint": "#166395",
+                "on-primary": "#ffffff",
+                "on-tertiary-container": "#ffbe87",
+                "on-primary-fixed-variant": "#004a75",
+                "tertiary-container": "#824701",
+                "on-background": "#191c1f",
+                "surface": "#FFFFFF",
+                "primary-fixed": "#cde5ff",
+                "error": "#C53030",
+                "warning": "#B37D00",
+                "inverse-primary": "#95ccff",
+                "surface-container-low": "#f2f3f8",
+                "primary-container": "#005a8c",
+                "tertiary-fixed": "#ffdcc1",
+                "on-primary-container": "#9fd0ff",
+                "inverse-on-surface": "#eff1f5",
+                "on-error-container": "#93000a",
+                "on-error": "#ffffff",
+                "secondary-fixed-dim": "#bcc8d4",
+                "outline-variant": "#c1c7d0",
+                "on-secondary-fixed": "#111d26",
+                "border-base": "#D9DEE3",
+                "outline": "#717880",
+                "secondary": "#54606b",
+                "surface-container-high": "#e7e8ed",
+                "on-tertiary-fixed": "#2e1500",
+                "on-tertiary": "#ffffff",
+                "success": "#278561",
+                "error-container": "#ffdad6"
+            },
+            "borderRadius": {
+                "DEFAULT": "0.125rem",
+                "lg": "0.25rem",
+                "xl": "0.5rem",
+                "full": "0.75rem"
+            },
+            "spacing": {
+                "sidebar-collapsed": "64px",
+                "padding-base": "1rem",
+                "sidebar-width": "224px",
+                "padding-compact": "0.75rem",
+                "gutter": "1rem",
+                "header-height": "52px"
+            },
+            "fontFamily": {
+                "body-md": ["Inter"],
+                "label-xs": ["Inter"],
+                "headline-md": ["Inter"],
+                "headline-lg": ["Inter"],
+                "body-sm": ["Inter"]
+            },
+            "fontSize": {
+                "body-md": ["12px", {"lineHeight": "18px", "fontWeight": "400"}],
+                "label-xs": ["10px", {"lineHeight": "14px", "letterSpacing": "0.02em", "fontWeight": "500"}],
+                "headline-md": ["16px", {"lineHeight": "24px", "fontWeight": "600"}],
+                "headline-lg": ["22px", {"lineHeight": "32px", "fontWeight": "600"}],
+                "body-sm": ["11px", {"lineHeight": "16px", "fontWeight": "400"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body {
+            background-color: #F5F6F7;
+            font-family: 'Inter', sans-serif;
+            color: #191c1f;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
+            font-size: 18px;
+        }
+        /* Custom scrollbar for clinical density */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #F5F6F7; }
+        ::-webkit-scrollbar-thumb { background: #D9DEE3; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #bcc8d4; }
+    </style>
+</head>
+<body class="overflow-hidden">
+<!-- SIDE NAV BAR -->
+<aside class="w-sidebar-width h-screen fixed left-0 top-0 border-r border-border-base bg-surface flex flex-col h-full py-4 overflow-y-auto">
+<div class="px-6 mb-8">
+<h1 class="font-headline-md text-headline-md font-bold text-primary">DENTIA</h1>
+<p class="font-label-xs text-label-xs uppercase tracking-widest text-on-surface-variant/60">Dental Software</p>
+</div>
+<nav class="flex-1 space-y-0.5">
+<!-- Nav Items Mapping -->
+<a class="flex items-center gap-3 px-6 py-2.5 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors duration-150 ease-in-out font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined">home</span>
+<span>Inicio</span>
+</a>
+<a class="flex items-center gap-3 px-6 py-2.5 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors duration-150 ease-in-out font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined">calendar_month</span>
+<span>Agenda</span>
+</a>
+<a class="flex items-center gap-3 px-6 py-2.5 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors duration-150 ease-in-out font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined">group</span>
+<span>Pacientes</span>
+</a>
+<a class="flex items-center gap-3 px-6 py-2.5 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors duration-150 ease-in-out font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined">medical_services</span>
+<span>Clínica</span>
+</a>
+<a class="flex items-center gap-3 px-6 py-2.5 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors duration-150 ease-in-out font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined">dentistry</span>
+<span>Tratamientos</span>
+</a>
+<a class="flex items-center gap-3 px-6 py-2.5 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors duration-150 ease-in-out font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined">payments</span>
+<span>Finanzas</span>
+</a>
+<a class="flex items-center gap-3 px-6 py-2.5 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors duration-150 ease-in-out font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined">account_tree</span>
+<span>CRM</span>
+</a>
+<a class="flex items-center gap-3 px-6 py-2.5 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors duration-150 ease-in-out font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined">folder_open</span>
+<span>Documentos</span>
+</a>
+<a class="flex items-center gap-3 px-6 py-2.5 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors duration-150 ease-in-out font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined">inventory_2</span>
+<span>Inventario</span>
+</a>
+<a class="flex items-center gap-3 px-6 py-2.5 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors duration-150 ease-in-out font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined">badge</span>
+<span>Equipo</span>
+</a>
+<a class="flex items-center gap-3 px-6 py-2.5 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors duration-150 ease-in-out font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined">query_stats</span>
+<span>Analítica</span>
+</a>
+<a class="flex items-center gap-3 px-6 py-2.5 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors duration-150 ease-in-out font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined">auto_mode</span>
+<span>Automatizaciones</span>
+</a>
+<!-- Active State: Configuración -->
+<a class="flex items-center gap-3 px-6 py-2.5 text-primary font-semibold border-r-2 border-primary bg-surface-alt font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span>Configuración</span>
+</a>
+</nav>
+<div class="px-6 pt-4 mt-auto border-t border-border-base">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-secondary-container flex items-center justify-center text-primary font-bold text-[10px]">DR</div>
+<div class="overflow-hidden">
+<p class="text-body-md font-semibold truncate">Dr. Ricardo Alv.</p>
+<p class="text-label-xs text-on-surface-variant">Admin Principal</p>
+</div>
+</div>
+</div>
+</aside>
+<!-- TOP NAV BAR -->
+<header class="h-header-height fixed top-0 right-0 left-sidebar-width z-50 bg-surface border-b border-border-base flex items-center justify-between px-gutter">
+<div class="flex items-center gap-8">
+<div class="flex items-center bg-surface-container-low px-3 py-1.5 rounded border border-border-base w-80">
+<span class="material-symbols-outlined text-on-surface-variant mr-2">search</span>
+<input class="bg-transparent border-none focus:ring-0 text-body-md w-full p-0" placeholder="Buscar en configuración..." type="text"/>
+</div>
+<nav class="flex gap-6">
+<a class="text-primary font-bold border-b-2 border-primary pb-1 font-body-md text-body-md" href="#">Sede Centro</a>
+<a class="text-on-surface-variant hover:text-primary transition-colors font-body-md text-body-md" href="#">Sede Playa</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<button class="flex items-center gap-2 bg-primary text-on-primary px-4 py-1.5 rounded-lg text-body-md font-semibold active:scale-95 transition-all">
+<span class="material-symbols-outlined">add</span>
+                + Crear
+            </button>
+<span class="material-symbols-outlined text-on-surface-variant cursor-pointer hover:text-primary">notifications</span>
+<span class="material-symbols-outlined text-on-surface-variant cursor-pointer hover:text-primary">account_circle</span>
+</div>
+</header>
+<!-- MAIN CONTENT CANVAS -->
+<main class="fixed inset-0 top-header-height left-sidebar-width overflow-y-auto p-8 bg-background">
+<!-- TOP APP BAR (Sub-header) -->
+<div class="flex items-center justify-between mb-8">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 bg-primary/10 text-primary rounded-lg flex items-center justify-center">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">settings</span>
+</div>
+<div>
+<h2 class="font-headline-lg text-headline-lg text-primary tracking-tight">Resumen de Configuración</h2>
+<p class="text-body-md text-on-surface-variant">Gestione los parámetros globales de su ecosistema clínico.</p>
+</div>
+</div>
+<div class="flex gap-2">
+<button class="bg-surface border border-border-base px-3 py-1.5 rounded text-label-xs flex items-center gap-1 hover:bg-surface-alt transition-colors uppercase font-bold text-on-surface-variant">
+<span class="material-symbols-outlined text-[14px]">warning</span>
+                    Reportar Incidencia
+                </button>
+<button class="bg-surface border border-border-base px-3 py-1.5 rounded text-label-xs flex items-center gap-1 hover:bg-surface-alt transition-colors uppercase font-bold text-on-surface-variant">
+<span class="material-symbols-outlined text-[14px]">account_balance_wallet</span>
+                    Suscripción
+                </button>
+</div>
+</div>
+<!-- BENTO GRID CONFIGURATION -->
+<div class="grid grid-cols-12 gap-4">
+<!-- Category: Organización -->
+<div class="col-span-12 md:col-span-4 bg-surface border border-border-base p-5 group hover:border-primary transition-colors cursor-pointer">
+<div class="flex items-start justify-between mb-4">
+<div class="w-10 h-10 bg-surface-container-low flex items-center justify-center rounded">
+<span class="material-symbols-outlined text-primary">corporate_fare</span>
+</div>
+<span class="material-symbols-outlined text-border-base group-hover:text-primary transition-colors">arrow_forward_ios</span>
+</div>
+<h3 class="font-headline-md text-headline-md mb-1">Organización</h3>
+<p class="text-body-md text-on-surface-variant mb-4">Información legal, logos, membretes y datos fiscales de la entidad.</p>
+<div class="flex gap-2">
+<span class="px-2 py-0.5 bg-surface-alt text-label-xs text-on-surface-variant rounded">Fiscal</span>
+<span class="px-2 py-0.5 bg-surface-alt text-label-xs text-on-surface-variant rounded">Marca</span>
+</div>
+</div>
+<!-- Category: Sedes -->
+<div class="col-span-12 md:col-span-4 bg-surface border border-border-base p-5 group hover:border-primary transition-colors cursor-pointer">
+<div class="flex items-start justify-between mb-4">
+<div class="w-10 h-10 bg-surface-container-low flex items-center justify-center rounded">
+<span class="material-symbols-outlined text-primary">location_on</span>
+</div>
+<span class="material-symbols-outlined text-border-base group-hover:text-primary transition-colors">arrow_forward_ios</span>
+</div>
+<h3 class="font-headline-md text-headline-md mb-1">Sedes</h3>
+<p class="text-body-md text-on-surface-variant mb-4">Gestión de consultorios físicos, salas de espera y ubicación geográfica.</p>
+<div class="flex items-center text-label-xs text-success font-bold">
+<span class="w-2 h-2 rounded-full bg-success mr-2"></span>
+                    2 Sedes Activas
+                </div>
+</div>
+<!-- Category: Usuarios -->
+<div class="col-span-12 md:col-span-4 bg-surface border border-border-base p-5 group hover:border-primary transition-colors cursor-pointer">
+<div class="flex items-start justify-between mb-4">
+<div class="w-10 h-10 bg-surface-container-low flex items-center justify-center rounded">
+<span class="material-symbols-outlined text-primary">person_add</span>
+</div>
+<span class="material-symbols-outlined text-border-base group-hover:text-primary transition-colors">arrow_forward_ios</span>
+</div>
+<h3 class="font-headline-md text-headline-md mb-1">Usuarios</h3>
+<p class="text-body-md text-on-surface-variant mb-4">Alta y baja de personal clínico, administrativo y especialistas externos.</p>
+<div class="flex -space-x-2">
+<div class="w-6 h-6 rounded-full bg-primary border-2 border-surface"></div>
+<div class="w-6 h-6 rounded-full bg-primary-container border-2 border-surface"></div>
+<div class="w-6 h-6 rounded-full bg-secondary border-2 border-surface"></div>
+<div class="w-6 h-6 rounded-full bg-border-base border-2 border-surface flex items-center justify-center text-[8px] font-bold">+12</div>
+</div>
+</div>
+<!-- Category: Roles y Permisos -->
+<div class="col-span-12 md:col-span-6 lg:col-span-3 bg-surface border border-border-base p-5 group hover:border-primary transition-colors cursor-pointer">
+<div class="flex items-start justify-between mb-4">
+<div class="w-10 h-10 bg-surface-container-low flex items-center justify-center rounded">
+<span class="material-symbols-outlined text-primary">admin_panel_settings</span>
+</div>
+<span class="material-symbols-outlined text-border-base group-hover:text-primary transition-colors">arrow_forward_ios</span>
+</div>
+<h3 class="font-headline-md text-headline-md mb-1">Roles y permisos</h3>
+<p class="text-body-sm text-on-surface-variant">Definición de perfiles de acceso y restricciones de seguridad por usuario.</p>
+</div>
+<!-- Category: Servicios -->
+<div class="col-span-12 md:col-span-6 lg:col-span-3 bg-surface border border-border-base p-5 group hover:border-primary transition-colors cursor-pointer">
+<div class="flex items-start justify-between mb-4">
+<div class="w-10 h-10 bg-surface-container-low flex items-center justify-center rounded">
+<span class="material-symbols-outlined text-primary">vaccines</span>
+</div>
+<span class="material-symbols-outlined text-border-base group-hover:text-primary transition-colors">arrow_forward_ios</span>
+</div>
+<h3 class="font-headline-md text-headline-md mb-1">Servicios y procedimientos</h3>
+<p class="text-body-sm text-on-surface-variant">Catálogo de tratamientos odontológicos y tiempos estimados de consulta.</p>
+</div>
+<!-- Category: Tarifas -->
+<div class="col-span-12 md:col-span-6 lg:col-span-3 bg-surface border border-border-base p-5 group hover:border-primary transition-colors cursor-pointer">
+<div class="flex items-start justify-between mb-4">
+<div class="w-10 h-10 bg-surface-container-low flex items-center justify-center rounded">
+<span class="material-symbols-outlined text-primary">sell</span>
+</div>
+<span class="material-symbols-outlined text-border-base group-hover:text-primary transition-colors">arrow_forward_ios</span>
+</div>
+<h3 class="font-headline-md text-headline-md mb-1">Tarifas</h3>
+<p class="text-body-sm text-on-surface-variant">Listas de precios, convenios con aseguradoras y descuentos aplicables.</p>
+</div>
+<!-- Category: Agenda -->
+<div class="col-span-12 md:col-span-6 lg:col-span-3 bg-surface border border-border-base p-5 group hover:border-primary transition-colors cursor-pointer">
+<div class="flex items-start justify-between mb-4">
+<div class="w-10 h-10 bg-surface-container-low flex items-center justify-center rounded">
+<span class="material-symbols-outlined text-primary">event_note</span>
+</div>
+<span class="material-symbols-outlined text-border-base group-hover:text-primary transition-colors">arrow_forward_ios</span>
+</div>
+<h3 class="font-headline-md text-headline-md mb-1">Agenda</h3>
+<p class="text-body-sm text-on-surface-variant">Horarios laborales, festivos y reglas de agendamiento online.</p>
+</div>
+<!-- Category: Documentos -->
+<div class="col-span-12 md:col-span-6 bg-surface border border-border-base p-6 group hover:border-primary transition-colors cursor-pointer relative overflow-hidden">
+<div class="relative z-10">
+<div class="flex items-start justify-between mb-4">
+<div class="w-10 h-10 bg-surface-container-low flex items-center justify-center rounded">
+<span class="material-symbols-outlined text-primary">description</span>
+</div>
+<span class="material-symbols-outlined text-border-base group-hover:text-primary transition-colors">arrow_forward_ios</span>
+</div>
+<h3 class="font-headline-md text-headline-md mb-1">Documentos</h3>
+<p class="text-body-md text-on-surface-variant mb-4">Plantillas de consentimientos informados, presupuestos e historias clínicas.</p>
+<div class="flex gap-4">
+<div class="bg-surface-alt p-2 rounded flex items-center gap-2">
+<span class="material-symbols-outlined text-on-surface-variant text-[16px]">picture_as_pdf</span>
+<span class="text-label-xs">24 Plantillas</span>
+</div>
+<div class="bg-surface-alt p-2 rounded flex items-center gap-2">
+<span class="material-symbols-outlined text-on-surface-variant text-[16px]">edit_document</span>
+<span class="text-label-xs">Editor Visual</span>
+</div>
+</div>
+</div>
+<!-- Subtle pattern decoration -->
+<div class="absolute right-0 bottom-0 opacity-5 pointer-events-none">
+<span class="material-symbols-outlined text-[120px]">sticky_note_2</span>
+</div>
+</div>
+<!-- Category: Facturación -->
+<div class="col-span-12 md:col-span-6 bg-surface border border-border-base p-6 group hover:border-primary transition-colors cursor-pointer relative overflow-hidden">
+<div class="relative z-10">
+<div class="flex items-start justify-between mb-4">
+<div class="w-10 h-10 bg-surface-container-low flex items-center justify-center rounded">
+<span class="material-symbols-outlined text-primary">receipt_long</span>
+</div>
+<span class="material-symbols-outlined text-border-base group-hover:text-primary transition-colors">arrow_forward_ios</span>
+</div>
+<h3 class="font-headline-md text-headline-md mb-1">Facturación</h3>
+<p class="text-body-md text-on-surface-variant mb-4">Configuración de series, impuestos (IVA/IGIC) y pasarelas de pago electrónico.</p>
+<div class="flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-success"></span>
+<span class="text-label-xs font-bold text-success uppercase">Facturación Electrónica Activa</span>
+</div>
+</div>
+<div class="absolute right-0 bottom-0 opacity-5 pointer-events-none">
+<span class="material-symbols-outlined text-[120px]">payments</span>
+</div>
+</div>
+<!-- Category: Integraciones -->
+<div class="col-span-12 md:col-span-8 bg-surface border border-border-base p-6 group hover:border-primary transition-colors cursor-pointer">
+<div class="flex items-center justify-between mb-6">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 bg-surface-container-low flex items-center justify-center rounded">
+<span class="material-symbols-outlined text-primary">hub</span>
+</div>
+<div>
+<h3 class="font-headline-md text-headline-md">Integraciones</h3>
+<p class="text-body-sm text-on-surface-variant">Conecte DENTIA con software de radiología, CRM externo y laboratorios.</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-border-base group-hover:text-primary transition-colors">arrow_forward_ios</span>
+</div>
+<div class="grid grid-cols-4 gap-4">
+<div class="flex flex-col items-center justify-center p-3 border border-dashed border-border-base rounded hover:bg-surface-alt transition-colors">
+<span class="material-symbols-outlined text-on-surface-variant mb-1">mail</span>
+<span class="text-label-xs font-semibold">Email Marketing</span>
+</div>
+<div class="flex flex-col items-center justify-center p-3 border border-dashed border-border-base rounded hover:bg-surface-alt transition-colors">
+<span class="material-symbols-outlined text-on-surface-variant mb-1">sms</span>
+<span class="text-label-xs font-semibold">SMS Gateway</span>
+</div>
+<div class="flex flex-col items-center justify-center p-3 border border-dashed border-border-base rounded hover:bg-surface-alt transition-colors">
+<span class="material-symbols-outlined text-on-surface-variant mb-1">cloud_done</span>
+<span class="text-label-xs font-semibold">Cloud Storage</span>
+</div>
+<div class="flex flex-col items-center justify-center p-3 border border-dashed border-border-base rounded hover:bg-surface-alt transition-colors">
+<span class="material-symbols-outlined text-on-surface-variant mb-1">add_circle</span>
+<span class="text-label-xs font-semibold">Nueva</span>
+</div>
+</div>
+</div>
+<!-- Category: Seguridad -->
+<div class="col-span-12 md:col-span-4 bg-primary text-on-primary p-6 group hover:bg-primary-container transition-colors cursor-pointer relative overflow-hidden">
+<div class="relative z-10 h-full flex flex-col">
+<div class="flex items-start justify-between mb-4">
+<div class="w-10 h-10 bg-on-primary/10 flex items-center justify-center rounded">
+<span class="material-symbols-outlined text-on-primary">verified_user</span>
+</div>
+<span class="material-symbols-outlined text-on-primary/40 group-hover:text-on-primary transition-colors">arrow_forward_ios</span>
+</div>
+<h3 class="font-headline-md text-headline-md mb-1">Seguridad</h3>
+<p class="text-body-sm text-on-primary/80 mb-6 flex-1">Auditoría de accesos (Logs), 2FA, cifrado de datos y backups automáticos.</p>
+<div class="bg-on-primary/20 p-2 rounded flex items-center justify-between">
+<span class="text-label-xs font-bold uppercase">Estado del Sistema</span>
+<span class="text-label-xs px-2 py-0.5 bg-success rounded text-on-primary">Protegido</span>
+</div>
+</div>
+</div>
+</div>
+<!-- FOOTER INFO -->
+<footer class="mt-12 flex items-center justify-between border-t border-border-base pt-6">
+<div class="flex items-center gap-6">
+<div class="flex items-center gap-2 text-label-xs text-on-surface-variant font-medium">
+<span class="material-symbols-outlined text-[14px]">update</span>
+                    Última modificación: 12 Oct 2023 - 14:30
+                </div>
+<div class="flex items-center gap-2 text-label-xs text-on-surface-variant font-medium">
+<span class="material-symbols-outlined text-[14px]">history</span>
+                    Ver historial de cambios
+                </div>
+</div>
+<div class="text-label-xs text-on-surface-variant/60 italic">
+                DENTIA v4.2.0 • Protocolo de Seguridad Clínica Certificado
+            </div>
+</footer>
+</main>
+<!-- FLOATING ACTION BUTTON (Suppressed per instructions on details/settings screens, but included if needed as context) -->
+<!-- Not rendered per rules: "You MUST suppress the FAB on Settings, Profile, Details, and Transactional screens." -->
+<script>
+        // Micro-interaction for cards
+        document.querySelectorAll('.group').forEach(card => {
+            card.addEventListener('mouseenter', () => {
+                // Potential subtle haptic-like effect or animation
+            });
+        });
+
+        // Search highlight logic placeholder
+        const searchInput = document.querySelector('input[type="text"]');
+        searchInput.addEventListener('input', (e) => {
+            const query = e.target.value.toLowerCase();
+            document.querySelectorAll('h3').forEach(title => {
+                const parent = title.closest('.col-span-12');
+                if (title.textContent.toLowerCase().includes(query)) {
+                    parent.style.opacity = '1';
+                    parent.style.transform = 'scale(1)';
+                } else {
+                    parent.style.opacity = '0.4';
+                    parent.style.transform = 'scale(0.98)';
+                }
+            });
+        });
+    </script>
+</body></html>

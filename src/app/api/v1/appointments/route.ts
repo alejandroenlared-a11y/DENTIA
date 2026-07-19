@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { apiError, authenticateApiRequest } from "@/lib/api-auth";
+import { notifyAppointmentEvent } from "@/lib/notifications/appointment-notifications";
 import { prisma } from "@/lib/prisma";
 import { firstErrorMessage, appointmentInputSchema } from "@/lib/validation";
 
@@ -92,6 +93,12 @@ export async function POST(request: NextRequest) {
         entityType: "Appointment",
         entityId: appointment.id
       }
+    });
+    await notifyAppointmentEvent({
+      tenantId: auth.tenant.id,
+      appointmentId: appointment.id,
+      eventType: "created",
+      actor: { type: "api" }
     });
 
     return NextResponse.json({ success: true, data: appointment, error: null }, { status: 201 });

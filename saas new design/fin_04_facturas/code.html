@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+
+<html class="light" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>DENTIA - Facturación (FIN-04)</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "success": "#278561",
+                        "on-primary": "#ffffff",
+                        "on-primary-fixed-variant": "#004a75",
+                        "secondary": "#54606b",
+                        "on-tertiary": "#ffffff",
+                        "tertiary-fixed-dim": "#ffb779",
+                        "surface-container": "#eceef2",
+                        "on-background": "#191c1f",
+                        "primary-fixed": "#cde5ff",
+                        "on-tertiary-container": "#ffbe87",
+                        "primary-container": "#005a8c",
+                        "error-container": "#ffdad6",
+                        "on-tertiary-fixed": "#2e1500",
+                        "outline": "#717880",
+                        "tertiary-fixed": "#ffdcc1",
+                        "on-primary-fixed": "#001d32",
+                        "on-error-container": "#93000a",
+                        "surface-bright": "#f8f9fe",
+                        "border-base": "#D9DEE3",
+                        "surface-container-low": "#f2f3f8",
+                        "on-surface-variant": "#41474f",
+                        "surface-variant": "#e1e2e7",
+                        "surface-container-high": "#e7e8ed",
+                        "on-secondary-container": "#58646f",
+                        "inverse-surface": "#2e3134",
+                        "tertiary": "#613300",
+                        "surface-tint": "#166395",
+                        "background": "#F5F6F7",
+                        "error": "#C53030",
+                        "outline-variant": "#c1c7d0",
+                        "on-secondary-fixed-variant": "#3c4852",
+                        "inverse-primary": "#95ccff",
+                        "secondary-container": "#d5e1ee",
+                        "text-primary": "#17212B",
+                        "border-subtle": "#E8EBEE",
+                        "primary-fixed-dim": "#95ccff",
+                        "warning": "#B37D00",
+                        "on-tertiary-fixed-variant": "#6c3a00",
+                        "primary": "#004268",
+                        "on-surface": "#191c1f",
+                        "surface-container-highest": "#e1e2e7",
+                        "surface-alt": "#F0F2F4",
+                        "on-primary-container": "#9fd0ff",
+                        "tertiary-container": "#824701",
+                        "secondary-fixed": "#d8e4f1",
+                        "surface-container-lowest": "#ffffff",
+                        "surface-dim": "#d8dadf",
+                        "on-error": "#ffffff",
+                        "on-secondary": "#ffffff",
+                        "inverse-on-surface": "#eff1f5",
+                        "surface": "#FFFFFF",
+                        "secondary-fixed-dim": "#bcc8d4",
+                        "on-secondary-fixed": "#111d26"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "sidebar-collapsed": "64px",
+                        "header-height": "52px",
+                        "sidebar-width": "224px",
+                        "padding-compact": "0.75rem",
+                        "gutter": "1rem",
+                        "padding-base": "1rem"
+                    },
+                    "fontFamily": {
+                        "headline-lg": ["Inter"],
+                        "body-md": ["Inter"],
+                        "label-xs": ["Inter"],
+                        "body-sm": ["Inter"],
+                        "headline-md": ["Inter"]
+                    },
+                    "fontSize": {
+                        "headline-lg": ["22px", {"lineHeight": "32px", "fontWeight": "600"}],
+                        "body-md": ["12px", {"lineHeight": "18px", "fontWeight": "400"}],
+                        "label-xs": ["10px", {"lineHeight": "14px", "letterSpacing": "0.02em", "fontWeight": "500"}],
+                        "body-sm": ["11px", {"lineHeight": "16px", "fontWeight": "400"}],
+                        "headline-md": ["16px", {"lineHeight": "24px", "fontWeight": "600"}]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; background-color: #F5F6F7; }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
+            font-size: 18px;
+        }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #D9DEE3; border-radius: 10px; }
+        .custom-shadow { box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05); }
+        .transition-standard { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
+    </style>
+</head>
+<body class="text-on-surface">
+<!-- SIDEBAR -->
+<aside class="w-sidebar-width h-screen fixed left-0 top-0 border-r border-border-base bg-surface flex flex-col py-4 overflow-y-auto z-50">
+<div class="px-6 mb-8">
+<h1 class="font-headline-md text-headline-md font-bold text-primary">DENTIA</h1>
+<p class="font-body-md text-body-md text-secondary opacity-70">Dental Software</p>
+</div>
+<nav class="flex-1">
+<ul class="space-y-1">
+<li><a class="flex items-center gap-3 px-6 py-2 transition-colors duration-150 ease-in-out text-on-surface-variant hover:bg-surface-alt hover:text-primary" href="#"><span class="material-symbols-outlined">home</span> <span class="font-body-md text-body-md">Inicio</span></a></li>
+<li><a class="flex items-center gap-3 px-6 py-2 transition-colors duration-150 ease-in-out text-on-surface-variant hover:bg-surface-alt hover:text-primary" href="#"><span class="material-symbols-outlined">calendar_month</span> <span class="font-body-md text-body-md">Agenda</span></a></li>
+<li><a class="flex items-center gap-3 px-6 py-2 transition-colors duration-150 ease-in-out text-on-surface-variant hover:bg-surface-alt hover:text-primary" href="#"><span class="material-symbols-outlined">group</span> <span class="font-body-md text-body-md">Pacientes</span></a></li>
+<li><a class="flex items-center gap-3 px-6 py-2 transition-colors duration-150 ease-in-out text-on-surface-variant hover:bg-surface-alt hover:text-primary" href="#"><span class="material-symbols-outlined">medical_services</span> <span class="font-body-md text-body-md">Clínica</span></a></li>
+<li><a class="flex items-center gap-3 px-6 py-2 transition-colors duration-150 ease-in-out text-primary font-semibold border-r-2 border-primary bg-surface-alt" href="#"><span class="material-symbols-outlined">payments</span> <span class="font-body-md text-body-md">Finanzas</span></a></li>
+<li><a class="flex items-center gap-3 px-6 py-2 transition-colors duration-150 ease-in-out text-on-surface-variant hover:bg-surface-alt hover:text-primary" href="#"><span class="material-symbols-outlined">account_tree</span> <span class="font-body-md text-body-md">CRM</span></a></li>
+<li><a class="flex items-center gap-3 px-6 py-2 transition-colors duration-150 ease-in-out text-on-surface-variant hover:bg-surface-alt hover:text-primary" href="#"><span class="material-symbols-outlined">inventory_2</span> <span class="font-body-md text-body-md">Inventario</span></a></li>
+<li><a class="flex items-center gap-3 px-6 py-2 transition-colors duration-150 ease-in-out text-on-surface-variant hover:bg-surface-alt hover:text-primary" href="#"><span class="material-symbols-outlined">badge</span> <span class="font-body-md text-body-md">Equipo</span></a></li>
+<li><a class="flex items-center gap-3 px-6 py-2 transition-colors duration-150 ease-in-out text-on-surface-variant hover:bg-surface-alt hover:text-primary" href="#"><span class="material-symbols-outlined">query_stats</span> <span class="font-body-md text-body-md">Analítica</span></a></li>
+<li><a class="flex items-center gap-3 px-6 py-2 transition-colors duration-150 ease-in-out text-on-surface-variant hover:bg-surface-alt hover:text-primary" href="#"><span class="material-symbols-outlined">settings</span> <span class="font-body-md text-body-md">Configuración</span></a></li>
+</ul>
+</nav>
+</aside>
+<!-- TOP NAV BAR -->
+<header class="h-header-height fixed top-0 right-0 left-[224px] z-50 bg-surface border-b border-border-base flex items-center justify-between px-gutter">
+<div class="flex items-center gap-6">
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline">search</span>
+<input class="h-8 pl-10 pr-4 bg-surface-container-low border border-border-base rounded text-body-md focus:outline-none focus:border-primary w-64 transition-standard" placeholder="Buscar paciente o factura..." type="text"/>
+</div>
+<div class="flex gap-4">
+<span class="text-primary font-bold border-b-2 border-primary pb-1 font-body-md cursor-pointer">Sede Centro</span>
+<span class="text-on-surface-variant hover:text-primary transition-colors font-body-md cursor-pointer">Sede Playa</span>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="bg-primary text-white h-[32px] px-4 rounded font-body-md font-medium hover:bg-primary-container transition-standard active:scale-95 flex items-center gap-2">
+<span class="material-symbols-outlined !text-[16px]">add</span> + Crear
+            </button>
+<span class="material-symbols-outlined text-on-surface-variant cursor-pointer hover:text-primary">notifications</span>
+<div class="w-8 h-8 rounded-full bg-secondary-container flex items-center justify-center cursor-pointer overflow-hidden border border-border-base">
+<img class="w-full h-full object-cover" data-alt="Professional studio portrait of a dental clinic administrator, modern minimalist clothing, clean white background, soft cinematic lighting, high-end corporate photography style." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBtO3IGvzCRHHMFCSKQCwtCuQz1MBuwcUNPzdZXb-ByAcsCCiNh__mGyIfSHt5R3Cizhdf5VPX6jpQZzQX0-t_-T6h2rB_zyO7_Tji4vwYNUt97rvTaa4Ohgb7efMKdiIaUI2jfhZ5bzR6elgoZdQeEcwPhijUdGmZooExjPdNcxvDpAUtxYC87JjXfoZF3p3C2eW68OKCZKYI1Z63LZ5B0_t08aSo-4H7u-aEROz4JX6NvmEVE6R6F"/>
+</div>
+</div>
+</header>
+<!-- MAIN CONTENT -->
+<main class="ml-[224px] mt-[52px] min-h-screen p-6">
+<!-- BREADCRUMBS & TITLE -->
+<div class="mb-6 flex justify-between items-end">
+<div>
+<nav class="flex items-center gap-2 mb-2">
+<span class="font-label-xs text-label-xs text-outline uppercase tracking-wider">Finanzas</span>
+<span class="material-symbols-outlined !text-[12px] text-outline">chevron_right</span>
+<span class="font-label-xs text-label-xs text-primary uppercase tracking-wider font-semibold">Facturas</span>
+</nav>
+<h2 class="font-headline-lg text-headline-lg text-text-primary">Gestión de Facturas</h2>
+</div>
+<div class="flex gap-2">
+<button class="flex items-center gap-2 border border-border-base bg-surface px-3 h-8 rounded font-body-sm text-secondary hover:bg-surface-alt transition-standard">
+<span class="material-symbols-outlined !text-[16px]">file_download</span> Exportar Excel
+                </button>
+<button class="flex items-center gap-2 border border-border-base bg-surface px-3 h-8 rounded font-body-sm text-secondary hover:bg-surface-alt transition-standard">
+<span class="material-symbols-outlined !text-[16px]">print</span> Imprimir Listado
+                </button>
+</div>
+</div>
+<!-- FILTERS -->
+<div class="bg-surface border border-border-base rounded p-4 mb-6 grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+<div class="space-y-1.5">
+<label class="font-label-xs text-label-xs text-secondary uppercase">Rango de Fecha</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-2 top-1/2 -translate-y-1/2 text-outline !text-[16px]">calendar_today</span>
+<input class="w-full h-8 pl-8 pr-2 bg-surface text-body-sm border border-border-base rounded focus:ring-0 focus:border-primary" type="text" value="01/10/2023 - 31/10/2023"/>
+</div>
+</div>
+<div class="space-y-1.5">
+<label class="font-label-xs text-label-xs text-secondary uppercase">Sede</label>
+<select class="w-full h-8 px-2 bg-surface text-body-sm border border-border-base rounded focus:ring-0 focus:border-primary">
+<option>Todas las sedes</option>
+<option>Sede Centro</option>
+<option>Sede Playa</option>
+</select>
+</div>
+<div class="space-y-1.5">
+<label class="font-label-xs text-label-xs text-secondary uppercase">Profesional</label>
+<select class="w-full h-8 px-2 bg-surface text-body-sm border border-border-base rounded focus:ring-0 focus:border-primary">
+<option>Todos los profesionales</option>
+<option>Dra. Elena Martínez</option>
+<option>Dr. Roberto Sanz</option>
+</select>
+</div>
+<div class="space-y-1.5">
+<label class="font-label-xs text-label-xs text-secondary uppercase">Estado de Cobro</label>
+<select class="w-full h-8 px-2 bg-surface text-body-sm border border-border-base rounded focus:ring-0 focus:border-primary">
+<option>Todos los estados</option>
+<option>Cobrada</option>
+<option>Pendiente</option>
+<option>Anulada</option>
+</select>
+</div>
+<div class="flex gap-2">
+<button class="flex-1 bg-primary text-white h-8 rounded font-body-sm font-medium hover:opacity-90">Aplicar</button>
+<button class="w-10 h-8 flex items-center justify-center border border-border-base text-secondary hover:bg-surface-alt rounded">
+<span class="material-symbols-outlined">filter_list_off</span>
+</button>
+</div>
+</div>
+<!-- TABLE SECTION -->
+<div class="bg-surface border border-border-base rounded overflow-hidden">
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-surface-container-low border-b border-border-base">
+<th class="px-4 py-3 font-label-xs text-label-xs text-outline uppercase">Nº Factura</th>
+<th class="px-4 py-3 font-label-xs text-label-xs text-outline uppercase">Fecha</th>
+<th class="px-4 py-3 font-label-xs text-label-xs text-outline uppercase">Paciente</th>
+<th class="px-4 py-3 font-label-xs text-label-xs text-outline uppercase">Sede</th>
+<th class="px-4 py-3 font-label-xs text-label-xs text-outline uppercase text-right">Base Imponible</th>
+<th class="px-4 py-3 font-label-xs text-label-xs text-outline uppercase text-right">Total</th>
+<th class="px-4 py-3 font-label-xs text-label-xs text-outline uppercase text-center">Estado Cobro</th>
+<th class="px-4 py-3 font-label-xs text-label-xs text-outline uppercase text-center">VeriFactu</th>
+<th class="px-4 py-3 font-label-xs text-label-xs text-outline uppercase text-right">Acciones</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-border-subtle">
+<!-- Row 1 -->
+<tr class="hover:bg-surface-alt transition-colors group h-[42px]">
+<td class="px-4 py-2 font-body-sm text-primary font-bold">F-2023/0482</td>
+<td class="px-4 py-2 font-body-sm text-secondary">24/10/2023</td>
+<td class="px-4 py-2 font-body-sm font-medium">Juan Pérez Sánchez</td>
+<td class="px-4 py-2 font-body-sm text-secondary">Sede Centro</td>
+<td class="px-4 py-2 font-body-sm text-secondary text-right">450,00 €</td>
+<td class="px-4 py-2 font-body-sm font-bold text-right">544,50 €</td>
+<td class="px-4 py-2 text-center">
+<span class="px-2 py-0.5 rounded-full bg-success/10 text-success font-label-xs text-[9px] font-bold uppercase">Cobrada</span>
+</td>
+<td class="px-4 py-2 text-center">
+<div class="flex items-center justify-center gap-1 text-primary">
+<span class="material-symbols-outlined !text-[14px]" style="font-variation-settings: 'FILL' 1;">verified</span>
+<span class="text-[9px] font-bold">REGISTRADA</span>
+</div>
+</td>
+<td class="px-4 py-2 text-right">
+<div class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-1 hover:bg-primary/10 text-primary rounded transition-standard" title="Ver"><span class="material-symbols-outlined">visibility</span></button>
+<button class="p-1 hover:bg-primary/10 text-primary rounded transition-standard" title="Descargar"><span class="material-symbols-outlined">download</span></button>
+<button class="p-1 hover:bg-error/10 text-error rounded transition-standard" title="Rectificar"><span class="material-symbols-outlined">history_edu</span></button>
+</div>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="hover:bg-surface-alt transition-colors group h-[42px]">
+<td class="px-4 py-2 font-body-sm text-primary font-bold">F-2023/0481</td>
+<td class="px-4 py-2 font-body-sm text-secondary">23/10/2023</td>
+<td class="px-4 py-2 font-body-sm font-medium">Marta López Ruiz</td>
+<td class="px-4 py-2 font-body-sm text-secondary">Sede Playa</td>
+<td class="px-4 py-2 font-body-sm text-secondary text-right">120,00 €</td>
+<td class="px-4 py-2 font-body-sm font-bold text-right">145,20 €</td>
+<td class="px-4 py-2 text-center">
+<span class="px-2 py-0.5 rounded-full bg-warning/10 text-warning font-label-xs text-[9px] font-bold uppercase">Pendiente</span>
+</td>
+<td class="px-4 py-2 text-center">
+<div class="flex items-center justify-center gap-1 text-primary">
+<span class="material-symbols-outlined !text-[14px]" style="font-variation-settings: 'FILL' 1;">verified</span>
+<span class="text-[9px] font-bold">REGISTRADA</span>
+</div>
+</td>
+<td class="px-4 py-2 text-right">
+<div class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-1 hover:bg-primary/10 text-primary rounded transition-standard"><span class="material-symbols-outlined">visibility</span></button>
+<button class="p-1 hover:bg-primary/10 text-primary rounded transition-standard"><span class="material-symbols-outlined">download</span></button>
+<button class="p-1 hover:bg-error/10 text-error rounded transition-standard"><span class="material-symbols-outlined">history_edu</span></button>
+</div>
+</td>
+</tr>
+<!-- Row 3 (Rectificada) -->
+<tr class="hover:bg-surface-alt transition-colors group h-[42px]">
+<td class="px-4 py-2 font-body-sm text-primary font-bold">R-2023/0012</td>
+<td class="px-4 py-2 font-body-sm text-secondary">22/10/2023</td>
+<td class="px-4 py-2 font-body-sm font-medium">Carlos Méndez</td>
+<td class="px-4 py-2 font-body-sm text-secondary">Sede Centro</td>
+<td class="px-4 py-2 font-body-sm text-secondary text-right">-45,00 €</td>
+<td class="px-4 py-2 font-body-sm font-bold text-right">-54,45 €</td>
+<td class="px-4 py-2 text-center">
+<span class="px-2 py-0.5 rounded-full bg-secondary-container text-secondary font-label-xs text-[9px] font-bold uppercase">Rectificada</span>
+</td>
+<td class="px-4 py-2 text-center">
+<div class="flex items-center justify-center gap-1 text-primary">
+<span class="material-symbols-outlined !text-[14px]" style="font-variation-settings: 'FILL' 1;">verified</span>
+<span class="text-[9px] font-bold">REGISTRADA</span>
+</div>
+</td>
+<td class="px-4 py-2 text-right">
+<div class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-1 hover:bg-primary/10 text-primary rounded transition-standard"><span class="material-symbols-outlined">visibility</span></button>
+<button class="p-1 hover:bg-primary/10 text-primary rounded transition-standard"><span class="material-symbols-outlined">download</span></button>
+<button class="p-1 opacity-20 cursor-not-allowed"><span class="material-symbols-outlined">history_edu</span></button>
+</div>
+</td>
+</tr>
+<!-- Row 4 -->
+<tr class="hover:bg-surface-alt transition-colors group h-[42px]">
+<td class="px-4 py-2 font-body-sm text-primary font-bold">F-2023/0480</td>
+<td class="px-4 py-2 font-body-sm text-secondary">22/10/2023</td>
+<td class="px-4 py-2 font-body-sm font-medium">Ana Belén Torres</td>
+<td class="px-4 py-2 font-body-sm text-secondary">Sede Centro</td>
+<td class="px-4 py-2 font-body-sm text-secondary text-right">2,400,00 €</td>
+<td class="px-4 py-2 font-body-sm font-bold text-right">2.904,00 €</td>
+<td class="px-4 py-2 text-center">
+<span class="px-2 py-0.5 rounded-full bg-success/10 text-success font-label-xs text-[9px] font-bold uppercase">Cobrada</span>
+</td>
+<td class="px-4 py-2 text-center">
+<div class="flex items-center justify-center gap-1 text-primary">
+<span class="material-symbols-outlined !text-[14px]" style="font-variation-settings: 'FILL' 1;">verified</span>
+<span class="text-[9px] font-bold">REGISTRADA</span>
+</div>
+</td>
+<td class="px-4 py-2 text-right">
+<div class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-1 hover:bg-primary/10 text-primary rounded transition-standard"><span class="material-symbols-outlined">visibility</span></button>
+<button class="p-1 hover:bg-primary/10 text-primary rounded transition-standard"><span class="material-symbols-outlined">download</span></button>
+<button class="p-1 hover:bg-error/10 text-error rounded transition-standard"><span class="material-symbols-outlined">history_edu</span></button>
+</div>
+</td>
+</tr>
+<!-- Row 5 (Error VeriFactu Sim) -->
+<tr class="hover:bg-surface-alt transition-colors group h-[42px]">
+<td class="px-4 py-2 font-body-sm text-primary font-bold">F-2023/0479</td>
+<td class="px-4 py-2 font-body-sm text-secondary">21/10/2023</td>
+<td class="px-4 py-2 font-body-sm font-medium">Roberto Jiménez</td>
+<td class="px-4 py-2 font-body-sm text-secondary">Sede Playa</td>
+<td class="px-4 py-2 font-body-sm text-secondary text-right">85,00 €</td>
+<td class="px-4 py-2 font-body-sm font-bold text-right">102,85 €</td>
+<td class="px-4 py-2 text-center">
+<span class="px-2 py-0.5 rounded-full bg-error/10 text-error font-label-xs text-[9px] font-bold uppercase">Anulada</span>
+</td>
+<td class="px-4 py-2 text-center">
+<div class="flex items-center justify-center gap-1 text-error">
+<span class="material-symbols-outlined !text-[14px]">warning</span>
+<span class="text-[9px] font-bold uppercase">Error Envío</span>
+</div>
+</td>
+<td class="px-4 py-2 text-right">
+<div class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-1 hover:bg-primary/10 text-primary rounded transition-standard"><span class="material-symbols-outlined">visibility</span></button>
+<button class="p-1 hover:bg-primary/10 text-primary rounded transition-standard"><span class="material-symbols-outlined">download</span></button>
+<button class="p-1 opacity-20 cursor-not-allowed"><span class="material-symbols-outlined">history_edu</span></button>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- PAGINATION -->
+<div class="px-4 py-3 border-t border-border-base bg-surface-container-low flex items-center justify-between">
+<span class="font-body-sm text-secondary">Mostrando 1 a 5 de 1,240 facturas</span>
+<div class="flex items-center gap-1">
+<button class="w-8 h-8 flex items-center justify-center border border-border-base bg-surface rounded text-secondary hover:bg-surface-alt disabled:opacity-50" disabled="">
+<span class="material-symbols-outlined">chevron_left</span>
+</button>
+<button class="w-8 h-8 flex items-center justify-center border border-primary bg-primary text-white rounded font-body-sm">1</button>
+<button class="w-8 h-8 flex items-center justify-center border border-border-base bg-surface rounded text-secondary hover:bg-surface-alt font-body-sm">2</button>
+<button class="w-8 h-8 flex items-center justify-center border border-border-base bg-surface rounded text-secondary hover:bg-surface-alt font-body-sm">3</button>
+<span class="px-2 text-secondary">...</span>
+<button class="w-8 h-8 flex items-center justify-center border border-border-base bg-surface rounded text-secondary hover:bg-surface-alt font-body-sm">248</button>
+<button class="w-8 h-8 flex items-center justify-center border border-border-base bg-surface rounded text-secondary hover:bg-surface-alt">
+<span class="material-symbols-outlined">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+<!-- SUMMARY CARDS (Bento Grid Style) -->
+<div class="mt-8 grid grid-cols-1 md:grid-cols-4 gap-4">
+<div class="bg-surface border border-border-base rounded p-4">
+<div class="flex justify-between items-start mb-2">
+<span class="font-label-xs text-label-xs text-secondary uppercase">Facturación Mes</span>
+<span class="p-1 bg-primary/10 text-primary rounded"><span class="material-symbols-outlined !text-[14px]">trending_up</span></span>
+</div>
+<div class="text-headline-lg font-headline-lg text-text-primary">42.840,20 €</div>
+<div class="flex items-center gap-1 text-[10px] text-success mt-1">
+<span class="material-symbols-outlined !text-[12px]">north</span>
+<span>12% respecto al mes anterior</span>
+</div>
+</div>
+<div class="bg-surface border border-border-base rounded p-4">
+<div class="flex justify-between items-start mb-2">
+<span class="font-label-xs text-label-xs text-secondary uppercase">Pdte. de Cobro</span>
+<span class="p-1 bg-warning/10 text-warning rounded"><span class="material-symbols-outlined !text-[14px]">schedule</span></span>
+</div>
+<div class="text-headline-lg font-headline-lg text-text-primary">8.420,00 €</div>
+<div class="flex items-center gap-1 text-[10px] text-secondary mt-1">
+<span>14 facturas pendientes</span>
+</div>
+</div>
+<div class="bg-surface border border-border-base rounded p-4">
+<div class="flex justify-between items-start mb-2">
+<span class="font-label-xs text-label-xs text-secondary uppercase">IVA (21%) Acumulado</span>
+<span class="p-1 bg-secondary/10 text-secondary rounded"><span class="material-symbols-outlined !text-[14px]">account_balance</span></span>
+</div>
+<div class="text-headline-lg font-headline-lg text-text-primary">7.435,15 €</div>
+<div class="flex items-center gap-1 text-[10px] text-secondary mt-1">
+<span>Trimestre actual (Q4)</span>
+</div>
+</div>
+<div class="bg-surface border border-border-base rounded p-4 border-l-4 border-l-success">
+<div class="flex justify-between items-start mb-2">
+<span class="font-label-xs text-label-xs text-secondary uppercase">Estado VeriFactu</span>
+<span class="p-1 bg-success/10 text-success rounded"><span class="material-symbols-outlined !text-[14px]">cloud_done</span></span>
+</div>
+<div class="text-headline-lg font-headline-lg text-success">Sincronizado</div>
+<div class="flex items-center gap-1 text-[10px] text-secondary mt-1">
+<span>Última conexión: Hace 5 min</span>
+</div>
+</div>
+</div>
+</main>
+<!-- FAB Action (Contextual Suppression Rule: Only on Dashboard/Home - usually suppressed on Details/Settings. For Finance list we can show "+ Nueva Factura") -->
+<button class="fixed bottom-6 right-6 w-12 h-12 bg-primary text-white rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-transform active:scale-95 z-50">
+<span class="material-symbols-outlined !text-[24px]" style="font-variation-settings: 'FILL' 1;">add_circle</span>
+</button>
+<script>
+        // Micro-interactions and focus handling
+        document.querySelectorAll('input, select').forEach(el => {
+            el.addEventListener('focus', () => {
+                el.parentElement.classList.add('border-primary');
+            });
+            el.addEventListener('blur', () => {
+                el.parentElement.classList.remove('border-primary');
+            });
+        });
+    </script>
+</body></html>

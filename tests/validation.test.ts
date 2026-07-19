@@ -140,6 +140,8 @@ describe("settingsInputSchema", () => {
   const base = {
     name: "Clinica Dental Murcia-Elche",
     assistantName: "Clara",
+    invoiceSeries: "F",
+    sifMode: "NO_VERIFACTU",
     pmsProvider: "Gesden",
     tone: "Cercano",
     escalationRules: "Urgencias a humano",

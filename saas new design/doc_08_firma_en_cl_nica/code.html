@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+
+<html class="light" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>DENTIA - Firma en Clínica</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "success": "#278561",
+                        "on-tertiary-fixed": "#2e1500",
+                        "tertiary-fixed-dim": "#ffb779",
+                        "tertiary-container": "#824701",
+                        "on-secondary-fixed": "#111d26",
+                        "text-primary": "#17212B",
+                        "tertiary": "#613300",
+                        "on-tertiary-container": "#ffbe87",
+                        "on-primary-fixed": "#001d32",
+                        "on-secondary-fixed-variant": "#3c4852",
+                        "surface-container-highest": "#e1e2e7",
+                        "secondary-fixed-dim": "#bcc8d4",
+                        "on-secondary-container": "#58646f",
+                        "background": "#F5F6F7",
+                        "surface-container-high": "#e7e8ed",
+                        "surface-variant": "#e1e2e7",
+                        "surface-container-lowest": "#ffffff",
+                        "surface-bright": "#f8f9fe",
+                        "tertiary-fixed": "#ffdcc1",
+                        "primary-fixed": "#cde5ff",
+                        "error": "#C53030",
+                        "on-error": "#ffffff",
+                        "outline": "#717880",
+                        "secondary-container": "#d5e1ee",
+                        "surface": "#FFFFFF",
+                        "on-secondary": "#ffffff",
+                        "inverse-on-surface": "#eff1f5",
+                        "surface-container-low": "#f2f3f8",
+                        "surface-container": "#eceef2",
+                        "primary": "#004268",
+                        "secondary": "#54606b",
+                        "on-background": "#191c1f",
+                        "secondary-fixed": "#d8e4f1",
+                        "surface-alt": "#F0F2F4",
+                        "warning": "#B37D00",
+                        "on-primary-fixed-variant": "#004a75",
+                        "border-subtle": "#E8EBEE",
+                        "on-surface": "#191c1f",
+                        "on-primary-container": "#9fd0ff",
+                        "primary-container": "#005a8c",
+                        "primary-fixed-dim": "#95ccff",
+                        "inverse-surface": "#2e3134",
+                        "error-container": "#ffdad6",
+                        "surface-dim": "#d8dadf",
+                        "on-tertiary-fixed-variant": "#6c3a00",
+                        "border-base": "#D9DEE3",
+                        "on-error-container": "#93000a",
+                        "on-surface-variant": "#41474f",
+                        "outline-variant": "#c1c7d0",
+                        "inverse-primary": "#95ccff",
+                        "on-primary": "#ffffff",
+                        "surface-tint": "#166395",
+                        "on-tertiary": "#ffffff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "sidebar-width": "224px",
+                        "padding-base": "1rem",
+                        "header-height": "52px",
+                        "gutter": "1rem",
+                        "sidebar-collapsed": "64px",
+                        "padding-compact": "0.75rem"
+                    },
+                    "fontFamily": {
+                        "label-xs": ["Inter"],
+                        "headline-lg": ["Inter"],
+                        "body-sm": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "body-md": ["Inter"]
+                    },
+                    "fontSize": {
+                        "label-xs": ["10px", {"lineHeight": "14px", "letterSpacing": "0.02em", "fontWeight": "500"}],
+                        "headline-lg": ["22px", {"lineHeight": "32px", "fontWeight": "600"}],
+                        "body-sm": ["11px", {"lineHeight": "16px", "fontWeight": "400"}],
+                        "headline-md": ["16px", {"lineHeight": "24px", "fontWeight": "600"}],
+                        "body-md": ["12px", {"lineHeight": "18px", "fontWeight": "400"}]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .signature-canvas {
+            cursor: crosshair;
+            touch-action: none;
+            background-image: radial-gradient(#D9DEE3 0.5px, transparent 0.5px);
+            background-size: 10px 10px;
+        }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #D9DEE3; border-radius: 10px; }
+    </style>
+</head>
+<body class="bg-background text-on-surface overflow-hidden">
+<!-- Top AppBar (from JSON) -->
+<header class="w-full h-10 flex items-center px-4 sticky top-0 z-40 bg-surface-container-low border-b border-border-subtle">
+<div class="flex items-center gap-4 transition-all">
+<span class="material-symbols-outlined text-on-surface" data-icon="person">person</span>
+<span class="font-label-xs text-label-xs text-on-surface font-bold">Paciente: Juan Pérez</span>
+</div>
+<div class="ml-auto flex items-center gap-4">
+<span class="material-symbols-outlined cursor-pointer hover:bg-surface-variant p-1 rounded" data-icon="warning">warning</span>
+<span class="material-symbols-outlined cursor-pointer hover:bg-surface-variant p-1 rounded" data-icon="account_balance_wallet">account_balance_wallet</span>
+<span class="material-symbols-outlined cursor-pointer hover:bg-surface-variant p-1 rounded" data-icon="quick_reference_all">quick_reference_all</span>
+</div>
+</header>
+<main class="flex flex-col items-center justify-start h-[calc(100vh-40px)] overflow-y-auto px-4 py-8">
+<!-- Tablet-style Container -->
+<div class="w-full max-w-4xl bg-surface border border-border-base rounded-lg shadow-sm flex flex-col overflow-hidden">
+<!-- Document Header -->
+<div class="p-6 border-b border-border-subtle bg-surface-bright flex justify-between items-center">
+<div>
+<h1 class="font-headline-md text-headline-md text-primary font-bold">Consentimiento Informado</h1>
+<p class="font-body-sm text-body-sm text-secondary">Referencia: DOC-2024-0822 — Tratamiento de Implantología</p>
+</div>
+<div class="flex gap-2">
+<button class="flex items-center gap-2 px-3 py-1.5 border border-border-base rounded font-body-sm text-body-sm hover:bg-surface-alt transition-colors">
+<span class="material-symbols-outlined text-body-md" data-icon="print">print</span>
+                        Imprimir
+                    </button>
+<button class="flex items-center gap-2 px-3 py-1.5 border border-border-base rounded font-body-sm text-body-sm hover:bg-surface-alt transition-colors">
+<span class="material-symbols-outlined text-body-md" data-icon="download">download</span>
+                        Descargar
+                    </button>
+</div>
+</div>
+<!-- Scrollable Document Content -->
+<div class="flex-grow p-10 max-h-[500px] overflow-y-auto font-body-md text-body-md leading-relaxed text-on-surface-variant">
+<h2 class="font-headline-md text-headline-md mb-4 text-on-surface">1. Naturaleza del Tratamiento</h2>
+<p class="mb-6">
+                    El tratamiento consiste en la colocación de implantes dentales para sustituir piezas dentales perdidas. Entiendo que se trata de una intervención quirúrgica que requiere anestesia local y un periodo de osteointegración de aproximadamente 3 a 6 meses.
+                </p>
+<h2 class="font-headline-md text-headline-md mb-4 text-on-surface">2. Riesgos y Complicaciones</h2>
+<p class="mb-6">
+                    Se me ha informado de los riesgos inherentes, incluyendo pero no limitado a: inflamación, hematomas, infección postoperatoria, entumecimiento temporal o permanente del labio o lengua, y la posibilidad de fracaso del implante por falta de integración ósea.
+                </p>
+<h2 class="font-headline-md text-headline-md mb-4 text-on-surface">3. Compromiso del Paciente</h2>
+<p class="mb-6">
+                    Me comprometo a seguir todas las instrucciones postoperatorias proporcionadas por el especialista, mantener una higiene bucal óptima y acudir a las revisiones programadas para garantizar el éxito del tratamiento.
+                </p>
+<div class="p-4 bg-surface-container rounded-lg border border-outline-variant mb-6">
+<p class="font-body-sm text-body-sm italic">
+                        Nota: Este documento tiene validez legal una vez firmado digitalmente en las instalaciones de DENTIA Sede Centro.
+                    </p>
+</div>
+<div class="space-y-4 pt-6 border-t border-border-subtle">
+<label class="flex items-start gap-3 cursor-pointer group">
+<input class="mt-1 h-4 w-4 rounded border-border-base text-primary focus:ring-primary" type="checkbox"/>
+<span class="font-body-md text-body-md">He leído y comprendo todos los puntos expuestos en este consentimiento informado para el tratamiento de implantología. <span class="text-error font-bold">*</span></span>
+</label>
+<label class="flex items-start gap-3 cursor-pointer group">
+<input class="mt-1 h-4 w-4 rounded border-border-base text-primary focus:ring-primary" type="checkbox"/>
+<span class="font-body-md text-body-md">Autorizo la toma de fotografías intraorales con fines exclusivamente de seguimiento clínico y diagnóstico.</span>
+</label>
+</div>
+</div>
+<!-- Signature & Action Area -->
+<div class="p-8 bg-surface-alt border-t border-border-base">
+<div class="grid grid-cols-1 md:grid-cols-12 gap-8 items-end">
+<!-- Signer Name Input -->
+<div class="md:col-span-4 flex flex-col gap-2">
+<label class="font-label-xs text-label-xs text-secondary uppercase tracking-wider">Nombre del Firmante</label>
+<input class="w-full h-10 px-3 bg-surface border border-border-base rounded focus:border-primary outline-none font-body-md text-body-md transition-all" placeholder="Juan Pérez" type="text" value="Juan Pérez"/>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-1">D.N.I.: 45.678.901-K</p>
+</div>
+<!-- Signature Pad -->
+<div class="md:col-span-5 flex flex-col gap-2">
+<div class="flex justify-between items-end">
+<label class="font-label-xs text-label-xs text-secondary uppercase tracking-wider">Firma en el recuadro</label>
+<button class="text-primary font-label-xs text-label-xs hover:underline flex items-center gap-1" id="clear-signature">
+<span class="material-symbols-outlined text-[14px]" data-icon="delete">delete</span>
+                                Limpiar firma
+                            </button>
+</div>
+<div class="w-full h-40 bg-surface border-2 border-dashed border-border-base rounded signature-canvas relative overflow-hidden group">
+<canvas class="w-full h-full" id="sig-canvas"></canvas>
+<div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none opacity-40" id="sig-placeholder">
+<span class="material-symbols-outlined text-4xl" data-icon="draw">draw</span>
+<span class="font-body-sm text-body-sm mt-2">Use el puntero o el dedo para firmar</span>
+</div>
+</div>
+</div>
+<!-- Confirm Action -->
+<div class="md:col-span-3">
+<button class="w-full h-12 bg-primary text-on-primary font-headline-md text-headline-md rounded-lg flex items-center justify-center gap-2 hover:bg-primary-container transition-all active:scale-95 shadow-sm" id="confirm-btn">
+<span class="material-symbols-outlined" data-icon="verified">verified</span>
+                            Confirmar firma
+                        </button>
+<button class="w-full mt-3 font-body-sm text-body-sm text-secondary hover:text-error transition-colors">
+                            Cancelar operación
+                        </button>
+</div>
+</div>
+</div>
+</div>
+<!-- Footer Meta -->
+<div class="mt-8 flex items-center gap-6 text-on-surface-variant opacity-60">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-body-md" data-icon="terminal">terminal</span>
+<span class="font-label-xs text-label-xs">IP: 192.168.1.42 (iPad Clínico 02)</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-body-md" data-icon="schedule">schedule</span>
+<span class="font-label-xs text-label-xs">22 de Mayo, 2024 - 10:45 AM</span>
+</div>
+</div>
+</main>
+<!-- Success Toast (Hidden) -->
+<div class="fixed bottom-10 left-1/2 -translate-x-1/2 bg-success text-white px-6 py-3 rounded-full shadow-lg flex items-center gap-3 transition-all transform translate-y-20 opacity-0 z-50" id="success-toast">
+<span class="material-symbols-outlined" data-icon="check_circle">check_circle</span>
+<span class="font-body-md text-body-md font-semibold">Documento firmado correctamente y guardado en ficha.</span>
+</div>
+<script>
+        // Simple Canvas Signature Logic
+        const canvas = document.getElementById('sig-canvas');
+        const ctx = canvas.getContext('2d');
+        const clearBtn = document.getElementById('clear-signature');
+        const placeholder = document.getElementById('sig-placeholder');
+        const confirmBtn = document.getElementById('confirm-btn');
+        const toast = document.getElementById('success-toast');
+
+        // Resize canvas to match display size
+        function resizeCanvas() {
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = rect.width;
+            canvas.height = rect.height;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        let drawing = false;
+
+        function startDrawing(e) {
+            drawing = true;
+            placeholder.style.opacity = '0';
+            draw(e);
+        }
+
+        function stopDrawing() {
+            drawing = false;
+            ctx.beginPath();
+        }
+
+        function draw(e) {
+            if (!drawing) return;
+
+            const rect = canvas.getBoundingClientRect();
+            const x = (e.clientX || e.touches[0].clientX) - rect.left;
+            const y = (e.clientY || e.touches[0].clientY) - rect.top;
+
+            ctx.lineWidth = 2;
+            ctx.lineCap = 'round';
+            ctx.strokeStyle = '#004268'; // Brand Primary
+
+            ctx.lineTo(x, y);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+        }
+
+        canvas.addEventListener('mousedown', startDrawing);
+        canvas.addEventListener('mousemove', draw);
+        canvas.addEventListener('mouseup', stopDrawing);
+        canvas.addEventListener('touchstart', startDrawing);
+        canvas.addEventListener('touchmove', draw);
+        canvas.addEventListener('touchend', stopDrawing);
+
+        clearBtn.addEventListener('click', () => {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            placeholder.style.opacity = '0.4';
+        });
+
+        confirmBtn.addEventListener('click', () => {
+            confirmBtn.disabled = true;
+            confirmBtn.innerHTML = '<span class="material-symbols-outlined animate-spin" data-icon="progress_activity">progress_activity</span> Procesando...';
+
+            setTimeout(() => {
+                toast.classList.remove('translate-y-20', 'opacity-0');
+                confirmBtn.innerHTML = '<span class="material-symbols-outlined" data-icon="check">check</span> ¡Hecho!';
+                confirmBtn.classList.replace('bg-primary', 'bg-success');
+
+                setTimeout(() => {
+                    toast.classList.add('translate-y-20', 'opacity-0');
+                }, 3000);
+            }, 1500);
+        });
+    </script>
+</body></html>

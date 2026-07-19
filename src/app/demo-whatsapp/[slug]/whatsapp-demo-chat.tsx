@@ -28,13 +28,6 @@ type WebhookResponse = {
   error: string | null;
 };
 
-const quickPrompts = [
-  "Me duele una muela con frio y al morder, no tengo fiebre ni hinchazon.",
-  "Quiero saber precio de un implante y si se puede financiar.",
-  "Me sangran las encias al cepillarme desde hace semanas.",
-  "Acepto que guardes mis datos. Soy Marta Ruiz, telefono 629179640. Prefiero Elche por la tarde."
-];
-
 export function WhatsAppDemoChat({
   slug,
   clinicName,
@@ -48,12 +41,6 @@ export function WhatsAppDemoChat({
   const [patientPhone] = useState(() => `+346${Math.floor(10000000 + Math.random() * 89999999)}`);
   const [message, setMessage] = useState("");
   const [entries, setEntries] = useState<ChatEntry[]>(() => [
-    {
-      id: crypto.randomUUID(),
-      from: "system",
-      text: "Demo privada: esta pantalla simula WhatsApp y guarda la conversacion en Dentia.",
-      time: new Intl.DateTimeFormat("es-ES", { hour: "2-digit", minute: "2-digit" }).format(new Date())
-    },
     {
       id: crypto.randomUUID(),
       from: "assistant",
@@ -75,6 +62,43 @@ export function WhatsAppDemoChat({
   useEffect(() => {
     messagesRef.current?.scrollTo({ top: messagesRef.current.scrollHeight, behavior: "smooth" });
   }, [entries, sending]);
+
+  useEffect(() => {
+    const root = document.documentElement;
+
+    function syncKeyboardInset() {
+      const viewport = window.visualViewport;
+      const rawKeyboardInset = viewport
+        ? Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop)
+        : 0;
+      const activeElement = document.activeElement;
+      const isWritingMessage =
+        activeElement instanceof HTMLElement && activeElement.matches(".wa-input-bar input");
+      const keyboardInset = isWritingMessage && rawKeyboardInset > 80 ? rawKeyboardInset : 0;
+
+      root.style.setProperty("--wa-keyboard-inset", `${Math.round(keyboardInset)}px`);
+
+      window.setTimeout(() => {
+        messagesRef.current?.scrollTo({ top: messagesRef.current.scrollHeight, behavior: "auto" });
+      }, 50);
+    }
+
+    syncKeyboardInset();
+    window.visualViewport?.addEventListener("resize", syncKeyboardInset);
+    window.visualViewport?.addEventListener("scroll", syncKeyboardInset);
+    window.addEventListener("resize", syncKeyboardInset);
+    window.addEventListener("focusin", syncKeyboardInset);
+    window.addEventListener("focusout", syncKeyboardInset);
+
+    return () => {
+      root.style.removeProperty("--wa-keyboard-inset");
+      window.visualViewport?.removeEventListener("resize", syncKeyboardInset);
+      window.visualViewport?.removeEventListener("scroll", syncKeyboardInset);
+      window.removeEventListener("resize", syncKeyboardInset);
+      window.removeEventListener("focusin", syncKeyboardInset);
+      window.removeEventListener("focusout", syncKeyboardInset);
+    };
+  }, []);
 
   function now() {
     return new Intl.DateTimeFormat("es-ES", { hour: "2-digit", minute: "2-digit" }).format(new Date());
@@ -198,14 +222,6 @@ export function WhatsAppDemoChat({
               </p>
             </div>
           ) : null}
-        </div>
-
-        <div className="wa-quick-prompts" aria-label="Mensajes rapidos de prueba">
-          {quickPrompts.map(prompt => (
-            <button key={prompt} type="button" onClick={() => void sendMessage(undefined, prompt)} disabled={sending}>
-              {prompt}
-            </button>
-          ))}
         </div>
 
         {error ? <p className="wa-error wa-error-inline" role="alert">{error}</p> : null}

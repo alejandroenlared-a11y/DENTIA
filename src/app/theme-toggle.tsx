@@ -24,6 +24,8 @@ export function ThemeToggle() {
   const [active, setActive] = useState<Theme>("light");
 
   useEffect(() => {
+    // Sync the button with the inline theme bootstrap script after hydration.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setActive(resolveActiveTheme());
   }, []);
 

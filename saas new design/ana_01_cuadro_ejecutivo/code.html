@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+
+<html class="light" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>DENTIA - Cuadro Ejecutivo ANA-01</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        body { font-family: 'Inter', sans-serif; }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            font-size: 18px;
+        }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; height: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #D9DEE3; border-radius: 10px; }
+
+        /* Funnel Clip Paths */
+        .funnel-step-1 { clip-path: polygon(0% 0%, 100% 0%, 90% 100%, 10% 100%); }
+        .funnel-step-2 { clip-path: polygon(10% 0%, 90% 0%, 80% 100%, 20% 100%); }
+        .funnel-step-3 { clip-path: polygon(20% 0%, 80% 0%, 75% 100%, 25% 100%); }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "secondary-fixed": "#d8e4f1",
+                        "error": "#C53030",
+                        "on-surface": "#191c1f",
+                        "on-primary-fixed": "#001d32",
+                        "border-subtle": "#E8EBEE",
+                        "success": "#278561",
+                        "on-background": "#191c1f",
+                        "error-container": "#ffdad6",
+                        "inverse-on-surface": "#eff1f5",
+                        "warning": "#B37D00",
+                        "secondary": "#54606b",
+                        "outline": "#717880",
+                        "on-surface-variant": "#41474f",
+                        "tertiary-fixed-dim": "#ffb779",
+                        "on-primary-container": "#9fd0ff",
+                        "on-error": "#ffffff",
+                        "surface-bright": "#f8f9fe",
+                        "surface-container-lowest": "#ffffff",
+                        "secondary-fixed-dim": "#bcc8d4",
+                        "primary": "#004268",
+                        "on-secondary-fixed-variant": "#3c4852",
+                        "surface-container-low": "#f2f3f8",
+                        "primary-container": "#005a8c",
+                        "surface-container": "#eceef2",
+                        "surface-alt": "#F0F2F4",
+                        "border-base": "#D9DEE3",
+                        "inverse-primary": "#95ccff",
+                        "on-secondary-container": "#58646f",
+                        "inverse-surface": "#2e3134",
+                        "on-tertiary-fixed": "#2e1500",
+                        "on-primary-fixed-variant": "#004a75",
+                        "on-tertiary": "#ffffff",
+                        "surface-container-high": "#e7e8ed",
+                        "on-error-container": "#93000a",
+                        "surface-dim": "#d8dadf",
+                        "on-secondary-fixed": "#111d26",
+                        "on-secondary": "#ffffff",
+                        "primary-fixed": "#cde5ff",
+                        "outline-variant": "#c1c7d0",
+                        "surface-container-highest": "#e1e2e7",
+                        "tertiary-container": "#824701",
+                        "on-primary": "#ffffff",
+                        "text-primary": "#17212B",
+                        "tertiary": "#613300",
+                        "surface": "#FFFFFF",
+                        "secondary-container": "#d5e1ee",
+                        "on-tertiary-container": "#ffbe87",
+                        "background": "#F5F6F7",
+                        "tertiary-fixed": "#ffdcc1",
+                        "surface-tint": "#166395",
+                        "primary-fixed-dim": "#95ccff",
+                        "surface-variant": "#e1e2e7",
+                        "on-tertiary-fixed-variant": "#6c3a00"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "padding-base": "1rem",
+                        "sidebar-collapsed": "64px",
+                        "sidebar-width": "224px",
+                        "gutter": "1rem",
+                        "header-height": "52px",
+                        "padding-compact": "0.75rem"
+                    },
+                    "fontFamily": {
+                        "label-xs": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "headline-lg": ["Inter"],
+                        "body-sm": ["Inter"],
+                        "body-md": ["Inter"]
+                    },
+                    "fontSize": {
+                        "label-xs": ["10px", {"lineHeight": "14px", "letterSpacing": "0.02em", "fontWeight": "500"}],
+                        "headline-md": ["16px", {"lineHeight": "24px", "fontWeight": "600"}],
+                        "headline-lg": ["22px", {"lineHeight": "32px", "fontWeight": "600"}],
+                        "body-sm": ["11px", {"lineHeight": "16px", "fontWeight": "400"}],
+                        "body-md": ["12px", {"lineHeight": "18px", "fontWeight": "400"}]
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-background text-on-surface">
+<!-- SIDE NAVBAR -->
+<aside class="w-sidebar-width h-screen fixed left-0 top-0 border-r border-border-base bg-surface flex flex-col py-4 overflow-y-auto z-50">
+<div class="px-6 mb-8">
+<h1 class="font-headline-md text-headline-md font-bold text-primary">DENTIA</h1>
+<p class="font-label-xs text-label-xs text-secondary opacity-70">Dental Software</p>
+</div>
+<nav class="flex-1">
+<ul class="space-y-1">
+<li class="px-3">
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined">home</span> Inicio
+                    </a>
+</li>
+<li class="px-3">
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined">calendar_month</span> Agenda
+                    </a>
+</li>
+<li class="px-3">
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined">group</span> Pacientes
+                    </a>
+</li>
+<!-- Active Item -->
+<li class="px-3">
+<a class="flex items-center gap-3 px-3 py-2 text-primary font-semibold border-r-2 border-primary bg-surface-alt font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined">query_stats</span> Analítica
+                    </a>
+</li>
+<li class="px-3">
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined">settings</span> Configuración
+                    </a>
+</li>
+</ul>
+</nav>
+<div class="mt-auto px-6 pt-4 border-t border-border-subtle">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-secondary-container flex items-center justify-center text-primary font-bold text-xs">DR</div>
+<div class="overflow-hidden">
+<p class="font-body-md text-body-md font-semibold truncate">Dr. Ricardo M.</p>
+<p class="font-label-xs text-label-xs text-secondary truncate">Administrador</p>
+</div>
+</div>
+</div>
+</aside>
+<!-- TOP NAVBAR -->
+<header class="h-header-height fixed top-0 right-0 left-[224px] z-40 bg-surface border-b border-border-base flex items-center justify-between px-gutter">
+<div class="flex items-center gap-6">
+<div class="flex items-center gap-4">
+<span class="font-body-md text-body-md text-primary font-bold border-b-2 border-primary pb-1 cursor-pointer">Sede Centro</span>
+<span class="font-body-md text-body-md text-on-surface-variant hover:text-primary transition-colors cursor-pointer">Sede Playa</span>
+</div>
+<div class="h-6 w-[1px] bg-border-base"></div>
+<div class="relative flex items-center">
+<span class="material-symbols-outlined absolute left-3 text-outline">search</span>
+<input class="pl-10 pr-4 py-1.5 bg-surface-container-low border border-border-base text-body-md font-body-md focus:outline-none focus:border-primary w-64 rounded" placeholder="Buscar reporte o métrica..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="flex items-center gap-2 px-4 py-1.5 bg-primary text-on-primary font-body-md text-body-md font-semibold rounded hover:bg-primary-container transition-transform active:scale-95">
+<span class="material-symbols-outlined text-[18px]">add</span>
+                Crear Reporte
+            </button>
+<span class="material-symbols-outlined text-on-surface-variant cursor-pointer hover:text-primary">notifications</span>
+<span class="material-symbols-outlined text-on-surface-variant cursor-pointer hover:text-primary">account_circle</span>
+</div>
+</header>
+<!-- MAIN CONTENT -->
+<main class="ml-[224px] pt-header-height min-h-screen">
+<!-- Persistent Filters Bar -->
+<div class="sticky top-header-height z-30 bg-surface-container-low border-b border-border-subtle px-gutter py-2 flex items-center gap-4">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-secondary">calendar_today</span>
+<select class="bg-transparent border-none font-label-xs text-label-xs text-on-surface focus:ring-0 cursor-pointer">
+<option>Este Mes (Marzo 2024)</option>
+<option>Último Trimestre</option>
+<option>Año Actual</option>
+</select>
+</div>
+<div class="w-[1px] h-4 bg-border-base"></div>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-secondary">location_on</span>
+<select class="bg-transparent border-none font-label-xs text-label-xs text-on-surface focus:ring-0 cursor-pointer">
+<option>Todas las Sedes</option>
+<option>Sede Centro</option>
+<option>Sede Playa</option>
+</select>
+</div>
+<div class="w-[1px] h-4 bg-border-base"></div>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-secondary">person</span>
+<select class="bg-transparent border-none font-label-xs text-label-xs text-on-surface focus:ring-0 cursor-pointer">
+<option>Todos los Profesionales</option>
+<option>Dr. Ricardo Mendoza</option>
+<option>Dra. Elena Soler</option>
+</select>
+</div>
+<div class="ml-auto flex items-center gap-2">
+<button class="p-1.5 hover:bg-surface-variant rounded transition-colors" title="Exportar PDF">
+<span class="material-symbols-outlined text-secondary">picture_as_pdf</span>
+</button>
+<button class="p-1.5 hover:bg-surface-variant rounded transition-colors" title="Exportar Excel">
+<span class="material-symbols-outlined text-secondary">table_view</span>
+</button>
+<button class="p-1.5 hover:bg-surface-variant rounded transition-colors" title="Refrescar">
+<span class="material-symbols-outlined text-secondary">refresh</span>
+</button>
+</div>
+</div>
+<div class="p-gutter space-y-6">
+<!-- HEADER SECTION -->
+<div class="flex flex-col gap-1">
+<h2 class="font-headline-lg text-headline-lg text-text-primary">ANA-01 — Cuadro Ejecutivo</h2>
+<p class="font-body-md text-body-md text-secondary">Análisis consolidado del rendimiento operativo y financiero de la clínica.</p>
+</div>
+<!-- KPI ROW -->
+<div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-3">
+<!-- KPI 1 -->
+<div class="bg-surface border border-border-base p-4 flex flex-col justify-between h-28">
+<span class="font-label-xs text-label-xs text-secondary">Pacientes nuevos</span>
+<div class="flex items-baseline justify-between mt-1">
+<span class="font-headline-lg text-headline-lg text-text-primary">124</span>
+<span class="font-label-xs text-label-xs text-success flex items-center">
+<span class="material-symbols-outlined text-[14px]">trending_up</span> 12%
+                        </span>
+</div>
+<div class="w-full bg-surface-container-low h-1 mt-2">
+<div class="bg-primary h-full w-3/4"></div>
+</div>
+</div>
+<!-- KPI 2 -->
+<div class="bg-surface border border-border-base p-4 flex flex-col justify-between h-28">
+<span class="font-label-xs text-label-xs text-secondary">Ocupación</span>
+<div class="flex items-baseline justify-between mt-1">
+<span class="font-headline-lg text-headline-lg text-text-primary">82%</span>
+<span class="font-label-xs text-label-xs text-error flex items-center">
+<span class="material-symbols-outlined text-[14px]">trending_down</span> 3%
+                        </span>
+</div>
+<div class="w-full bg-surface-container-low h-1 mt-2">
+<div class="bg-primary h-full w-[82%]"></div>
+</div>
+</div>
+<!-- KPI 3 -->
+<div class="bg-surface border border-border-base p-4 flex flex-col justify-between h-28">
+<span class="font-label-xs text-label-xs text-secondary">Facturación</span>
+<div class="flex items-baseline justify-between mt-1">
+<span class="font-headline-lg text-headline-lg text-text-primary">45.2k€</span>
+<span class="font-label-xs text-label-xs text-success flex items-center">
+<span class="material-symbols-outlined text-[14px]">trending_up</span> 8%
+                        </span>
+</div>
+<div class="w-full bg-surface-container-low h-1 mt-2">
+<div class="bg-primary h-full w-[65%]"></div>
+</div>
+</div>
+<!-- KPI 4 -->
+<div class="bg-surface border border-border-base p-4 flex flex-col justify-between h-28">
+<span class="font-label-xs text-label-xs text-secondary">Cobro Real</span>
+<div class="flex items-baseline justify-between mt-1">
+<span class="font-headline-lg text-headline-lg text-text-primary">38.9k€</span>
+<span class="font-label-xs text-label-xs text-warning flex items-center">
+<span class="material-symbols-outlined text-[14px]">remove</span> 0%
+                        </span>
+</div>
+<div class="w-full bg-surface-container-low h-1 mt-2">
+<div class="bg-success h-full w-[86%]"></div>
+</div>
+</div>
+<!-- KPI 5 -->
+<div class="bg-surface border border-border-base p-4 flex flex-col justify-between h-28">
+<span class="font-label-xs text-label-xs text-secondary">Deuda Pendiente</span>
+<div class="flex items-baseline justify-between mt-1">
+<span class="font-headline-lg text-headline-lg text-text-primary">6.3k€</span>
+<span class="font-label-xs text-label-xs text-error flex items-center">
+<span class="material-symbols-outlined text-[14px]">trending_up</span> 15%
+                        </span>
+</div>
+<div class="w-full bg-surface-container-low h-1 mt-2">
+<div class="bg-error h-full w-[15%]"></div>
+</div>
+</div>
+<!-- KPI 6 -->
+<div class="bg-surface border border-border-base p-4 flex flex-col justify-between h-28">
+<span class="font-label-xs text-label-xs text-secondary">Aceptación Planes</span>
+<div class="flex items-baseline justify-between mt-1">
+<span class="font-headline-lg text-headline-lg text-text-primary">64%</span>
+<span class="font-label-xs text-label-xs text-success flex items-center">
+<span class="material-symbols-outlined text-[14px]">trending_up</span> 5%
+                        </span>
+</div>
+<div class="w-full bg-surface-container-low h-1 mt-2">
+<div class="bg-primary h-full w-[64%]"></div>
+</div>
+</div>
+</div>
+<!-- CHARTS SECTION -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+<!-- Line Chart: Ingresos vs Producción -->
+<div class="lg:col-span-8 bg-surface border border-border-base p-6">
+<div class="flex items-center justify-between mb-8">
+<div>
+<h3 class="font-headline-md text-headline-md text-text-primary">Ingresos vs Producción</h3>
+<p class="font-label-xs text-label-xs text-secondary uppercase tracking-wider mt-1">Acumulado Mensual • 2024</p>
+</div>
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-2">
+<span class="w-3 h-3 bg-primary rounded-full"></span>
+<span class="font-label-xs text-label-xs">Producción</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="w-3 h-3 bg-success rounded-full"></span>
+<span class="font-label-xs text-label-xs">Ingresos</span>
+</div>
+</div>
+</div>
+<div class="relative h-64 w-full flex items-end justify-between px-2">
+<!-- Y-Axis Mock -->
+<div class="absolute inset-0 flex flex-col justify-between pointer-events-none border-l border-border-subtle">
+<div class="w-full border-t border-border-subtle border-dashed"></div>
+<div class="w-full border-t border-border-subtle border-dashed"></div>
+<div class="w-full border-t border-border-subtle border-dashed"></div>
+<div class="w-full border-t border-border-subtle border-dashed"></div>
+</div>
+<!-- Columns/Bars Visualization Mock -->
+<div class="flex flex-col items-center gap-2 w-full h-full relative pt-4">
+<svg class="absolute inset-0 w-full h-full" preserveaspectratio="none" viewbox="0 0 100 100">
+<!-- Production Line -->
+<path d="M0,80 Q10,75 20,70 T40,60 T60,40 T80,30 T100,20" fill="none" stroke="#004268" stroke-width="2"></path>
+<!-- Collection Line -->
+<path d="M0,85 Q10,82 20,78 T40,68 T60,50 T80,45 T100,35" fill="none" stroke="#278561" stroke-width="2"></path>
+</svg>
+<!-- Labels -->
+<div class="absolute bottom-[-24px] left-0 w-full flex justify-between font-label-xs text-label-xs text-secondary px-2">
+<span>Ene</span><span>Feb</span><span>Mar</span><span>Abr</span><span>May</span><span>Jun</span><span>Jul</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Conversion Funnel -->
+<div class="lg:col-span-4 bg-surface border border-border-base p-6 flex flex-col">
+<h3 class="font-headline-md text-headline-md text-text-primary mb-1">Conversión de Tratamientos</h3>
+<p class="font-label-xs text-label-xs text-secondary mb-8">Embudo de aceptación comercial</p>
+<div class="flex flex-col gap-1 items-center flex-1 justify-center py-4">
+<!-- Step 1: Borrador -->
+<div class="w-full max-w-[240px] funnel-step-1 bg-surface-container-high h-16 flex items-center justify-center relative group hover:bg-primary/10 transition-colors">
+<div class="text-center">
+<p class="font-label-xs text-label-xs text-secondary">Borrador</p>
+<p class="font-headline-md text-headline-md">€145,200</p>
+</div>
+</div>
+<!-- Step 2: Presentado -->
+<div class="w-full max-w-[240px] funnel-step-2 bg-secondary-container h-16 flex items-center justify-center relative group hover:bg-primary/20 transition-colors">
+<div class="text-center">
+<p class="font-label-xs text-label-xs text-secondary">Presentado</p>
+<p class="font-headline-md text-headline-md">€92,400</p>
+</div>
+<span class="absolute right-0 top-1/2 translate-x-12 -translate-y-1/2 font-label-xs text-label-xs text-secondary italic">63.6%</span>
+</div>
+<!-- Step 3: Aceptado -->
+<div class="w-full max-w-[240px] funnel-step-3 bg-primary text-on-primary h-16 flex items-center justify-center relative group">
+<div class="text-center">
+<p class="font-label-xs text-label-xs opacity-80">Aceptado</p>
+<p class="font-headline-md text-headline-md">€59,136</p>
+</div>
+<span class="absolute right-0 top-1/2 translate-x-12 -translate-y-1/2 font-label-xs text-label-xs text-success font-bold italic">64%</span>
+</div>
+</div>
+<div class="mt-4 p-3 bg-surface-container-low rounded border border-border-subtle">
+<div class="flex justify-between items-center">
+<span class="font-label-xs text-label-xs text-secondary">Ticket promedio aceptado:</span>
+<span class="font-body-md text-body-md font-bold">€842</span>
+</div>
+</div>
+</div>
+</div>
+<!-- TABLE SECTION -->
+<div class="bg-surface border border-border-base overflow-hidden">
+<div class="px-6 py-4 border-b border-border-subtle flex items-center justify-between">
+<div>
+<h3 class="font-headline-md text-headline-md text-text-primary">Rendimiento por Profesional</h3>
+<p class="font-label-xs text-label-xs text-secondary">Métricas individuales de eficiencia y facturación</p>
+</div>
+<div class="flex gap-2">
+<button class="px-3 py-1 border border-border-base font-label-xs text-label-xs rounded bg-surface hover:bg-surface-alt transition-colors">Mes Anterior</button>
+<button class="px-3 py-1 border border-primary font-label-xs text-label-xs rounded bg-primary-fixed text-primary font-bold">Mes Actual</button>
+</div>
+</div>
+<div class="overflow-x-auto custom-scrollbar">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-surface-container-low border-b border-border-subtle">
+<th class="px-6 py-3 font-label-xs text-label-xs text-secondary uppercase tracking-wider">Profesional</th>
+<th class="px-6 py-3 font-label-xs text-label-xs text-secondary uppercase tracking-wider">Pacientes Atend.</th>
+<th class="px-6 py-3 font-label-xs text-label-xs text-secondary uppercase tracking-wider">Prod. Total (€)</th>
+<th class="px-6 py-3 font-label-xs text-label-xs text-secondary uppercase tracking-wider">Cobrado (€)</th>
+<th class="px-6 py-3 font-label-xs text-label-xs text-secondary uppercase tracking-wider">Eficiencia Agenda</th>
+<th class="px-6 py-3 font-label-xs text-label-xs text-secondary uppercase tracking-wider">% Aceptación</th>
+<th class="px-6 py-3 font-label-xs text-label-xs text-secondary uppercase tracking-wider">Acciones</th>
+</tr>
+</thead>
+<tbody class="font-body-md text-body-md divide-y divide-border-subtle">
+<tr class="hover:bg-surface-container-lowest transition-colors">
+<td class="px-6 py-3">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 bg-surface-alt rounded border border-border-base flex items-center justify-center">
+<span class="material-symbols-outlined text-secondary">dentistry</span>
+</div>
+<div>
+<p class="font-semibold text-text-primary">Dr. Ricardo Mendoza</p>
+<p class="text-[10px] text-secondary">Implantología</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-3">145</td>
+<td class="px-6 py-3 font-semibold">18,450.00 €</td>
+<td class="px-6 py-3 text-success">16,200.00 €</td>
+<td class="px-6 py-3">
+<div class="flex items-center gap-2">
+<div class="w-16 h-1.5 bg-surface-container-low rounded-full overflow-hidden">
+<div class="bg-primary h-full w-[92%]"></div>
+</div>
+<span class="text-[10px] font-bold">92%</span>
+</div>
+</td>
+<td class="px-6 py-3">
+<span class="px-2 py-0.5 bg-success/10 text-success rounded text-[10px] font-bold">78%</span>
+</td>
+<td class="px-6 py-3">
+<button class="text-primary hover:underline text-[11px] font-semibold">Ver detalle</button>
+</td>
+</tr>
+<tr class="hover:bg-surface-container-lowest transition-colors">
+<td class="px-6 py-3">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 bg-surface-alt rounded border border-border-base flex items-center justify-center">
+<span class="material-symbols-outlined text-secondary">medical_services</span>
+</div>
+<div>
+<p class="font-semibold text-text-primary">Dra. Elena Soler</p>
+<p class="text-[10px] text-secondary">Ortodoncia</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-3">112</td>
+<td class="px-6 py-3 font-semibold">12,100.00 €</td>
+<td class="px-6 py-3 text-success">11,950.00 €</td>
+<td class="px-6 py-3">
+<div class="flex items-center gap-2">
+<div class="w-16 h-1.5 bg-surface-container-low rounded-full overflow-hidden">
+<div class="bg-primary h-full w-[85%]"></div>
+</div>
+<span class="text-[10px] font-bold">85%</span>
+</div>
+</td>
+<td class="px-6 py-3">
+<span class="px-2 py-0.5 bg-success/10 text-success rounded text-[10px] font-bold">82%</span>
+</td>
+<td class="px-6 py-3">
+<button class="text-primary hover:underline text-[11px] font-semibold">Ver detalle</button>
+</td>
+</tr>
+<tr class="hover:bg-surface-container-lowest transition-colors">
+<td class="px-6 py-3">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 bg-surface-alt rounded border border-border-base flex items-center justify-center">
+<span class="material-symbols-outlined text-secondary">badge</span>
+</div>
+<div>
+<p class="font-semibold text-text-primary">Dr. Jorge Luis V.</p>
+<p class="text-[10px] text-secondary">General</p>
+</div>
+</div>
+</td>
+<td class="px-6 py-3">189</td>
+<td class="px-6 py-3 font-semibold">9,820.00 €</td>
+<td class="px-6 py-3 text-success">8,400.00 €</td>
+<td class="px-6 py-3">
+<div class="flex items-center gap-2">
+<div class="w-16 h-1.5 bg-surface-container-low rounded-full overflow-hidden">
+<div class="bg-warning h-full w-[65%]"></div>
+</div>
+<span class="text-[10px] font-bold">65%</span>
+</div>
+</td>
+<td class="px-6 py-3">
+<span class="px-2 py-0.5 bg-warning/10 text-warning rounded text-[10px] font-bold">54%</span>
+</td>
+<td class="px-6 py-3">
+<button class="text-primary hover:underline text-[11px] font-semibold">Ver detalle</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="px-6 py-3 border-t border-border-subtle bg-surface-container-low flex items-center justify-between">
+<span class="font-label-xs text-label-xs text-secondary italic">Mostrando 3 de 12 profesionales activos</span>
+<div class="flex items-center gap-1">
+<button class="p-1 hover:bg-border-subtle rounded"><span class="material-symbols-outlined">chevron_left</span></button>
+<span class="px-2 text-label-xs font-bold">1</span>
+<button class="p-1 hover:bg-border-subtle rounded"><span class="material-symbols-outlined">chevron_right</span></button>
+</div>
+</div>
+</div>
+</div>
+<footer class="p-gutter border-t border-border-subtle text-center">
+<p class="font-label-xs text-label-xs text-secondary opacity-60">© 2024 DENTIA Dental Software. Todos los derechos reservados. Confidencialidad Nivel 3.</p>
+</footer>
+</main>
+<!-- MICRO-INTERACTIONS SCRIPT -->
+<script>
+        // Simple scale and highlight interaction for KPIs
+        const cards = document.querySelectorAll('.bg-surface.border');
+        cards.forEach(card => {
+            card.addEventListener('mouseenter', () => {
+                card.style.borderColor = '#004268';
+            });
+            card.addEventListener('mouseleave', () => {
+                card.style.borderColor = '#D9DEE3';
+            });
+        });
+
+        // Search highlight mock
+        const searchInput = document.querySelector('input[type="text"]');
+        searchInput.addEventListener('focus', () => {
+            searchInput.parentElement.classList.add('ring-1', 'ring-primary');
+        });
+        searchInput.addEventListener('blur', () => {
+            searchInput.parentElement.classList.remove('ring-1', 'ring-primary');
+        });
+    </script>
+</body></html>

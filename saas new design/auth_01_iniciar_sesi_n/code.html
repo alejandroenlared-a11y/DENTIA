@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+
+<html class="light" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>DENTIA - Iniciar sesión</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface": "#FFFFFF",
+                        "warning": "#B37D00",
+                        "error-container": "#ffdad6",
+                        "on-primary": "#ffffff",
+                        "surface-container": "#eceef2",
+                        "on-tertiary-container": "#ffbe87",
+                        "on-secondary-fixed-variant": "#3c4852",
+                        "on-surface": "#191c1f",
+                        "primary-fixed-dim": "#95ccff",
+                        "surface-container-highest": "#e1e2e7",
+                        "on-tertiary-fixed": "#2e1500",
+                        "surface-container-lowest": "#ffffff",
+                        "on-error": "#ffffff",
+                        "primary-container": "#005a8c",
+                        "tertiary-fixed-dim": "#ffb779",
+                        "primary-fixed": "#cde5ff",
+                        "on-secondary-fixed": "#111d26",
+                        "on-primary-fixed": "#001d32",
+                        "on-surface-variant": "#41474f",
+                        "inverse-primary": "#95ccff",
+                        "border-base": "#D9DEE3",
+                        "surface-alt": "#F0F2F4",
+                        "surface-tint": "#166395",
+                        "on-tertiary": "#ffffff",
+                        "on-primary-container": "#9fd0ff",
+                        "tertiary-fixed": "#ffdcc1",
+                        "on-error-container": "#93000a",
+                        "surface-dim": "#d8dadf",
+                        "inverse-surface": "#2e3134",
+                        "outline-variant": "#c1c7d0",
+                        "secondary-container": "#d5e1ee",
+                        "success": "#278561",
+                        "tertiary": "#613300",
+                        "surface-container-low": "#f2f3f8",
+                        "primary": "#004268",
+                        "inverse-on-surface": "#eff1f5",
+                        "surface-container-high": "#e7e8ed",
+                        "on-primary-fixed-variant": "#004a75",
+                        "on-background": "#191c1f",
+                        "text-primary": "#17212B",
+                        "error": "#C53030",
+                        "on-secondary": "#ffffff",
+                        "background": "#F5F6F7",
+                        "surface-variant": "#e1e2e7",
+                        "secondary-fixed-dim": "#bcc8d4",
+                        "border-subtle": "#E8EBEE",
+                        "outline": "#717880",
+                        "tertiary-container": "#824701",
+                        "secondary": "#54606b",
+                        "on-tertiary-fixed-variant": "#6c3a00",
+                        "secondary-fixed": "#d8e4f1",
+                        "surface-bright": "#f8f9fe",
+                        "on-secondary-container": "#58646f"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "sidebar-collapsed": "64px",
+                        "padding-compact": "0.75rem",
+                        "header-height": "52px",
+                        "gutter": "1rem",
+                        "padding-base": "1rem",
+                        "sidebar-width": "224px"
+                    },
+                    "fontFamily": {
+                        "body-sm": ["Inter"],
+                        "label-xs": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "body-md": ["Inter"],
+                        "headline-lg": ["Inter"]
+                    },
+                    "fontSize": {
+                        "body-sm": ["11px", {"lineHeight": "16px", "fontWeight": "400"}],
+                        "label-xs": ["10px", {"lineHeight": "14px", "letterSpacing": "0.02em", "fontWeight": "500"}],
+                        "headline-md": ["16px", {"lineHeight": "24px", "fontWeight": "600"}],
+                        "body-md": ["12px", {"lineHeight": "18px", "fontWeight": "400"}],
+                        "headline-lg": ["22px", {"lineHeight": "32px", "fontWeight": "600"}]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #F5F6F7;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
+            font-size: 18px;
+        }
+        .login-card {
+            border: 1px solid #D9DEE3;
+            box-shadow: none;
+        }
+        input:focus {
+            outline: none !important;
+            border-color: #004268 !important;
+            box-shadow: none !important;
+        }
+        .btn-primary {
+            transition: all 0.15s ease-in-out;
+        }
+        .btn-primary:active {
+            transform: scale(0.98);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+<!-- Auth Shell Suppression: Per instructions, Navigation shell is suppressed for Transactional/Login screens -->
+<main class="w-full max-w-[400px]">
+<div class="login-card bg-surface p-8 flex flex-col items-center">
+<!-- Logo Section -->
+<div class="mb-8 w-full flex flex-col items-center">
+<img alt="DENTIA Dental Software Logo" class="h-16 w-auto mb-2" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDdGJCbL0YqlSXq7wDb4fXU65yXeijgSdyQLjw_GcHyEFSZz1pLhGUZuBn50jwxkWXnXfInsPyPjIE64PU_oocYp1lNzXD03Etrbp_qWkZz1hpGFPUwG4-Qryq7V8mhluVCtE3h0mtNCRJ-QI-ksi5XrhoSjdm2ScwEu9yfxgy5XBjbAEvo5tn6i2R-ZxrQpYjIMIfJxLN-Qz7Pa2DQj8zO68nHTrqFkB81RxXbqPl4-r2o3bJaD6By"/>
+<div class="text-center">
+<span class="font-headline-md text-headline-md font-bold text-primary block uppercase tracking-tight">DENTIA</span>
+<span class="font-label-xs text-label-xs text-outline block -mt-1">Dental Software</span>
+</div>
+</div>
+<div class="w-full mb-6">
+<h1 class="font-headline-lg text-headline-lg text-text-primary text-center">Iniciar sesión</h1>
+</div>
+<form class="w-full space-y-4" onsubmit="event.preventDefault();">
+<!-- Email Field -->
+<div class="space-y-1">
+<label class="font-label-xs text-label-xs text-secondary uppercase" for="email">Email</label>
+<div class="relative">
+<input class="w-full h-10 px-3 bg-surface border border-border-base font-body-md text-body-md text-text-primary rounded-none transition-colors" id="email" name="email" placeholder="ejemplo@clinica.com" required="" type="email"/>
+</div>
+</div>
+<!-- Password Field -->
+<div class="space-y-1">
+<label class="font-label-xs text-label-xs text-secondary uppercase" for="password">Contraseña</label>
+<div class="relative group">
+<input class="w-full h-10 px-3 pr-10 bg-surface border border-border-base font-body-md text-body-md text-text-primary rounded-none transition-colors" id="password" name="password" placeholder="••••••••" required="" type="password"/>
+<button class="absolute right-3 top-1/2 -translate-y-1/2 text-outline hover:text-primary transition-colors flex items-center justify-center" onclick="togglePassword()" type="button">
+<span class="material-symbols-outlined" id="password-icon">visibility</span>
+</button>
+</div>
+</div>
+<!-- Remember Device -->
+<div class="flex items-center justify-between pt-1">
+<label class="flex items-center gap-2 cursor-pointer group">
+<input class="w-4 h-4 rounded-none border-border-base text-primary focus:ring-0 cursor-pointer" type="checkbox"/>
+<span class="font-body-sm text-body-sm text-secondary group-hover:text-text-primary transition-colors">Recordar dispositivo</span>
+</label>
+</div>
+<!-- Primary Action -->
+<div class="pt-4">
+<button class="btn-primary w-full h-10 bg-primary text-on-primary font-body-md text-body-md font-semibold rounded-none hover:bg-primary-container hover:text-on-primary-container flex items-center justify-center gap-2" type="submit">
+                        Entrar
+                        <span class="material-symbols-outlined text-[16px]">login</span>
+</button>
+</div>
+<!-- Footer Link -->
+<div class="text-center pt-4">
+<a class="font-body-sm text-body-sm text-primary hover:underline transition-all" href="#">
+                        He olvidado mi contraseña
+                    </a>
+</div>
+</form>
+</div>
+<!-- System Status / Info -->
+<div class="mt-8 text-center space-y-2">
+<p class="font-label-xs text-label-xs text-outline uppercase tracking-widest">
+                Entorno Seguro Protegido
+            </p>
+<div class="flex justify-center gap-4 text-outline font-body-sm text-body-sm">
+<span class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">lock</span>
+                    SSL 256-bit
+                </span>
+<span class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">verified_user</span>
+                    v4.2.1
+                </span>
+</div>
+</div>
+</main>
+<script>
+        function togglePassword() {
+            const passwordInput = document.getElementById('password');
+            const passwordIcon = document.getElementById('password-icon');
+
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+                passwordIcon.innerText = 'visibility_off';
+            } else {
+                passwordInput.type = 'password';
+                passwordIcon.innerText = 'visibility';
+            }
+        }
+
+        // Simple atmospheric interaction for the background
+        document.addEventListener('mousemove', (e) => {
+            const x = (e.clientX / window.innerWidth) * 5;
+            const y = (e.clientY / window.innerHeight) * 5;
+            document.body.style.backgroundPosition = `${x}px ${y}px`;
+        });
+    </script>
+</body></html>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { sleep, splitReplyIntoBubbles, typingDelayForBubble } from "@/lib/chat-bubbles";
 import { fetchWithTimeout, isTimeoutError } from "@/lib/http";
 
@@ -25,32 +25,23 @@ interface WebhookResponse {
 }
 
 export function WidgetChat({ slug, clinicName, assistantName, assistantEnabled }: WidgetChatProps) {
-  const [phone, setPhone] = useState("");
-  const [name, setName] = useState("");
-  const [consent, setConsent] = useState(false);
-  const [started, setStarted] = useState(false);
+  const [conversationFrom] = useState(() => `web-${crypto.randomUUID()}`);
   const [message, setMessage] = useState("");
-  const [entries, setEntries] = useState<ChatEntry[]>([]);
+  const [entries, setEntries] = useState<ChatEntry[]>(() => [
+    {
+      from: "assistant",
+      text: assistantEnabled
+        ? `Hola, soy ${assistantName}, recepcionista IA de ${clinicName}. Puedes contarme que necesitas y te oriento para cita, presupuesto o urgencia.`
+        : `Hola, ahora mismo el asistente esta pausado. Deja tu mensaje y recepcion lo revisara.`
+    }
+  ]);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const messagesRef = useRef<HTMLDivElement | null>(null);
 
-  function startChat(event: React.FormEvent) {
-    event.preventDefault();
-    if (!phone.trim() || !consent) {
-      setError("Necesitamos un telefono de contacto y tu consentimiento RGPD.");
-      return;
-    }
-    setError(null);
-    setStarted(true);
-    setEntries([
-      {
-        from: "assistant",
-        text: assistantEnabled
-          ? `Hola! Soy ${assistantName}, el asistente de ${clinicName}. En que puedo ayudarte?`
-          : `Hola! Ahora mismo el asistente esta pausado; deja tu mensaje y el equipo de ${clinicName} te respondera.`
-      }
-    ]);
-  }
+  useEffect(() => {
+    messagesRef.current?.scrollTo({ top: messagesRef.current.scrollHeight, behavior: "smooth" });
+  }, [entries, sending]);
 
   async function sendMessage(event: React.FormEvent) {
     event.preventDefault();
@@ -67,7 +58,7 @@ export function WidgetChat({ slug, clinicName, assistantName, assistantEnabled }
       const response = await fetchWithTimeout(`/api/webhooks/${slug}/web`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ from: phone.trim(), name: name.trim() || undefined, body })
+        body: JSON.stringify({ from: conversationFrom, body })
       }, CHAT_REQUEST_TIMEOUT_MS);
       const payload = (await response.json()) as WebhookResponse;
 
@@ -106,50 +97,26 @@ export function WidgetChat({ slug, clinicName, assistantName, assistantEnabled }
         <span>{assistantEnabled ? `${assistantName} en linea · 24/7` : "Recepcion respondera en horario de clinica"}</span>
       </header>
 
-      {!started ? (
-        <form onSubmit={startChat} className="form-grid">
-          <label className="field">
-            <span>Telefono de contacto</span>
-            <input value={phone} onChange={event => setPhone(event.target.value)} required placeholder="600 000 000" />
-          </label>
-          <label className="field">
-            <span>Nombre (opcional)</span>
-            <input value={name} onChange={event => setName(event.target.value)} />
-          </label>
-          <label className="widget-consent">
-            <input type="checkbox" checked={consent} onChange={event => setConsent(event.target.checked)} required />
-            <span>
-              Acepto que {clinicName} trate mis datos para gestionar mi consulta (RGPD). Hablas con un asistente
-              virtual.
-            </span>
-          </label>
-          {error ? <p className="widget-error" role="alert">{error}</p> : null}
-          <button className="button primary" type="submit">Empezar chat</button>
-        </form>
-      ) : (
-        <>
-          <div className="widget-messages" aria-live="polite">
-            {entries.map((entry, index) => (
-              <p key={index} className={`widget-message ${entry.from}`}>
-                {entry.text}
-              </p>
-            ))}
-            {sending ? <p className="widget-message system">Escribiendo…</p> : null}
-          </div>
-          {error ? <p className="widget-error" role="alert">{error}</p> : null}
-          <form onSubmit={sendMessage} className="widget-input">
-            <input
-              value={message}
-              onChange={event => setMessage(event.target.value)}
-              placeholder="Escribe tu mensaje…"
-              aria-label="Mensaje"
-            />
-            <button className="button primary" type="submit" disabled={sending}>
-              Enviar
-            </button>
-          </form>
-        </>
-      )}
+      <div className="widget-messages" aria-live="polite" ref={messagesRef}>
+        {entries.map((entry, index) => (
+          <p key={index} className={`widget-message ${entry.from}`}>
+            {entry.text}
+          </p>
+        ))}
+        {sending ? <p className="widget-message system">Escribiendo…</p> : null}
+      </div>
+      {error ? <p className="widget-error" role="alert">{error}</p> : null}
+      <form onSubmit={sendMessage} className="widget-input">
+        <input
+          value={message}
+          onChange={event => setMessage(event.target.value)}
+          placeholder="Escribe tu mensaje..."
+          aria-label="Mensaje para Clara"
+        />
+        <button className="button primary" type="submit" disabled={sending}>
+          Enviar
+        </button>
+      </form>
     </section>
   );
 }

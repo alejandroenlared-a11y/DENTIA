@@ -4,6 +4,18 @@ export const demoKnowledge = {
     assistant: "Clara",
     phone: "+34 968 000 111",
     locations: ["Murcia centro", "Elche - Altabix"],
+    addresses: {
+      "Murcia centro": "Paseo Duques de Lugo, 16, 30009 Murcia",
+      "Elche - Altabix": "Carrer Reina Victoria, 49, 03201 Elche (Alicante)"
+    },
+    team: [
+      { name: "Dr. Ernesto Ruiz Chumilla", specialty: "Periodoncia, implantes y cirugia oral" },
+      { name: "Dra. Esther Estrada Mallada", specialty: "Ortodoncia" },
+      { name: "Dra. Laura Herencia Lizaran", specialty: "Endodoncia y odontopediatria" },
+      { name: "Dr. Manuel Ruiz Chumilla", specialty: "Estetica dental y conservadora" },
+      { name: "Dra. Paula Garcia Garcia", specialty: "Odontopediatria" },
+      { name: "Equipo de higienistas", specialty: "Higiene dental y mantenimiento periodontal" }
+    ],
     hours: "Lunes a viernes, 9:30-14:00 y 16:00-20:00. Urgencias priorizadas el mismo dia."
   },
   treatments: [
@@ -38,16 +50,22 @@ export const demoKnowledge = {
       rule: "Sangrado, movilidad o inflamacion de encias requiere sondaje periodontal."
     },
     {
+      name: "Estetica dental",
+      price: "valoracion sin coste",
+      about: "Valoracion de sonrisa para elegir entre blanqueamiento, carillas, restauraciones esteticas de composite o Digital Smile Design segun color, forma, encia y mordida.",
+      rule: "No reducir estetica dental a blanqueamiento; si el paciente pide opciones, explicar alternativas y proponer valoracion gratuita."
+    },
+    {
       name: "Blanqueamiento",
       price: "desde 280 EUR",
       about: "Aclara el color natural del diente en clinica o con ferulas para casa; antes se revisa sensibilidad y estado de las encias.",
       rule: "Requiere valorar sensibilidad y estado de encia."
     },
     {
-      name: "Ortodoncia invisible",
+      name: "Ortodoncia",
       price: "desde 1.800 EUR",
-      about: "Alineadores transparentes removibles (se pueden quitar para comer y limpiar) o brackets de baja friccion como alternativa; requiere estudio digital previo.",
-      rule: "Siempre con valoracion previa y estudio digital."
+      about: "Alineadores transparentes removibles, brackets Damon o brackets esteticos segun edad, mordida y objetivos; requiere estudio digital previo.",
+      rule: "No responder como si todo fuera Invisalign: si preguntan por brackets o aparato, explicar que se confirma la opcion adecuada en valoracion."
     },
     {
       name: "Implante unitario",

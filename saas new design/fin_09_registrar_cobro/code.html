@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+
+<html lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>DENTIA - Registrar Cobro</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "success": "#278561",
+                    "on-primary": "#ffffff",
+                    "on-primary-fixed-variant": "#004a75",
+                    "secondary": "#54606b",
+                    "on-tertiary": "#ffffff",
+                    "tertiary-fixed-dim": "#ffb779",
+                    "surface-container": "#eceef2",
+                    "on-background": "#191c1f",
+                    "primary-fixed": "#cde5ff",
+                    "on-tertiary-container": "#ffbe87",
+                    "primary-container": "#005a8c",
+                    "error-container": "#ffdad6",
+                    "on-tertiary-fixed": "#2e1500",
+                    "outline": "#717880",
+                    "tertiary-fixed": "#ffdcc1",
+                    "on-primary-fixed": "#001d32",
+                    "on-error-container": "#93000a",
+                    "surface-bright": "#f8f9fe",
+                    "border-base": "#D9DEE3",
+                    "surface-container-low": "#f2f3f8",
+                    "on-surface-variant": "#41474f",
+                    "surface-variant": "#e1e2e7",
+                    "surface-container-high": "#e7e8ed",
+                    "on-secondary-container": "#58646f",
+                    "inverse-surface": "#2e3134",
+                    "tertiary": "#613300",
+                    "surface-tint": "#166395",
+                    "background": "#F5F6F7",
+                    "error": "#C53030",
+                    "outline-variant": "#c1c7d0",
+                    "on-secondary-fixed-variant": "#3c4852",
+                    "inverse-primary": "#95ccff",
+                    "secondary-container": "#d5e1ee",
+                    "text-primary": "#17212B",
+                    "border-subtle": "#E8EBEE",
+                    "primary-fixed-dim": "#95ccff",
+                    "warning": "#B37D00",
+                    "on-tertiary-fixed-variant": "#6c3a00",
+                    "primary": "#004268",
+                    "on-surface": "#191c1f",
+                    "surface-container-highest": "#e1e2e7",
+                    "surface-alt": "#F0F2F4",
+                    "on-primary-container": "#9fd0ff",
+                    "tertiary-container": "#824701",
+                    "secondary-fixed": "#d8e4f1",
+                    "surface-container-lowest": "#ffffff",
+                    "surface-dim": "#d8dadf",
+                    "on-error": "#ffffff",
+                    "on-secondary": "#ffffff",
+                    "inverse-on-surface": "#eff1f5",
+                    "surface": "#FFFFFF",
+                    "secondary-fixed-dim": "#bcc8d4",
+                    "on-secondary-fixed": "#111d26"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "sidebar-collapsed": "64px",
+                    "header-height": "52px",
+                    "sidebar-width": "224px",
+                    "padding-compact": "0.75rem",
+                    "gutter": "1rem",
+                    "padding-base": "1rem"
+            },
+            "fontFamily": {
+                    "headline-lg": ["Inter"],
+                    "body-md": ["Inter"],
+                    "label-xs": ["Inter"],
+                    "body-sm": ["Inter"],
+                    "headline-md": ["Inter"]
+            },
+            "fontSize": {
+                    "headline-lg": ["22px", {"lineHeight": "32px", "fontWeight": "600"}],
+                    "body-md": ["12px", {"lineHeight": "18px", "fontWeight": "400"}],
+                    "label-xs": ["10px", {"lineHeight": "14px", "letterSpacing": "0.02em", "fontWeight": "500"}],
+                    "body-sm": ["11px", {"lineHeight": "16px", "fontWeight": "400"}],
+                    "headline-md": ["16px", {"lineHeight": "24px", "fontWeight": "600"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; background-color: #F5F6F7; color: #191c1f; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
+    </style>
+</head>
+<body class="overflow-hidden">
+<!-- Global Layout Container -->
+<div class="flex h-screen w-full">
+<!-- Sidebar Navigation -->
+<aside class="w-sidebar-width h-screen fixed left-0 top-0 border-r border-border-base bg-surface flex flex-col py-4 overflow-y-auto z-30">
+<div class="px-6 mb-8">
+<span class="font-headline-md text-headline-md font-bold text-primary">DENTIA</span>
+<p class="text-[10px] uppercase tracking-widest text-on-surface-variant font-semibold">Dental Software</p>
+</div>
+<nav class="flex-1">
+<ul class="space-y-1">
+<li><a class="flex items-center px-6 py-2 gap-3 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors duration-150" href="#"><span class="material-symbols-outlined">home</span> <span class="font-body-md text-body-md">Inicio</span></a></li>
+<li><a class="flex items-center px-6 py-2 gap-3 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors duration-150" href="#"><span class="material-symbols-outlined">calendar_month</span> <span class="font-body-md text-body-md">Agenda</span></a></li>
+<li><a class="flex items-center px-6 py-2 gap-3 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors duration-150" href="#"><span class="material-symbols-outlined">group</span> <span class="font-body-md text-body-md">Pacientes</span></a></li>
+<li><a class="flex items-center px-6 py-2 gap-3 text-primary font-semibold border-r-2 border-primary bg-surface-alt" href="#"><span class="material-symbols-outlined">payments</span> <span class="font-body-md text-body-md">Finanzas</span></a></li>
+<li><a class="flex items-center px-6 py-2 gap-3 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors duration-150" href="#"><span class="material-symbols-outlined">inventory_2</span> <span class="font-body-md text-body-md">Inventario</span></a></li>
+<li><a class="flex items-center px-6 py-2 gap-3 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors duration-150" href="#"><span class="material-symbols-outlined">badge</span> <span class="font-body-md text-body-md">Equipo</span></a></li>
+<li><a class="flex items-center px-6 py-2 gap-3 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors duration-150" href="#"><span class="material-symbols-outlined">settings</span> <span class="font-body-md text-body-md">Configuración</span></a></li>
+</ul>
+</nav>
+</aside>
+<!-- Main Content Area -->
+<main class="ml-sidebar-width flex-1 flex flex-col h-full bg-background relative">
+<!-- Top Navigation Bar -->
+<header class="h-header-height bg-surface border-b border-border-base flex items-center justify-between px-gutter sticky top-0 z-20">
+<div class="flex items-center gap-4">
+<div class="relative">
+<span class="absolute inset-y-0 left-3 flex items-center text-on-surface-variant">
+<span class="material-symbols-outlined text-[18px]">search</span>
+</span>
+<input class="pl-10 pr-4 py-1.5 bg-surface-alt border border-border-base rounded-lg text-body-sm w-64 focus:outline-none focus:border-primary transition-all" placeholder="Buscar facturas, pacientes..." type="text"/>
+</div>
+<div class="flex gap-4 ml-4">
+<span class="text-primary font-bold border-b-2 border-primary pb-1 font-body-md text-body-md cursor-pointer">Sede Centro</span>
+<span class="text-on-surface-variant hover:text-primary transition-colors font-body-md text-body-md cursor-pointer">Sede Playa</span>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="bg-primary text-on-primary px-4 py-1.5 rounded text-body-md font-semibold hover:opacity-90 active:scale-95 transition-all">+ Crear</button>
+<span class="material-symbols-outlined text-on-surface-variant cursor-pointer hover:text-primary">notifications</span>
+<div class="w-8 h-8 rounded-full overflow-hidden border border-border-base bg-surface-variant">
+<img class="w-full h-full object-cover" data-alt="Close-up professional portrait of a dental clinic administrator in a clean white medical uniform, neutral background, soft professional lighting, sharp focus on face, minimalist aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBtGAsbL6u4d9z5KuWuSnWhppsF92mhG5I01hypTgutsuy081tPgEgnMVur2SutNqAjuJBuBgzvBhZSSVR_QSA7M15boI-HVVZNol81WceP9UZOYVnRJfpbf9poVXrd7_Zr1u1BeaW6jAyzA3DIiStslR5URnbtYHpiDY5bjEfvfUMP91kh45um9veH8NAjAOVmkF0OAW_v5c9diGzaubt_Nlh5xDYVWIsN7q4sf6rTkfcQKn8obyw_"/>
+</div>
+</div>
+</header>
+<!-- Secondary App Bar -->
+<div class="w-full h-10 bg-surface-container-low border-b border-border-subtle flex items-center px-4 gap-4 sticky top-header-height z-10">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-[18px]">person</span>
+<span class="font-headline-md text-headline-md text-on-surface">Paciente: Juan Pérez</span>
+</div>
+<div class="h-4 w-px bg-border-base mx-2"></div>
+<div class="flex items-center gap-4">
+<span class="text-label-xs font-label-xs bg-error-container text-on-error-container px-2 py-0.5 rounded">Pendiente: 450,00 €</span>
+<span class="text-label-xs font-label-xs bg-surface-variant text-on-surface-variant px-2 py-0.5 rounded">Expediente: #40922</span>
+</div>
+<div class="flex-1"></div>
+<div class="flex gap-3">
+<span class="material-symbols-outlined text-secondary cursor-pointer hover:bg-surface-variant p-1 rounded">warning</span>
+<span class="material-symbols-outlined text-secondary cursor-pointer hover:bg-surface-variant p-1 rounded">account_balance_wallet</span>
+<span class="material-symbols-outlined text-secondary cursor-pointer hover:bg-surface-variant p-1 rounded">quick_reference_all</span>
+</div>
+</div>
+<!-- Content Area: Facturas Table -->
+<div class="p-gutter overflow-auto flex-1">
+<div class="bg-surface border border-border-base rounded overflow-hidden">
+<table class="w-full text-left border-collapse">
+<thead class="bg-surface-alt border-b border-border-base">
+<tr>
+<th class="px-4 py-2 text-label-xs font-label-xs text-on-surface-variant uppercase tracking-wider">Fecha</th>
+<th class="px-4 py-2 text-label-xs font-label-xs text-on-surface-variant uppercase tracking-wider">Concepto / Tratamiento</th>
+<th class="px-4 py-2 text-label-xs font-label-xs text-on-surface-variant uppercase tracking-wider text-right">Importe</th>
+<th class="px-4 py-2 text-label-xs font-label-xs text-on-surface-variant uppercase tracking-wider text-right">Pendiente</th>
+<th class="px-4 py-2 text-label-xs font-label-xs text-on-surface-variant uppercase tracking-wider text-center">Estado</th>
+<th class="px-4 py-2 text-label-xs font-label-xs text-on-surface-variant uppercase tracking-wider"></th>
+</tr>
+</thead>
+<tbody class="divide-y divide-border-subtle">
+<tr class="hover:bg-surface-alt transition-colors group">
+<td class="px-4 py-2 text-body-sm text-on-surface">12/05/2024</td>
+<td class="px-4 py-2 text-body-sm text-on-surface font-medium">Implante Dental - Fase 1</td>
+<td class="px-4 py-2 text-body-sm text-on-surface text-right">850,00 €</td>
+<td class="px-4 py-2 text-body-sm text-error font-semibold text-right">350,00 €</td>
+<td class="px-4 py-2 text-center">
+<span class="px-2 py-0.5 rounded-full text-[9px] font-bold bg-warning/10 text-warning uppercase">Parcial</span>
+</td>
+<td class="px-4 py-2 text-right">
+<button class="text-primary hover:underline text-body-sm font-semibold">Cobrar</button>
+</td>
+</tr>
+<tr class="hover:bg-surface-alt transition-colors group">
+<td class="px-4 py-2 text-body-sm text-on-surface">15/05/2024</td>
+<td class="px-4 py-2 text-body-sm text-on-surface font-medium">Limpieza Bucal Profunda</td>
+<td class="px-4 py-2 text-body-sm text-on-surface text-right">100,00 €</td>
+<td class="px-4 py-2 text-body-sm text-error font-semibold text-right">100,00 €</td>
+<td class="px-4 py-2 text-center">
+<span class="px-2 py-0.5 rounded-full text-[9px] font-bold bg-error/10 text-error uppercase">Pendiente</span>
+</td>
+<td class="px-4 py-2 text-right">
+<button class="text-primary hover:underline text-body-sm font-semibold">Cobrar</button>
+</td>
+</tr>
+<tr class="hover:bg-surface-alt transition-colors group">
+<td class="px-4 py-2 text-body-sm text-on-surface">10/04/2024</td>
+<td class="px-4 py-2 text-body-sm text-on-surface font-medium">Consulta Diagnóstico</td>
+<td class="px-4 py-2 text-body-sm text-on-surface text-right">50,00 €</td>
+<td class="px-4 py-2 text-body-sm text-success font-semibold text-right">0,00 €</td>
+<td class="px-4 py-2 text-center">
+<span class="px-2 py-0.5 rounded-full text-[9px] font-bold bg-success/10 text-success uppercase">Pagado</span>
+</td>
+<td class="px-4 py-2 text-right">
+<span class="material-symbols-outlined text-on-surface-variant text-[18px]">done_all</span>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<!-- Overlay for Drawer -->
+<div class="absolute inset-0 bg-black/20 backdrop-blur-[1px] z-40 transition-opacity duration-300" id="drawer-overlay"></div>
+<!-- FIN-09: Drawer - Registrar Cobro -->
+<div class="absolute right-0 top-0 h-full w-[400px] bg-surface z-50 border-l border-border-base flex flex-col shadow-2xl transform transition-transform duration-300 translate-x-0" id="cobro-drawer">
+<!-- Drawer Header -->
+<div class="px-6 py-4 border-b border-border-base flex items-center justify-between">
+<div>
+<h2 class="font-headline-md text-headline-md text-primary">Registrar Cobro</h2>
+<p class="text-label-xs font-label-xs text-on-surface-variant">PACIENTE: JUAN PÉREZ</p>
+</div>
+<button class="p-1 hover:bg-surface-alt rounded-full transition-colors" onclick="toggleDrawer()">
+<span class="material-symbols-outlined text-secondary">close</span>
+</button>
+</div>
+<!-- Drawer Content -->
+<div class="flex-1 overflow-y-auto p-6 space-y-6">
+<!-- Resumen del Saldo Actual -->
+<div class="bg-surface-container-low rounded p-4 border border-border-subtle">
+<div class="flex justify-between items-center mb-1">
+<span class="text-body-sm text-secondary">Saldo Pendiente Total</span>
+<span class="text-headline-md text-error font-bold">450,00 €</span>
+</div>
+<div class="w-full bg-border-subtle h-1 rounded-full overflow-hidden">
+<div class="bg-error h-full" style="width: 100%;"></div>
+</div>
+</div>
+<!-- Selección de Factura -->
+<div>
+<label class="block text-label-xs font-label-xs text-on-surface-variant uppercase mb-2">Tratamiento / Factura a cobrar</label>
+<select class="w-full bg-surface border border-border-base rounded px-3 py-2 text-body-md focus:border-primary focus:ring-0">
+<option>Implante Dental - Fase 1 (Pendiente: 350,00 €)</option>
+<option>Limpieza Bucal Profunda (Pendiente: 100,00 €)</option>
+<option>Varios / Saldo a cuenta</option>
+</select>
+</div>
+<!-- Importe -->
+<div class="grid grid-cols-2 gap-4">
+<div class="col-span-2">
+<label class="block text-label-xs font-label-xs text-on-surface-variant uppercase mb-2">Importe a cobrar (€)</label>
+<div class="relative">
+<input class="w-full bg-surface border border-border-base rounded-l px-3 py-2 text-headline-md font-bold text-primary focus:border-primary focus:ring-0" type="number" value="350.00"/>
+<div class="absolute right-0 top-0 bottom-0 flex border-l border-border-base">
+<button class="px-3 bg-surface-alt hover:bg-border-base text-label-xs font-bold transition-colors">TOTAL</button>
+<button class="px-3 bg-white hover:bg-surface-alt text-label-xs font-bold border-l border-border-base transition-colors">PARCIAL</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Método de Pago -->
+<div>
+<label class="block text-label-xs font-label-xs text-on-surface-variant uppercase mb-3">Método de pago</label>
+<div class="grid grid-cols-2 gap-2">
+<label class="cursor-pointer">
+<input checked="" class="hidden peer" name="pago" type="radio"/>
+<div class="border border-border-base rounded p-3 text-center peer-checked:bg-primary-fixed peer-checked:border-primary transition-all">
+<span class="material-symbols-outlined block text-[20px] mb-1">payments</span>
+<span class="text-label-xs font-semibold">EFECTIVO</span>
+</div>
+</label>
+<label class="cursor-pointer">
+<input class="hidden peer" name="pago" type="radio"/>
+<div class="border border-border-base rounded p-3 text-center peer-checked:bg-primary-fixed peer-checked:border-primary transition-all">
+<span class="material-symbols-outlined block text-[20px] mb-1">credit_card</span>
+<span class="text-label-xs font-semibold">TARJETA</span>
+</div>
+</label>
+<label class="cursor-pointer">
+<input class="hidden peer" name="pago" type="radio"/>
+<div class="border border-border-base rounded p-3 text-center peer-checked:bg-primary-fixed peer-checked:border-primary transition-all">
+<span class="material-symbols-outlined block text-[20px] mb-1">account_balance</span>
+<span class="text-label-xs font-semibold">TRANSFER.</span>
+</div>
+</label>
+<label class="cursor-pointer">
+<input class="hidden peer" name="pago" type="radio"/>
+<div class="border border-border-base rounded p-3 text-center peer-checked:bg-primary-fixed peer-checked:border-primary transition-all">
+<span class="material-symbols-outlined block text-[20px] mb-1">account_tree</span>
+<span class="text-label-xs font-semibold">FINANCIAC.</span>
+</div>
+</label>
+</div>
+</div>
+<!-- Fecha y Caja -->
+<div class="grid grid-cols-2 gap-4">
+<div>
+<label class="block text-label-xs font-label-xs text-on-surface-variant uppercase mb-2">Fecha</label>
+<input class="w-full bg-surface border border-border-base rounded px-3 py-2 text-body-md focus:border-primary focus:ring-0" type="date" value="2024-05-20"/>
+</div>
+<div>
+<label class="block text-label-xs font-label-xs text-on-surface-variant uppercase mb-2">Caja de destino</label>
+<select class="w-full bg-surface border border-border-base rounded px-3 py-2 text-body-md focus:border-primary focus:ring-0">
+<option>Caja Principal</option>
+<option>Caja Tarde</option>
+<option>Banco Santander</option>
+</select>
+</div>
+</div>
+<!-- Post-Payment Simulation -->
+<div class="p-4 border border-dashed border-border-base rounded bg-surface-alt">
+<div class="flex justify-between items-center mb-2">
+<span class="text-body-sm text-secondary">Nuevo saldo pendiente:</span>
+<span class="text-body-sm font-bold text-success">100,00 €</span>
+</div>
+<p class="text-[10px] text-on-surface-variant italic">El paciente quedará con una deuda pendiente de 100,00 € correspondiente a "Limpieza Bucal Profunda".</p>
+</div>
+</div>
+<!-- Drawer Footer Actions -->
+<div class="p-6 border-t border-border-base bg-surface-container-low flex gap-3">
+<button class="flex-1 border border-border-base py-2 rounded text-body-md font-semibold text-secondary hover:bg-surface-alt transition-colors" onclick="toggleDrawer()">Cancelar</button>
+<button class="flex-1 bg-primary text-on-primary py-2 rounded text-body-md font-semibold hover:opacity-90 active:scale-95 transition-all">Confirmar Cobro</button>
+</div>
+</div>
+</main>
+</div>
+<script>
+        function toggleDrawer() {
+            const drawer = document.getElementById('cobro-drawer');
+            const overlay = document.getElementById('drawer-overlay');
+
+            if (drawer.style.transform === 'translateX(0px)') {
+                drawer.style.transform = 'translateX(100%)';
+                overlay.style.opacity = '0';
+                setTimeout(() => {
+                    overlay.classList.add('hidden');
+                }, 300);
+            } else {
+                overlay.classList.remove('hidden');
+                setTimeout(() => {
+                    drawer.style.transform = 'translateX(0px)';
+                    overlay.style.opacity = '1';
+                }, 10);
+            }
+        }
+
+        // Initialize state
+        window.onload = () => {
+            // Uncomment the line below if you want it closed by default
+            // toggleDrawer();
+        }
+    </script>
+</body></html>

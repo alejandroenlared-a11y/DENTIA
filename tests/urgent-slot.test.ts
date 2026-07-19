@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatUrgentSlotSentence, roundUpToSlot, type UrgentBooking } from "@/lib/agent";
+import { formatUrgentSlotSentence, inferPreferredStartForTest, roundUpToSlot, type UrgentBooking } from "@/lib/agent";
 
 describe("roundUpToSlot", () => {
   it("redondea hacia arriba al siguiente bloque de 30 minutos", () => {
@@ -34,5 +34,16 @@ describe("formatUrgentSlotSentence", () => {
     const sentence = formatUrgentSlotSentence(booking);
     expect(sentence).toContain("en Gabinete 2 Elche");
     expect(sentence).not.toContain("hoy");
+  });
+});
+
+describe("inferPreferredStartForTest", () => {
+  it("respeta manana por la tarde como manana a las 17:00", () => {
+    const now = new Date("2026-07-15T16:56:00");
+    const preferred = inferPreferredStartForTest("manana tarde", now);
+
+    expect(preferred.toISOString()).toBe("2026-07-16T15:00:00.000Z");
+    expect(preferred.getDate()).toBe(16);
+    expect(preferred.getHours()).toBe(17);
   });
 });

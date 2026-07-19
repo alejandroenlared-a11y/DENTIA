@@ -24,6 +24,10 @@ export function getWeekDays(reference: Date = new Date(), weekOffset = 0): WeekD
   });
 }
 
+export function getBusinessWeekDays(reference: Date = new Date(), weekOffset = 0): WeekDay[] {
+  return getWeekDays(reference, weekOffset).slice(0, 5);
+}
+
 export interface MonthDay {
   iso: string;
   dayNumber: number;

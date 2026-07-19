@@ -8,6 +8,7 @@ import {
   PatientStatus,
   TaskPriority,
   TaskStatus,
+  type Prisma,
   type Tenant,
   type TenantSetting
 } from "@prisma/client";
@@ -22,6 +23,7 @@ import { prisma } from "@/lib/prisma";
 import {
   cancelAppointment,
   findNextAvailableSlot,
+  hasConflict,
   listNextAvailableSlots,
   rescheduleAppointment,
   roundUpToSlot,
@@ -32,6 +34,8 @@ import {
 } from "@/lib/scheduling";
 import { detectSchedulingRequest, type SchedulingRequestKind } from "@/lib/agent/scheduling-intent";
 import { parseSlotChoice } from "@/lib/agent/slot-choice";
+import { notifyAppointmentEvent } from "@/lib/notifications/appointment-notifications";
+import { ensurePatientIntakeFromDentalState } from "@/lib/patient-intake";
 
 export { roundUpToSlot };
 
@@ -57,6 +61,7 @@ export async function processInboundMessage(
   payload: InboundPayload
 ): Promise<InboundResult> {
   const startedAt = Date.now();
+  const inboundEmail = extractEmail(payload.body);
 
   const patient = await prisma.patient.upsert({
     where: { tenantId_phone: { tenantId: tenant.id, phone: payload.from } },
@@ -64,11 +69,15 @@ export async function processInboundMessage(
       tenantId: tenant.id,
       name: payload.name?.trim() || `Contacto ${payload.from}`,
       phone: payload.from,
+      email: inboundEmail || null,
       status: PatientStatus.NEW_LEAD,
       source: payload.channel.toLowerCase(),
       preferredChannel: payload.channel
     },
-    update: payload.name?.trim() ? { name: payload.name.trim() } : {}
+    update: {
+      ...(payload.name?.trim() ? { name: payload.name.trim() } : {}),
+      ...(inboundEmail ? { email: inboundEmail } : {})
+    }
   });
 
   const existing = await prisma.conversation.findFirst({
@@ -130,6 +139,26 @@ export async function processInboundMessage(
     return { conversationId: conversation.id, reply: pendingChoiceReply, escalated: false };
   }
 
+  const pendingBookingReply = existing
+    ? await resolvePendingBookingChoice(tenant.id, conversation.id, payload.body)
+    : null;
+  if (pendingBookingReply) {
+    await prisma.message.create({
+      data: {
+        conversationId: conversation.id,
+        direction: MessageDirection.OUTBOUND,
+        senderName: tenant.assistantName,
+        body: pendingBookingReply,
+        metadata: { intent: "AGENDA_BOOKING_CONFIRMED" }
+      }
+    });
+    await prisma.conversation.update({
+      where: { id: conversation.id },
+      data: { intent: "AGENDA_BOOKING_CONFIRMED", unread: true, result: "Cita elegida por paciente" }
+    });
+    return { conversationId: conversation.id, reply: pendingBookingReply, escalated: false };
+  }
+
   const schedulingRequest = detectSchedulingRequest(payload.body);
   if (schedulingRequest) {
     const schedulingResult = await handleSchedulingRequest({
@@ -172,7 +201,11 @@ export async function processInboundMessage(
     role: message.direction === MessageDirection.INBOUND ? "patient" : "assistant",
     body: message.body
   }));
-  const previousState = extractPreviousDentalState(recent);
+  const extractedPreviousState = extractPreviousDentalState(recent);
+  const previousState = {
+    ...extractedPreviousState,
+    email: extractedPreviousState.email || patient.email || ""
+  };
   const dentalTurn = await runDentalAgentTurn({
     latestPatientMessage: payload.body,
     history,
@@ -183,19 +216,69 @@ export async function processInboundMessage(
   let reply = dentalTurn.reply;
   const intent = dentalTurn.state.intentCode || dentalTurn.state.intent || "INTENCION_PENDIENTE";
   const escalated = dentalTurn.state.escalated;
+  const requestedOptionsPeriod = getRequestedAvailabilityOptionsPeriod(payload.body);
+  const lastOutbound = [...recent].reverse().find(message => message.direction === MessageDirection.OUTBOUND);
+  const hasOpenPendingBooking = Boolean(parsePendingBooking(asRecord(lastOutbound?.metadata).pendingBooking)?.options.length);
+  const shouldOfferDefaultAvailabilityOptions =
+    !requestedOptionsPeriod &&
+    canOfferAvailabilityOptions(dentalTurn.state) &&
+    !hasOpenPendingBooking;
+  const availabilityOptionsPeriod = requestedOptionsPeriod || (shouldOfferDefaultAvailabilityOptions ? "manana" : "");
+  const availabilityOptionsProposal =
+    availabilityOptionsPeriod && canOfferAvailabilityOptions(dentalTurn.state)
+      ? await buildBookingProposal({
+          tenantId: tenant.id,
+          patientId: patient.id,
+          channel: payload.channel,
+          dentalTurn: {
+            ...dentalTurn,
+            state: {
+              ...dentalTurn.state,
+              availability: availabilityOptionsPeriod,
+              ready: true
+            }
+          }
+        })
+      : null;
+  const bookingProposal =
+    !availabilityOptionsProposal && !escalated && dentalTurn.state.ready && !previousState.ready
+      ? await buildBookingProposal({
+          tenantId: tenant.id,
+          patientId: patient.id,
+          channel: payload.channel,
+          dentalTurn
+        })
+      : null;
   const { created: appointmentCreated, startsAt: bookedStartsAt, providerName: bookedProviderName } = await persistDentalOutcome({
     tenantId: tenant.id,
     patientId: patient.id,
     conversationId: conversation.id,
     channel: payload.channel,
-    dentalTurn
+    dentalTurn,
+    autoBook: !bookingProposal
   });
+  await ensurePatientIntakeFromDentalState({
+    tenantId: tenant.id,
+    patientId: patient.id,
+    conversationId: conversation.id,
+    channel: payload.channel,
+    state: dentalTurn.state
+  }).catch(error => {
+    console.error("ensurePatientIntakeFromDentalState failed", error);
+  });
+
+  if (bookingProposal) {
+    reply = bookingProposal.reply;
+  }
+  if (availabilityOptionsProposal) {
+    reply = availabilityOptionsProposal.reply;
+  }
 
   // La pre-reserva solo menciona la franja preferida ("franja manana"), nunca
   // el dia real ni con quien: sin esto el paciente se queda sin saber para
   // cuando es la cita (visto en QA: preguntaba "para cuando es?" tras la
   // confirmacion) ni que el enrutado por especialidad es real, no al azar.
-  if (!escalated && dentalTurn.state.ready && !previousState.ready && bookedStartsAt) {
+  if (!bookingProposal && !escalated && dentalTurn.state.ready && !previousState.ready && bookedStartsAt) {
     const withWho = bookedProviderName ? ` con ${bookedProviderName}` : "";
     reply = `${reply}\n\nTe espero ${formatFriendlyDateTime(bookedStartsAt)}${withWho}.`;
   }
@@ -205,7 +288,7 @@ export async function processInboundMessage(
   // seguridad (fiebre, hinchazon, dificultad para tragar...) y se espera la
   // respuesta del paciente. Solo entonces se reserva y se habla de la cita.
   const safetyKnown = dentalTurn.state.safetyScreened || dentalTurn.state.redFlags.length > 0;
-  if (escalated && safetyKnown) {
+  if (escalated && safetyKnown && dentalTurn.state.ready) {
     urgentBooking = await bookUrgentSlot({
       tenantId: tenant.id,
       patientId: patient.id,
@@ -222,14 +305,20 @@ export async function processInboundMessage(
         reply = [
           formatUrgentSlotSentence(urgentBooking),
           !dentalTurn.state.consent
-            ? "Para dejarla a tu nombre, aceptas que guardemos tus datos? Dime tambien tu nombre y un telefono."
+            ? "Para dejarla a tu nombre, aceptas que guardemos tus datos?"
             : !dentalTurn.state.name || !dentalTurn.state.phone
-              ? "Dime tu nombre y un telefono para dejarla a tu nombre."
+              ? "Dime tu nombre y apellidos para dejarla a tu nombre."
               : ""
         ].filter(Boolean).join("\n\n");
       }
     }
   }
+
+  reply = sanitizeReceptionCallbackAfterNormalBooking(reply, {
+    appointmentCreated: appointmentCreated || Boolean(bookingProposal) || Boolean(availabilityOptionsProposal),
+    escalated,
+    urgentBooking: Boolean(urgentBooking)
+  });
 
   await prisma.message.create({
     data: {
@@ -242,7 +331,8 @@ export async function processInboundMessage(
         engine: dentalTurn.runtime,
         model: dentalTurn.model,
         fallbackReason: dentalTurn.fallbackReason,
-        dentalState: dentalTurn.state
+        dentalState: dentalTurn.state,
+        pendingBooking: bookingProposal?.pendingBooking ?? availabilityOptionsProposal?.pendingBooking ?? null
       }
     }
   });
@@ -297,6 +387,26 @@ export async function processInboundMessage(
   return { conversationId: conversation.id, reply, escalated };
 }
 
+export function sanitizeReceptionCallbackAfterNormalBooking(
+  reply: string,
+  context: { appointmentCreated: boolean; escalated: boolean; urgentBooking: boolean }
+) {
+  if (!context.appointmentCreated || context.escalated || context.urgentBooking) {
+    return reply;
+  }
+
+  return reply
+    .split(/\n{2,}/)
+    .filter(part => !mentionsReceptionCallback(part))
+    .join("\n\n")
+    .trim();
+}
+
+function mentionsReceptionCallback(text: string) {
+  const normalized = normalize(text);
+  return /(recepcion|equipo|persona|clinica).{0,80}(llam|contact|avis|confirm)|(?:te|le|lo|la)\s+(?:llamaremos|llamaran|contactaremos|contactaran)|(?:te|le)\s+llamamos|(?:te|le)\s+contactamos/.test(normalized);
+}
+
 type TreatmentForContext = {
   id: string;
   name: string;
@@ -339,6 +449,20 @@ function extractPreviousDentalState(messages: Array<{ metadata: unknown }>): Den
   return initialDentalAgentState;
 }
 
+type PendingBookingMetadata = {
+  patientId: string;
+  treatmentId: string | null;
+  providerId: string | null;
+  providerName: string | null;
+  operatoryId: string | null;
+  durationMinutes: number;
+  treatmentNeed: string;
+  channel: ConversationChannel;
+  options: string[];
+};
+
+type BookingProposal = { reply: string; pendingBooking: PendingBookingMetadata };
+
 type PersistOutcome = { created: boolean; startsAt: Date | null; providerName: string | null };
 
 async function persistDentalOutcome(input: {
@@ -347,14 +471,16 @@ async function persistDentalOutcome(input: {
   conversationId: string;
   channel: ConversationChannel;
   dentalTurn: DentalAgentApiTurn;
+  autoBook?: boolean;
 }): Promise<PersistOutcome> {
-  const { tenantId, patientId, conversationId, channel, dentalTurn } = input;
+  const { tenantId, patientId, conversationId, channel, dentalTurn, autoBook = true } = input;
   const state = dentalTurn.state;
 
   await prisma.patient.update({
     where: { id: patientId },
     data: {
       ...(state.name ? { name: state.name } : {}),
+      ...(state.email ? { email: state.email } : {}),
       treatmentNeed: state.treatmentNeed,
       estimatedValue: state.estimatedValue,
       status: state.escalated ? PatientStatus.URGENT : state.ready ? PatientStatus.OPEN_BUDGET : PatientStatus.NEW_LEAD,
@@ -381,7 +507,7 @@ async function persistDentalOutcome(input: {
     });
   }
 
-  if (!state.ready || state.escalated) {
+  if (!state.ready || state.escalated || !autoBook) {
     return { created: false, startsAt: null, providerName: null };
   }
 
@@ -416,7 +542,7 @@ async function persistDentalOutcome(input: {
     ? (await findNextAvailableSlot(tenantId, provider.id, { durationMinutes, from: preferredFrom })) ?? preferredFrom
     : preferredFrom;
 
-  await prisma.appointment.create({
+  const createdAppointment = await prisma.appointment.create({
     data: {
       tenantId,
       patientId,
@@ -430,6 +556,12 @@ async function persistDentalOutcome(input: {
       channel,
       createdByAi: true
     }
+  });
+  await notifyAppointmentEvent({
+    tenantId,
+    appointmentId: createdAppointment.id,
+    eventType: "created",
+    actor: { type: "ai" }
   });
 
   await prisma.auditLog.create({
@@ -449,6 +581,70 @@ async function persistDentalOutcome(input: {
   });
 
   return { created: true, startsAt, providerName: provider?.name ?? null };
+}
+
+async function buildBookingProposal(input: {
+  tenantId: string;
+  patientId: string;
+  channel: ConversationChannel;
+  dentalTurn: DentalAgentApiTurn;
+}): Promise<BookingProposal | null> {
+  const { tenantId, patientId, channel, dentalTurn } = input;
+  const state = dentalTurn.state;
+  const treatment = await prisma.treatment.findFirst({
+    where: {
+      tenantId,
+      active: true,
+      OR: [{ name: { contains: state.treatmentNeed.split(" ")[0] || state.treatmentNeed } }, { rules: { contains: state.intentCode } }]
+    },
+    orderBy: { name: "asc" }
+  });
+  const provider = await findProviderForIntent(tenantId, state.intent);
+  const operatory = await prisma.operatory.findFirst({ where: { tenantId, active: true }, orderBy: { name: "asc" } });
+  const durationMinutes = treatment?.durationMinutes ?? 30;
+  const options = provider
+    ? await listGuidedBookingSlots(tenantId, provider.id, state.availability, durationMinutes)
+    : fallbackGuidedSlots(state.availability);
+
+  if (options.length === 0) {
+    return {
+      reply: "Ya tengo tus datos.\n\nNo veo huecos claros ahora mismo; dejo aviso a recepcion para que te propongan una hora.",
+      pendingBooking: {
+        patientId,
+        treatmentId: treatment?.id ?? null,
+        providerId: provider?.id ?? null,
+        providerName: provider?.name ?? null,
+        operatoryId: operatory?.id ?? null,
+        durationMinutes,
+        treatmentNeed: state.treatmentNeed,
+        channel,
+        options: []
+      }
+    };
+  }
+
+  const optionLines = options.map((slot, index) => `${index + 1}. ${formatPatientSlotOption(slot)}`);
+  const reply = [
+    "Perfecto, ya tengo lo necesario.",
+    `Te propongo estos huecos en ${state.location}:`,
+    ...optionLines,
+    "Responde con 1, 2 o 3 y te la dejo pre-reservada."
+  ].join("\n\n");
+
+  return {
+    reply,
+    pendingBooking: {
+      patientId,
+      treatmentId: treatment?.id ?? null,
+      providerId: provider?.id ?? null,
+      providerName: provider?.name ?? null,
+      operatoryId: operatory?.id ?? null,
+      durationMinutes,
+      treatmentNeed: state.treatmentNeed,
+      channel,
+      options: options.map(slot => slot.toISOString())
+    }
+  };
 }
 
 async function ensureEscalationTask(
@@ -511,7 +707,10 @@ async function handleSchedulingRequest(input: {
   });
 
   if (!appointment) {
-    return { reply: "No encuentro ninguna cita proxima a tu nombre en la agenda. Si quieres, te ayudo a reservar una nueva." };
+    return {
+      reply:
+        "No encuentro ninguna cita proxima con los datos que tengo. Para localizarla mejor, dime nombre completo y telefono de contacto."
+    };
   }
 
   if (kind === "query") {
@@ -577,6 +776,125 @@ async function resolvePendingSchedulingChoice(
   }
 }
 
+async function resolvePendingBookingChoice(
+  tenantId: string,
+  conversationId: string,
+  body: string
+): Promise<string | null> {
+  const lastOutbound = await prisma.message.findFirst({
+    where: { conversationId, direction: MessageDirection.OUTBOUND },
+    orderBy: { createdAt: "desc" }
+  });
+  const metadata = asRecord(lastOutbound?.metadata);
+  const pending = parsePendingBooking(metadata.pendingBooking);
+  if (!pending || pending.options.length === 0) {
+    return null;
+  }
+
+  const choiceIndex = parseSlotChoice(body, pending.options.length);
+  if (choiceIndex === null) {
+    return null;
+  }
+
+  const startsAt = new Date(pending.options[choiceIndex]);
+  if (Number.isNaN(startsAt.getTime())) {
+    return "Ese hueco ya no parece valido. Te busco opciones nuevas si me escribes manana o tarde.";
+  }
+
+  const patient = await prisma.patient.findFirst({ where: { id: pending.patientId, tenantId }, select: { id: true, name: true } });
+  if (!patient) {
+    return "No encuentro tu ficha en esta clinica. Te paso con recepcion para revisarlo.";
+  }
+
+  const existingAppointment = await prisma.appointment.findFirst({
+    where: {
+      tenantId,
+      patientId: pending.patientId,
+      createdByAi: true,
+      startsAt: { gte: new Date() },
+      status: { in: [AppointmentStatus.REQUESTED, AppointmentStatus.PROPOSED, AppointmentStatus.CONFIRMED] }
+    },
+    orderBy: { createdAt: "desc" }
+  });
+  if (existingAppointment) {
+    return `Ya tenias una pre-reserva: ${formatFriendlyDateTime(existingAppointment.startsAt)}. Si quieres cambiarla, dimelo y te doy alternativas.`;
+  }
+
+  if (pending.providerId) {
+    const conflict = await hasBookingConflict(tenantId, pending.providerId, startsAt, pending.durationMinutes);
+    if (conflict) {
+      return "Ese hueco se acaba de ocupar. Escribeme manana o tarde y te doy tres opciones nuevas.";
+    }
+  }
+
+  const appointment = await prisma.appointment.create({
+    data: {
+      tenantId,
+      patientId: pending.patientId,
+      treatmentId: pending.treatmentId,
+      providerId: pending.providerId,
+      operatoryId: pending.operatoryId,
+      title: `IA WhatsApp: ${pending.treatmentNeed}`,
+      startsAt,
+      durationMinutes: pending.durationMinutes,
+      status: AppointmentStatus.PROPOSED,
+      channel: pending.channel,
+      createdByAi: true
+    }
+  });
+
+  await prisma.auditLog.create({
+    data: {
+      tenantId,
+      action: "agent.appointment_slot_selected",
+      entityType: "Appointment",
+      entityId: appointment.id,
+      metadata: {
+        conversationId,
+        startsAt,
+        providerId: pending.providerId,
+        choice: choiceIndex + 1
+      } as Prisma.InputJsonValue
+    }
+  });
+  await notifyAppointmentEvent({
+    tenantId,
+    appointmentId: appointment.id,
+    eventType: "created",
+    actor: { type: "ai" }
+  });
+
+  return formatPendingBookingConfirmation(startsAt);
+}
+
+export function formatPendingBookingConfirmation(startsAt: Date) {
+  return `Perfecto, te dejo pre-reservada la cita ${formatFriendlyDateTime(startsAt)}.\n\nSi no te encaja, dime cambiar y te doy otras opciones.`;
+}
+
+function parsePendingBooking(value: unknown): PendingBookingMetadata | null {
+  const record = asRecord(value);
+  const options = Array.isArray(record.options) ? record.options.filter((option): option is string => typeof option === "string") : [];
+  if (typeof record.patientId !== "string" || options.length === 0) {
+    return null;
+  }
+
+  return {
+    patientId: record.patientId,
+    treatmentId: typeof record.treatmentId === "string" ? record.treatmentId : null,
+    providerId: typeof record.providerId === "string" ? record.providerId : null,
+    providerName: typeof record.providerName === "string" ? record.providerName : null,
+    operatoryId: typeof record.operatoryId === "string" ? record.operatoryId : null,
+    durationMinutes: typeof record.durationMinutes === "number" ? record.durationMinutes : 30,
+    treatmentNeed: typeof record.treatmentNeed === "string" ? record.treatmentNeed : "valoracion dental",
+    channel: isConversationChannel(record.channel) ? record.channel : ConversationChannel.WHATSAPP,
+    options
+  };
+}
+
+function isConversationChannel(value: unknown): value is ConversationChannel {
+  return typeof value === "string" && Object.values(ConversationChannel).includes(value as ConversationChannel);
+}
+
 async function bookUrgentSlot(input: {
   tenantId: string;
   patientId: string;
@@ -611,6 +929,7 @@ async function bookUrgentSlot(input: {
 
   const startsAt = await findNextAvailableSlot(tenantId, provider.id, {
     durationMinutes: URGENT_SLOT_MINUTES,
+    from: inferPreferredStart(dentalTurn.state.availability),
     maxDaysAhead: URGENT_MAX_DAYS_AHEAD,
     bufferMinutes: URGENT_BOOKING_BUFFER_MINUTES
   });
@@ -623,7 +942,7 @@ async function bookUrgentSlot(input: {
     orderBy: { name: "asc" }
   });
 
-  await prisma.appointment.create({
+  const appointment = await prisma.appointment.create({
     data: {
       tenantId,
       patientId,
@@ -637,6 +956,12 @@ async function bookUrgentSlot(input: {
       channel,
       createdByAi: true
     }
+  });
+  await notifyAppointmentEvent({
+    tenantId,
+    appointmentId: appointment.id,
+    eventType: "created",
+    actor: { type: "ai" }
   });
 
   await prisma.auditLog.create({
@@ -662,18 +987,28 @@ async function bookUrgentSlot(input: {
 // cuya especialidad coincide (p.ej. ortodoncia -> doctor de ortodoncia), como
 // haria una recepcionista que conoce al equipo. Si nadie coincide, cualquier
 // profesional activo atiende (mejor eso que dejar sin cita).
-const SPECIALTY_KEYWORDS: Partial<Record<DentalIntentId, string[]>> = {
-  implant_price: ["implant", "periodon", "cirug"],
-  orthodontics: ["ortodon"],
-  endodontics: ["endodon"],
-  periodontics: ["periodon"],
-  prosthetics: ["estetic", "protesis", "conservador"],
-  whitening: ["estetic"],
-  caries_restoration: ["conservador"],
-  wisdom_tooth: ["cirug", "urgenc"],
-  trauma: ["cirug", "urgenc"],
-  urgent_pain: ["urgenc", "conservador"],
-  tmj_bruxism: ["conservador", "urgenc"]
+type ProviderRoutingProfile = {
+  keywords: string[];
+  avoid?: string[];
+};
+
+const SPECIALTY_ROUTING: Partial<Record<DentalIntentId, ProviderRoutingProfile>> = {
+  implant_price: { keywords: ["implant", "periodon", "cirug"], avoid: ["higien", "mantenimiento"] },
+  orthodontics: { keywords: ["ortodon"] },
+  endodontics: { keywords: ["endodon"] },
+  // Periodoncia clinica debe ir al periodoncista. Una higienista puede tener
+  // "mantenimiento periodontal" en su especialidad, pero no debe ganar el
+  // enrutado de una valoracion de encias/periodoncia.
+  periodontics: { keywords: ["periodon"], avoid: ["higien", "mantenimiento"] },
+  reactivation: { keywords: ["higien"] },
+  prosthetics: { keywords: ["estetic", "protesis", "conservador"] },
+  whitening: { keywords: ["estetic"] },
+  cosmetic_dentistry: { keywords: ["estetic"] },
+  caries_restoration: { keywords: ["conservador"] },
+  wisdom_tooth: { keywords: ["cirug", "urgenc"] },
+  trauma: { keywords: ["cirug", "urgenc"] },
+  urgent_pain: { keywords: ["urgenc", "conservador"] },
+  tmj_bruxism: { keywords: ["conservador", "urgenc"] }
 };
 
 async function findProviderForIntent(tenantId: string, intent: DentalIntentId | undefined) {
@@ -681,12 +1016,29 @@ async function findProviderForIntent(tenantId: string, intent: DentalIntentId | 
   if (providers.length === 0) {
     return null;
   }
+  return chooseProviderForIntent(providers, intent);
+}
 
-  const keywords = intent ? (SPECIALTY_KEYWORDS[intent] ?? []) : [];
-  if (keywords.length > 0) {
-    const match = providers.find(candidate => keywords.some(keyword => normalize(candidate.specialty ?? "").includes(keyword)));
-    if (match) {
-      return match;
+export function chooseProviderForIntent<T extends { specialty: string | null }>(
+  providers: T[],
+  intent: DentalIntentId | undefined
+): T | null {
+  if (providers.length === 0) {
+    return null;
+  }
+
+  const routing = intent ? SPECIALTY_ROUTING[intent] : undefined;
+  if (routing?.keywords.length) {
+    const matches = providers.filter(candidate => {
+      const specialty = normalize(candidate.specialty ?? "");
+      return routing.keywords.some(keyword => specialty.includes(keyword));
+    });
+    if (matches.length > 0) {
+      const preferred = matches.find(candidate => {
+        const specialty = normalize(candidate.specialty ?? "");
+        return !(routing.avoid ?? []).some(keyword => specialty.includes(keyword));
+      });
+      return preferred ?? matches[0];
     }
   }
 
@@ -695,6 +1047,63 @@ async function findProviderForIntent(tenantId: string, intent: DentalIntentId | 
   // la hace un odontologo. Se prioriza cualquier profesional que no sea
   // higienista antes de caer en el resto.
   return providers.find(candidate => !normalize(candidate.specialty ?? "").includes("higien")) ?? providers[0];
+}
+
+async function listGuidedBookingSlots(
+  tenantId: string,
+  providerId: string,
+  availability: string,
+  durationMinutes: number
+): Promise<Date[]> {
+  const slots: Date[] = [];
+  const normalized = normalize(availability);
+  const preferredHour = normalized.includes("tarde") ? 17 : 10;
+  const start = new Date();
+
+  for (let offset = 1; offset <= 10 && slots.length < 3; offset += 1) {
+    const candidate = new Date(start);
+    candidate.setDate(start.getDate() + offset);
+    if (candidate.getDay() === 0 || candidate.getDay() === 6) {
+      continue;
+    }
+    candidate.setHours(preferredHour, 0, 0, 0);
+    const slot = await findNextAvailableSlot(tenantId, providerId, {
+      durationMinutes,
+      from: candidate,
+      maxDaysAhead: 1
+    });
+    if (slot) {
+      slots.push(slot);
+    }
+  }
+
+  return slots;
+}
+
+function fallbackGuidedSlots(availability: string): Date[] {
+  const normalized = normalize(availability);
+  const hour = normalized.includes("tarde") ? 17 : 10;
+  const slots: Date[] = [];
+  const start = new Date();
+  for (let offset = 1; offset <= 10 && slots.length < 3; offset += 1) {
+    const candidate = new Date(start);
+    candidate.setDate(start.getDate() + offset);
+    if (candidate.getDay() === 0 || candidate.getDay() === 6) {
+      continue;
+    }
+    candidate.setHours(hour, 0, 0, 0);
+    slots.push(candidate);
+  }
+  return slots;
+}
+
+async function hasBookingConflict(
+  tenantId: string,
+  providerId: string,
+  startsAt: Date,
+  durationMinutes: number
+): Promise<boolean> {
+  return hasConflict(tenantId, { providerId, startsAt, durationMinutes });
 }
 
 // Fecha en lenguaje natural para el paciente ("hoy a las 18:00" / "martes 14
@@ -710,6 +1119,16 @@ export function formatFriendlyDateTime(date: Date): string {
   return `${dayLabel} a las ${time}`;
 }
 
+function formatPatientSlotOption(date: Date): string {
+  return new Intl.DateTimeFormat("es-ES", {
+    weekday: "long",
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(date);
+}
+
 export function formatUrgentSlotSentence(booking: UrgentBooking): string {
   const withWho = ` con ${booking.providerName}`;
   const where = booking.operatoryName ? ` en ${booking.operatoryName}` : "";
@@ -721,17 +1140,28 @@ function formatSlotForStaff(date: Date): string {
   return new Intl.DateTimeFormat("es-ES", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }).format(date);
 }
 
-function inferPreferredStart(availability: string) {
-  const start = new Date();
-  start.setDate(start.getDate() + 1);
+export function inferPreferredStartForTest(availability: string, now = new Date()) {
+  return inferPreferredStart(availability, now);
+}
+
+function inferPreferredStart(availability: string, now = new Date()) {
+  const start = new Date(now);
   start.setMinutes(0, 0, 0);
 
-  const normalized = availability.toLowerCase();
+  const normalized = normalize(availability);
+  if (normalized.includes("pasado manana")) {
+    start.setDate(start.getDate() + 2);
+  } else if (normalized.includes("manana") || normalized.includes("proxima semana")) {
+    start.setDate(start.getDate() + 1);
+  } else {
+    start.setDate(start.getDate() + 1);
+  }
+
   if (normalized.includes("tarde")) {
     start.setHours(17);
     return start;
   }
-  if (normalized.includes("manana") || normalized.includes("mañana")) {
+  if (/(por la manana|por las mananas|de manana|primera hora|temprano)/.test(normalized)) {
     start.setHours(10);
     return start;
   }
@@ -747,6 +1177,38 @@ function inferPreferredStart(availability: string) {
   return start;
 }
 
+function getRequestedAvailabilityOptionsPeriod(body: string) {
+  const normalized = normalize(body);
+  const asksForOptions = /(que dias|que dia|que huecos|que horas|tienes|teneis|disponible|disponibilidad|opciones|hueco|huecos)/.test(normalized);
+  if (!asksForOptions) {
+    return "";
+  }
+  if (/\b(tarde|tardes|por la tarde|por las tardes)\b/.test(normalized)) {
+    return "tarde";
+  }
+  if (/\b(manana|mananas|por la manana|por las mananas)\b/.test(normalized)) {
+    return "manana";
+  }
+  return "";
+}
+
+function canOfferAvailabilityOptions(state: DentalAgentState) {
+  return Boolean(
+    state.intent &&
+    state.consent &&
+    state.name.trim().split(/\s+/).filter(Boolean).length >= 2 &&
+    state.phone &&
+    state.email &&
+    state.location &&
+    !state.availability
+  );
+}
+
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+}
+
+function extractEmail(text: string) {
+  const match = text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
+  return match?.[0]?.toLowerCase() ?? "";
 }

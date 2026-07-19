@@ -1,16 +1,19 @@
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import {
   AgentSessionOutcome,
   AppointmentStatus,
   ConsentKind,
   ConversationChannel,
   ConversationStatus,
+  ElectronicInvoiceStatus,
   ExpenseCategory,
   ExpenseStatus,
   InvoiceStatus,
+  InvoiceReceiverType,
   MessageDirection,
   PatientStatus,
   PrismaClient,
+  SifMode,
   TaskPriority,
   TaskStatus,
   UserRole
@@ -24,12 +27,17 @@ const PRIMARY_TENANT = {
   name: "Clinica Dental Murcia-Elche",
   slug: "clinica-murcia-elche",
   legalName: "Clinica Dental Murcia-Elche S.L.",
+  taxId: "B00000000",
+  fiscalAddress: "Calle Demo 12, 30001 Murcia",
   phone: "+34 968 000 111",
   address: "Sedes en Murcia y Elche",
   pmsProvider: "Klinikare API",
   assistantName: "Clara",
   assistantEnabled: true,
-  retentionDays: 90
+  retentionDays: 90,
+  invoiceSeries: "F",
+  electronicInvoiceProvider: "Proveedor pendiente",
+  sifMode: SifMode.NO_VERIFACTU
 };
 // Resumen operativo de la clinica para el prompt del agente IA. Fuente:
 // RUIZ-ESTRADA-BASE-CONOCIMIENTO.md (investigacion propia sobre la web real
@@ -185,7 +193,7 @@ async function main() {
   // Equipo real de la clinica (ver RUIZ-ESTRADA-BASE-CONOCIMIENTO.md seccion 3):
   // el enrutado por especialidad (findProviderForIntent en src/lib/agent/index.ts)
   // hace match por subcadena contra estos campos "specialty".
-  const [draEstrada, drManuel, higienista, drErnesto, draLaura] = await Promise.all([
+  const [draEstrada, drManuel, higienista, drErnesto] = await Promise.all([
     prisma.provider.upsert({
       where: { id: "seed-provider-vidal" },
       update: { name: "Dra. Esther Estrada Mallada", specialty: "Ortodoncia" },
@@ -268,6 +276,9 @@ async function main() {
     name: "Maria Lopez Gonzalez",
     phone: "+34 612 456 890",
     email: "maria.lopez@mail.com",
+    fiscalName: "Maria Lopez Gonzalez",
+    taxId: "12345678Z",
+    fiscalAddress: "Calle Mayor 12, 30001 Murcia",
     status: PatientStatus.NEW_LEAD,
     source: "WhatsApp",
     preferredChannel: ConversationChannel.WHATSAPP,
@@ -292,6 +303,9 @@ async function main() {
     name: "Ana Molina Prieto",
     phone: "+34 600 331 987",
     email: "ana.molina@mail.com",
+    fiscalName: "Ana Molina Prieto",
+    taxId: "87654321X",
+    fiscalAddress: "Avenida Libertad 8, 03201 Elche",
     status: PatientStatus.OPEN_BUDGET,
     source: "WhatsApp",
     preferredChannel: ConversationChannel.WHATSAPP,
@@ -498,6 +512,9 @@ async function upsertPatient(
     name: string;
     phone: string;
     email: string;
+    fiscalName?: string;
+    taxId?: string;
+    fiscalAddress?: string;
     status: PatientStatus;
     source: string;
     preferredChannel: ConversationChannel;
@@ -565,6 +582,9 @@ async function seedBilling(
     name: "Lucia Rivas Fernandez",
     phone: "+34 655 902 341",
     email: "lucia.rivas@mail.com",
+    fiscalName: "Lucia Rivas Fernandez",
+    taxId: "11223344B",
+    fiscalAddress: "Calle Traperia 4, 30001 Murcia",
     status: PatientStatus.ACTIVE,
     source: "Instagram",
     preferredChannel: ConversationChannel.WHATSAPP,
@@ -577,6 +597,9 @@ async function seedBilling(
     name: "Antonio Fernandez Ruiz",
     phone: "+34 611 774 502",
     email: "antonio.fernandez@mail.com",
+    fiscalName: "Antonio Fernandez Ruiz",
+    taxId: "44332211C",
+    fiscalAddress: "Calle Reina Victoria 19, 03201 Elche",
     status: PatientStatus.ACTIVE,
     source: "Google",
     preferredChannel: ConversationChannel.EMAIL,
@@ -585,10 +608,43 @@ async function seedBilling(
     notes: "Implante colocado, pendiente de segunda cuota."
   });
 
+  const firstInvoiceIssuedAt = daysFromNow(-15);
+  const firstInvoiceFiscalHash = createHash("sha256")
+    .update([tenantId, "F-2026-001", firstInvoiceIssuedAt.toISOString(), 159000, 159000, 0, "A00000000"].join("|"))
+    .digest("hex");
+
   await prisma.invoice.deleteMany({ where: { tenantId } });
   await prisma.invoice.createMany({
     data: [
-      { tenantId, patientId: patients.maria.id, number: "F-2026-001", treatmentName: "Ortodoncia invisible", amountCents: 159000, status: InvoiceStatus.SENT, issuedAt: daysFromNow(-15), dueAt: daysFromNow(15) },
+      {
+        tenantId,
+        patientId: patients.maria.id,
+        number: "F-2026-001",
+        series: "F",
+        sequence: 1,
+        receiverType: InvoiceReceiverType.INSURER,
+        receiverName: "Mutua Dental Demo S.A.",
+        receiverTaxId: "A00000000",
+        receiverEmail: "facturas@mutuademo.test",
+        issuerLegalName: PRIMARY_TENANT.legalName,
+        issuerTaxId: PRIMARY_TENANT.taxId,
+        issuerAddress: PRIMARY_TENANT.fiscalAddress,
+        treatmentName: "Ortodoncia invisible",
+        amountCents: 159000,
+        taxBaseCents: 159000,
+        taxCents: 0,
+        taxRateBasisPoints: 0,
+        taxExemptionReason: "Operacion sanitaria exenta o no sujeta a IVA segun configuracion de la clinica.",
+        status: InvoiceStatus.SENT,
+        electronicStatus: ElectronicInvoiceStatus.READY,
+        electronicProvider: PRIMARY_TENANT.electronicInvoiceProvider,
+        sifMode: PRIMARY_TENANT.sifMode,
+        fiscalHash: firstInvoiceFiscalHash,
+        qrPayload: "https://www2.agenciatributaria.gob.es/wlpl/TIKE-CONT/ValidarQR?nif=B00000000&numserie=F-2026-001&importe=1590.00",
+        immutableIssued: true,
+        issuedAt: firstInvoiceIssuedAt,
+        dueAt: daysFromNow(15)
+      },
       { tenantId, patientId: lucia.id, number: "F-2026-002", treatmentName: "Ortodoncia invisible", amountCents: 70000, status: InvoiceStatus.SENT, issuedAt: daysFromNow(-2), dueAt: daysFromNow(28) },
       { tenantId, patientId: patients.javier.id, number: "F-2026-003", treatmentName: "Urgencia dental", amountCents: 7000, status: InvoiceStatus.OVERDUE, issuedAt: daysFromNow(-40), dueAt: daysFromNow(-35) },
       { tenantId, patientId: antonio.id, number: "F-2026-004", treatmentName: "Implante unitario", amountCents: 60000, status: InvoiceStatus.OVERDUE, issuedAt: daysFromNow(-50), dueAt: daysFromNow(-20) },

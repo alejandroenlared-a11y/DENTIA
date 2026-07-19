@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+
+<html class="light" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>DENTIA - Ficha Resumen Paciente</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                "on-surface-variant": "#41474f",
+                "border-subtle": "#E8EBEE",
+                "on-secondary": "#ffffff",
+                "outline": "#717880",
+                "surface-container-lowest": "#ffffff",
+                "on-tertiary-fixed": "#2e1500",
+                "on-primary-container": "#9fd0ff",
+                "on-background": "#191c1f",
+                "on-secondary-fixed-variant": "#3c4852",
+                "surface-container": "#eceef2",
+                "border-base": "#D9DEE3",
+                "tertiary-fixed": "#ffdcc1",
+                "surface-container-high": "#e7e8ed",
+                "on-primary-fixed-variant": "#004a75",
+                "secondary-fixed": "#d8e4f1",
+                "warning": "#B37D00",
+                "secondary-container": "#d5e1ee",
+                "on-primary-fixed": "#001d32",
+                "surface-container-low": "#f2f3f8",
+                "on-surface": "#191c1f",
+                "on-secondary-fixed": "#111d26",
+                "surface": "#FFFFFF",
+                "primary-container": "#005a8c",
+                "on-tertiary-fixed-variant": "#6c3a00",
+                "inverse-on-surface": "#eff1f5",
+                "tertiary": "#613300",
+                "surface-tint": "#166395",
+                "success": "#278561",
+                "surface-dim": "#d8dadf",
+                "on-tertiary": "#ffffff",
+                "secondary-fixed-dim": "#bcc8d4",
+                "surface-alt": "#F0F2F4",
+                "surface-container-highest": "#e1e2e7",
+                "tertiary-container": "#824701",
+                "primary": "#004268",
+                "secondary": "#54606b",
+                "outline-variant": "#c1c7d0",
+                "on-error": "#ffffff",
+                "on-error-container": "#93000a",
+                "inverse-surface": "#2e3134",
+                "surface-bright": "#f8f9fe",
+                "primary-fixed": "#cde5ff",
+                "inverse-primary": "#95ccff",
+                "tertiary-fixed-dim": "#ffb779",
+                "on-tertiary-container": "#ffbe87",
+                "background": "#F5F6F7",
+                "primary-fixed-dim": "#95ccff",
+                "surface-variant": "#e1e2e7",
+                "error-container": "#ffdad6",
+                "text-primary": "#17212B",
+                "on-primary": "#ffffff",
+                "error": "#C53030",
+                "on-secondary-container": "#58646f"
+            },
+            "borderRadius": {
+                "DEFAULT": "0.125rem",
+                "lg": "0.25rem",
+                "xl": "0.5rem",
+                "full": "0.75rem"
+            },
+            "spacing": {
+                "sidebar-collapsed": "64px",
+                "gutter": "1rem",
+                "sidebar-width": "224px",
+                "padding-compact": "0.75rem",
+                "padding-base": "1rem",
+                "header-height": "52px"
+            },
+            "fontFamily": {
+                "headline-md": ["Inter"],
+                "headline-lg": ["Inter"],
+                "label-xs": ["Inter"],
+                "body-sm": ["Inter"],
+                "body-md": ["Inter"]
+            },
+            "fontSize": {
+                "headline-md": ["16px", {"lineHeight": "24px", "fontWeight": "600"}],
+                "headline-lg": ["22px", {"lineHeight": "32px", "fontWeight": "600"}],
+                "label-xs": ["10px", {"lineHeight": "14px", "letterSpacing": "0.02em", "fontWeight": "500"}],
+                "body-sm": ["11px", {"lineHeight": "16px", "fontWeight": "400"}],
+                "body-md": ["12px", {"lineHeight": "18px", "fontWeight": "400"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
+            font-size: 18px;
+        }
+        .sidebar-scroll::-webkit-scrollbar { width: 4px; }
+        .sidebar-scroll::-webkit-scrollbar-thumb { background: #D9DEE3; border-radius: 10px; }
+    </style>
+</head>
+<body class="bg-background text-on-surface">
+<!-- SideNavBar -->
+<aside class="w-sidebar-width h-screen fixed left-0 top-0 border-r border-border-base bg-surface flex flex-col py-4 z-50">
+<div class="px-6 mb-8">
+<h1 class="font-headline-md text-headline-md font-bold text-primary">DENTIA</h1>
+<p class="font-label-xs text-label-xs text-on-surface-variant uppercase tracking-wider">Dental Software</p>
+</div>
+<nav class="flex-1 px-3 space-y-1 sidebar-scroll overflow-y-auto">
+<!-- Navigation Items mapped from JSON -->
+<a class="flex items-center gap-3 px-3 py-2 transition-colors duration-150 ease-in-out text-on-surface-variant hover:bg-surface-alt hover:text-primary rounded" href="#">
+<span class="material-symbols-outlined">home</span>
+<span class="font-body-md text-body-md">Inicio</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 transition-colors duration-150 ease-in-out text-on-surface-variant hover:bg-surface-alt hover:text-primary rounded" href="#">
+<span class="material-symbols-outlined">calendar_month</span>
+<span class="font-body-md text-body-md">Agenda</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 transition-colors duration-150 ease-in-out text-primary font-semibold border-r-2 border-primary bg-surface-alt rounded-l" href="#">
+<span class="material-symbols-outlined">group</span>
+<span class="font-body-md text-body-md">Pacientes</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 transition-colors duration-150 ease-in-out text-on-surface-variant hover:bg-surface-alt hover:text-primary rounded" href="#">
+<span class="material-symbols-outlined">medical_services</span>
+<span class="font-body-md text-body-md">Clínica</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 transition-colors duration-150 ease-in-out text-on-surface-variant hover:bg-surface-alt hover:text-primary rounded" href="#">
+<span class="material-symbols-outlined">dentistry</span>
+<span class="font-body-md text-body-md">Tratamientos</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 transition-colors duration-150 ease-in-out text-on-surface-variant hover:bg-surface-alt hover:text-primary rounded" href="#">
+<span class="material-symbols-outlined">payments</span>
+<span class="font-body-md text-body-md">Finanzas</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 transition-colors duration-150 ease-in-out text-on-surface-variant hover:bg-surface-alt hover:text-primary rounded" href="#">
+<span class="material-symbols-outlined">account_tree</span>
+<span class="font-body-md text-body-md">CRM</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 transition-colors duration-150 ease-in-out text-on-surface-variant hover:bg-surface-alt hover:text-primary rounded" href="#">
+<span class="material-symbols-outlined">folder_open</span>
+<span class="font-body-md text-body-md">Documentos</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 transition-colors duration-150 ease-in-out text-on-surface-variant hover:bg-surface-alt hover:text-primary rounded" href="#">
+<span class="material-symbols-outlined">inventory_2</span>
+<span class="font-body-md text-body-md">Inventario</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 transition-colors duration-150 ease-in-out text-on-surface-variant hover:bg-surface-alt hover:text-primary rounded" href="#">
+<span class="material-symbols-outlined">badge</span>
+<span class="font-body-md text-body-md">Equipo</span>
+</a>
+<div class="pt-4 mt-4 border-t border-border-subtle">
+<a class="flex items-center gap-3 px-3 py-2 transition-colors duration-150 ease-in-out text-on-surface-variant hover:bg-surface-alt hover:text-primary rounded" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-body-md text-body-md">Configuración</span>
+</a>
+</div>
+</nav>
+</aside>
+<!-- TopNavBar -->
+<header class="h-header-height fixed top-0 right-0 left-sidebar-width z-50 bg-surface border-b border-border-base flex items-center justify-between px-gutter">
+<div class="flex items-center gap-6">
+<div class="relative">
+<input class="w-64 h-8 bg-surface-container-low border border-border-base rounded px-3 py-1 font-body-md text-body-md focus:outline-none focus:border-primary" placeholder="Buscar pacientes..." type="text"/>
+<span class="material-symbols-outlined absolute right-2 top-1.5 text-on-surface-variant text-[16px]">search</span>
+</div>
+<div class="flex items-center gap-4 border-l border-border-base pl-6 h-6">
+<span class="font-body-md text-body-md text-primary font-bold border-b-2 border-primary pb-1">Sede Centro</span>
+<span class="font-body-md text-body-md text-on-surface-variant hover:text-primary cursor-pointer transition-colors">Sede Playa</span>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="bg-primary text-on-primary px-3 py-1.5 rounded font-body-md font-semibold hover:opacity-90 active:scale-95 transition-all">+ Crear</button>
+<div class="flex items-center gap-2">
+<button class="p-1.5 hover:bg-surface-alt rounded transition-colors text-on-surface-variant">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<div class="flex items-center gap-2 pl-2 border-l border-border-base ml-2 cursor-pointer group">
+<div class="w-8 h-8 rounded-full bg-secondary-container flex items-center justify-center">
+<span class="material-symbols-outlined text-on-secondary-container">account_circle</span>
+</div>
+<span class="font-body-md text-body-md text-on-surface group-hover:text-primary transition-colors">Dr. Smith</span>
+</div>
+</div>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="ml-sidebar-width pt-header-height min-h-screen">
+<!-- TopAppBar (Patient Banner) -->
+<div class="w-full h-auto sticky top-header-height z-40 bg-surface-container-low border-b border-border-subtle px-gutter py-3 flex flex-wrap items-center justify-between gap-4">
+<div class="flex items-center gap-4">
+<div class="w-10 h-10 rounded-full bg-primary-container flex items-center justify-center text-on-primary-container">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">person</span>
+</div>
+<div>
+<h2 class="font-headline-md text-headline-md text-on-surface">Juan Pérez García</h2>
+<div class="flex items-center gap-3">
+<span class="font-label-xs text-label-xs text-on-surface-variant">HC: #28442</span>
+<span class="w-1.5 h-1.5 rounded-full bg-success"></span>
+<span class="font-label-xs text-label-xs text-success font-semibold">Paciente Activo</span>
+</div>
+</div>
+</div>
+<!-- Medical Alerts & Balance -->
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-2 bg-error-container/40 border border-error/20 px-3 py-1.5 rounded">
+<span class="material-symbols-outlined text-error text-[18px]">warning</span>
+<span class="font-body-sm text-body-sm text-on-error-container font-semibold">ALERTA MÉDICA: Hipertensión, Anticoagulantes</span>
+</div>
+<div class="flex items-center gap-2 bg-surface px-3 py-1.5 border border-border-base rounded">
+<span class="font-label-xs text-label-xs text-on-surface-variant">SALDO PENDIENTE</span>
+<span class="font-headline-md text-headline-md text-error">145,00€</span>
+</div>
+</div>
+<!-- Trailing Icons/Actions -->
+<div class="flex items-center gap-2">
+<button class="p-2 hover:bg-surface-variant rounded transition-all text-on-surface-variant">
+<span class="material-symbols-outlined">account_balance_wallet</span>
+</button>
+<button class="p-2 hover:bg-surface-variant rounded transition-all text-on-surface-variant">
+<span class="material-symbols-outlined">quick_reference_all</span>
+</button>
+<button class="p-2 hover:bg-surface-variant rounded transition-all text-on-surface-variant">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</div>
+</div>
+<!-- Dashboard Content -->
+<div class="p-gutter max-w-7xl mx-auto">
+<!-- Quick Action Buttons -->
+<div class="flex gap-2 mb-8">
+<button class="flex items-center gap-2 px-4 py-2 bg-primary text-on-primary rounded font-body-md font-semibold active:scale-95 transition-all">
+<span class="material-symbols-outlined text-[18px]">add_circle</span>
+                    Nueva cita
+                </button>
+<button class="flex items-center gap-2 px-4 py-2 bg-surface border border-primary text-primary rounded font-body-md font-semibold hover:bg-surface-alt active:scale-95 transition-all">
+<span class="material-symbols-outlined text-[18px]">edit_document</span>
+                    Abrir encuentro
+                </button>
+<button class="flex items-center gap-2 px-4 py-2 bg-surface border border-border-base text-on-surface-variant rounded font-body-md font-semibold hover:bg-surface-alt active:scale-95 transition-all">
+<span class="material-symbols-outlined text-[18px]">note_add</span>
+                    Nueva nota
+                </button>
+</div>
+<div class="grid grid-cols-12 gap-6">
+<!-- Main Column (8 cols) -->
+<div class="col-span-12 lg:col-span-8 space-y-6">
+<!-- Próxima Cita -->
+<div class="bg-surface border border-border-base rounded p-4">
+<div class="flex items-center justify-between mb-4">
+<h3 class="font-headline-md text-headline-md text-primary flex items-center gap-2">
+<span class="material-symbols-outlined">event</span>
+                                Próxima cita
+                            </h3>
+<span class="text-label-xs font-label-xs bg-secondary-container text-on-secondary-container px-2 py-0.5 rounded">MAÑANA</span>
+</div>
+<div class="flex items-start gap-4 p-3 bg-surface-alt rounded">
+<div class="flex flex-col items-center justify-center bg-surface border border-border-base w-14 h-14 rounded">
+<span class="font-label-xs text-label-xs text-on-surface-variant uppercase">OCT</span>
+<span class="font-headline-lg text-headline-lg text-primary leading-none">24</span>
+</div>
+<div class="flex-1">
+<p class="font-body-md text-body-md font-bold text-on-surface">10:30 AM — Limpieza Profiláctica + Revisión</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Gabinete 02 · Dra. Elena Rodríguez</p>
+<p class="font-body-sm text-body-sm text-primary mt-1">Duración estimada: 45 min</p>
+</div>
+<button class="text-primary hover:underline font-body-sm text-body-sm">Ver detalles</button>
+</div>
+</div>
+<!-- Tratamiento Activo (Bento Style) -->
+<div class="bg-surface border border-border-base rounded overflow-hidden">
+<div class="p-4 border-b border-border-subtle bg-surface-container-low flex justify-between items-center">
+<h3 class="font-headline-md text-headline-md text-on-surface">Tratamiento activo</h3>
+<button class="text-primary font-body-sm text-body-sm hover:underline">Ver Plan Completo</button>
+</div>
+<div class="p-4">
+<div class="mb-4">
+<div class="flex justify-between items-center mb-1">
+<span class="font-body-md text-body-md font-semibold text-on-surface">Ortodoncia Invisible (Invisalign)</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">65% Completado</span>
+</div>
+<div class="w-full bg-surface-variant h-1.5 rounded-full overflow-hidden">
+<div class="bg-primary h-full w-[65%]"></div>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-3 mt-4">
+<div class="border border-border-subtle p-3 rounded bg-surface">
+<p class="font-label-xs text-label-xs text-on-surface-variant uppercase mb-1">Última Fase</p>
+<p class="font-body-md text-body-md font-medium">Ajuste férula #14</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant">12 Sept, 2023</p>
+</div>
+<div class="border border-border-subtle p-3 rounded bg-surface">
+<p class="font-label-xs text-label-xs text-on-surface-variant uppercase mb-1">Siguiente Hito</p>
+<p class="font-body-md text-body-md font-medium">Escaneo 3D Refinamiento</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant">08 Nov, 2023</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Actividad Reciente (Table) -->
+<div class="bg-surface border border-border-base rounded">
+<div class="p-4 border-b border-border-subtle">
+<h3 class="font-headline-md text-headline-md text-on-surface">Actividad reciente</h3>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full border-collapse">
+<thead class="bg-surface-container-low">
+<tr>
+<th class="px-4 py-2 text-left font-label-xs text-label-xs text-on-surface-variant uppercase tracking-wider">Fecha</th>
+<th class="px-4 py-2 text-left font-label-xs text-label-xs text-on-surface-variant uppercase tracking-wider">Acción</th>
+<th class="px-4 py-2 text-left font-label-xs text-label-xs text-on-surface-variant uppercase tracking-wider">Profesional</th>
+<th class="px-4 py-2 text-left font-label-xs text-label-xs text-on-surface-variant uppercase tracking-wider">Estado</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-border-subtle">
+<tr class="hover:bg-surface-alt transition-colors h-[38px]">
+<td class="px-4 font-body-sm text-body-sm">Hoy, 09:15</td>
+<td class="px-4 font-body-sm text-body-sm">Nota clínica añadida</td>
+<td class="px-4 font-body-sm text-body-sm">Dra. Elena Rodríguez</td>
+<td class="px-4">
+<span class="text-[10px] bg-surface-variant text-on-surface-variant px-1.5 py-0.5 rounded">GUARDADO</span>
+</td>
+</tr>
+<tr class="hover:bg-surface-alt transition-colors h-[38px]">
+<td class="px-4 font-body-sm text-body-sm">12 Oct, 2023</td>
+<td class="px-4 font-body-sm text-body-sm">Pago de factura #F-2023/12</td>
+<td class="px-4 font-body-sm text-body-sm">Administración</td>
+<td class="px-4">
+<span class="text-[10px] bg-success/10 text-success px-1.5 py-0.5 rounded font-bold">PAGADO</span>
+</td>
+</tr>
+<tr class="hover:bg-surface-alt transition-colors h-[38px]">
+<td class="px-4 font-body-sm text-body-sm">05 Oct, 2023</td>
+<td class="px-4 font-body-sm text-body-sm">Prueba de diagnóstico (RX)</td>
+<td class="px-4 font-body-sm text-body-sm">Téc. Marcos Ruiz</td>
+<td class="px-4">
+<span class="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded font-bold">ARCHIVADO</span>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<!-- Side Column (4 cols) -->
+<div class="col-span-12 lg:col-span-4 space-y-6">
+<!-- Alergias y Medicación -->
+<div class="bg-surface border border-border-base rounded p-4">
+<div class="mb-6">
+<h4 class="font-label-xs text-label-xs text-on-surface-variant uppercase mb-3 flex items-center gap-2">
+<span class="material-symbols-outlined text-[16px] text-error">coronavirus</span>
+                                Alergias
+                            </h4>
+<div class="flex flex-wrap gap-2">
+<span class="bg-error/10 text-error font-body-sm text-body-sm px-2 py-1 rounded border border-error/20 font-medium">Penicilina</span>
+<span class="bg-error/10 text-error font-body-sm text-body-sm px-2 py-1 rounded border border-error/20 font-medium">Látex</span>
+<span class="bg-surface-variant text-on-surface-variant font-body-sm text-body-sm px-2 py-1 rounded">Polen (Estacional)</span>
+</div>
+</div>
+<div>
+<h4 class="font-label-xs text-label-xs text-on-surface-variant uppercase mb-3 flex items-center gap-2">
+<span class="material-symbols-outlined text-[16px] text-warning">pill</span>
+                                Medicación actual
+                            </h4>
+<ul class="space-y-2">
+<li class="flex items-start gap-2 group">
+<span class="material-symbols-outlined text-[14px] mt-0.5 text-on-surface-variant">check_circle</span>
+<div>
+<p class="font-body-md text-body-md font-medium text-on-surface">Simvastatina 20mg</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant">1 comprimido/noche</p>
+</div>
+</li>
+<li class="flex items-start gap-2">
+<span class="material-symbols-outlined text-[14px] mt-0.5 text-on-surface-variant">check_circle</span>
+<div>
+<p class="font-body-md text-body-md font-medium text-on-surface">Aspirina 100mg</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Pre-operatorio: requiere interrupción</p>
+</div>
+</li>
+</ul>
+</div>
+</div>
+<!-- Contactos -->
+<div class="bg-surface border border-border-base rounded p-4">
+<h4 class="font-label-xs text-label-xs text-on-surface-variant uppercase mb-4">Información de contacto</h4>
+<div class="space-y-4">
+<div>
+<p class="font-label-xs text-label-xs text-on-surface-variant">Teléfono móvil</p>
+<p class="font-body-md text-body-md text-primary font-medium">+34 600 123 456</p>
+</div>
+<div>
+<p class="font-label-xs text-label-xs text-on-surface-variant">Correo electrónico</p>
+<p class="font-body-md text-body-md text-primary font-medium">juan.perez@email.com</p>
+</div>
+<div class="pt-4 border-t border-border-subtle">
+<p class="font-label-xs text-label-xs text-on-surface-variant mb-2">Contacto de emergencia</p>
+<div class="bg-surface-alt p-2 rounded">
+<p class="font-body-md text-body-md font-bold text-on-surface">María García (Esposa)</p>
+<p class="font-body-sm text-body-sm text-on-surface-variant">+34 600 987 654</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Resumen Financiero Mini -->
+<div class="bg-primary/5 border border-primary/10 rounded p-4">
+<h4 class="font-label-xs text-label-xs text-primary uppercase mb-3">Resumen Financiero</h4>
+<div class="flex flex-col gap-2">
+<div class="flex justify-between">
+<span class="font-body-sm text-body-sm text-on-surface-variant">Total Presupuestado</span>
+<span class="font-body-md text-body-md font-semibold">2.450,00€</span>
+</div>
+<div class="flex justify-between">
+<span class="font-body-sm text-body-sm text-on-surface-variant">Pagado hasta hoy</span>
+<span class="font-body-md text-body-md font-semibold text-success">2.305,00€</span>
+</div>
+<div class="pt-2 border-t border-primary/20 flex justify-between mt-1">
+<span class="font-body-sm text-body-sm font-bold text-on-surface">Saldo Restante</span>
+<span class="font-body-md text-body-md font-bold text-error">145,00€</span>
+</div>
+</div>
+<button class="w-full mt-4 bg-primary/10 text-primary py-1.5 rounded font-body-sm text-body-sm font-bold hover:bg-primary/20 transition-colors">Generar Factura</button>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Floating Action Button (Contextual) -->
+<div class="fixed bottom-6 right-6 flex flex-col gap-3">
+<button class="w-12 h-12 bg-primary text-on-primary rounded-full shadow-lg flex items-center justify-center hover:scale-105 active:scale-95 transition-all">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">add</span>
+</button>
+</div>
+<script>
+        // Micro-interaction for sidebar links
+        document.querySelectorAll('aside nav a').forEach(link => {
+            link.addEventListener('click', function(e) {
+                // If we were building a multi-page app, this would handle navigation
+                // For now, it just demonstrates interaction
+            });
+        });
+
+        // Simple shadow toggle on header on scroll
+        window.addEventListener('scroll', () => {
+            const header = document.querySelector('header');
+            if (window.scrollY > 0) {
+                header.classList.add('shadow-sm');
+            } else {
+                header.classList.remove('shadow-sm');
+            }
+        });
+    </script>
+</body></html>

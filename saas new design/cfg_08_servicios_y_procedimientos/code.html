@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+
+<html class="light" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>DENTIA - Servicios y Procedimientos (CFG-08)</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
+            font-size: 18px;
+        }
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #D9DEE3;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #717880;
+        }
+        .clinical-table-row:hover {
+            background-color: #F0F2F4;
+        }
+        .compact-input:focus {
+            outline: none;
+            border-color: #004268;
+        }
+    </style>
+<!-- Tailwind Config Verbatim -->
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "tertiary": "#613300",
+                      "on-secondary": "#ffffff",
+                      "secondary-fixed": "#d8e4f1",
+                      "on-tertiary-fixed-variant": "#6c3a00",
+                      "inverse-surface": "#2e3134",
+                      "on-primary-fixed": "#001d32",
+                      "tertiary-fixed-dim": "#ffb779",
+                      "on-surface": "#191c1f",
+                      "on-secondary-container": "#58646f",
+                      "on-secondary-fixed-variant": "#3c4852",
+                      "surface-bright": "#f8f9fe",
+                      "surface-alt": "#F0F2F4",
+                      "primary": "#004268",
+                      "on-surface-variant": "#41474f",
+                      "text-primary": "#17212B",
+                      "background": "#F5F6F7",
+                      "border-subtle": "#E8EBEE",
+                      "surface-variant": "#e1e2e7",
+                      "secondary-container": "#d5e1ee",
+                      "surface-container": "#eceef2",
+                      "primary-fixed-dim": "#95ccff",
+                      "surface-container-highest": "#e1e2e7",
+                      "surface-container-lowest": "#ffffff",
+                      "surface-dim": "#d8dadf",
+                      "surface-tint": "#166395",
+                      "on-primary": "#ffffff",
+                      "on-tertiary-container": "#ffbe87",
+                      "on-primary-fixed-variant": "#004a75",
+                      "tertiary-container": "#824701",
+                      "on-background": "#191c1f",
+                      "surface": "#FFFFFF",
+                      "primary-fixed": "#cde5ff",
+                      "error": "#C53030",
+                      "warning": "#B37D00",
+                      "inverse-primary": "#95ccff",
+                      "surface-container-low": "#f2f3f8",
+                      "primary-container": "#005a8c",
+                      "tertiary-fixed": "#ffdcc1",
+                      "on-primary-container": "#9fd0ff",
+                      "inverse-on-surface": "#eff1f5",
+                      "on-error-container": "#93000a",
+                      "on-error": "#ffffff",
+                      "secondary-fixed-dim": "#bcc8d4",
+                      "outline-variant": "#c1c7d0",
+                      "on-secondary-fixed": "#111d26",
+                      "border-base": "#D9DEE3",
+                      "outline": "#717880",
+                      "secondary": "#54606b",
+                      "surface-container-high": "#e7e8ed",
+                      "on-tertiary-fixed": "#2e1500",
+                      "on-tertiary": "#ffffff",
+                      "success": "#278561",
+                      "error-container": "#ffdad6"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.125rem",
+                      "lg": "0.25rem",
+                      "xl": "0.5rem",
+                      "full": "0.75rem"
+              },
+              "spacing": {
+                      "sidebar-collapsed": "64px",
+                      "padding-base": "1rem",
+                      "sidebar-width": "224px",
+                      "padding-compact": "0.75rem",
+                      "gutter": "1rem",
+                      "header-height": "52px"
+              },
+              "fontFamily": {
+                      "body-md": ["Inter"],
+                      "label-xs": ["Inter"],
+                      "headline-md": ["Inter"],
+                      "headline-lg": ["Inter"],
+                      "body-sm": ["Inter"]
+              },
+              "fontSize": {
+                      "body-md": ["12px", {"lineHeight": "18px", "fontWeight": "400"}],
+                      "label-xs": ["10px", {"lineHeight": "14px", "letterSpacing": "0.02em", "fontWeight": "500"}],
+                      "headline-md": ["16px", {"lineHeight": "24px", "fontWeight": "600"}],
+                      "headline-lg": ["22px", {"lineHeight": "32px", "fontWeight": "600"}],
+                      "body-sm": ["11px", {"lineHeight": "16px", "fontWeight": "400"}]
+              }
+            },
+          },
+        }
+    </script>
+</head>
+<body class="bg-background text-on-surface font-body-md overflow-hidden h-screen flex">
+<!-- SideNavBar Component (JSON based) -->
+<nav class="bg-surface w-sidebar-width h-screen fixed left-0 top-0 border-r border-border-base flex flex-col py-4 overflow-y-auto transition-colors duration-150 ease-in-out" id="sidebar">
+<div class="px-6 mb-8">
+<h1 class="font-headline-md text-headline-md font-bold text-primary">DENTIA</h1>
+<p class="text-[10px] text-on-surface-variant uppercase tracking-widest">Dental Software</p>
+</div>
+<div class="flex flex-col gap-1 px-3">
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors duration-150 ease-in-out rounded" href="#">
+<span class="material-symbols-outlined">home</span>
+<span class="font-body-md">Inicio</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors duration-150 ease-in-out rounded" href="#">
+<span class="material-symbols-outlined">calendar_month</span>
+<span class="font-body-md">Agenda</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors duration-150 ease-in-out rounded" href="#">
+<span class="material-symbols-outlined">group</span>
+<span class="font-body-md">Pacientes</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors duration-150 ease-in-out rounded" href="#">
+<span class="material-symbols-outlined">medical_services</span>
+<span class="font-body-md">Clínica</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors duration-150 ease-in-out rounded" href="#">
+<span class="material-symbols-outlined">dentistry</span>
+<span class="font-body-md">Tratamientos</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors duration-150 ease-in-out rounded" href="#">
+<span class="material-symbols-outlined">payments</span>
+<span class="font-body-md">Finanzas</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors duration-150 ease-in-out rounded" href="#">
+<span class="material-symbols-outlined">account_tree</span>
+<span class="font-body-md">CRM</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors duration-150 ease-in-out rounded" href="#">
+<span class="material-symbols-outlined">folder_open</span>
+<span class="font-body-md">Documentos</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors duration-150 ease-in-out rounded" href="#">
+<span class="material-symbols-outlined">inventory_2</span>
+<span class="font-body-md">Inventario</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors duration-150 ease-in-out rounded" href="#">
+<span class="material-symbols-outlined">badge</span>
+<span class="font-body-md">Equipo</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors duration-150 ease-in-out rounded" href="#">
+<span class="material-symbols-outlined">query_stats</span>
+<span class="font-body-md">Analítica</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors duration-150 ease-in-out rounded" href="#">
+<span class="material-symbols-outlined">auto_mode</span>
+<span class="font-body-md">Automatizaciones</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 text-primary font-semibold border-r-2 border-primary bg-surface-alt transition-colors duration-150 ease-in-out" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-body-md">Configuración</span>
+</a>
+</div>
+</nav>
+<!-- Main Content Area -->
+<main class="flex-1 ml-sidebar-width h-screen flex flex-col overflow-hidden">
+<!-- TopNavBar Component (JSON based) -->
+<header class="bg-surface h-header-height border-b border-border-base flex items-center justify-between px-gutter w-full shrink-0">
+<div class="flex items-center gap-6">
+<div class="relative group">
+<span class="absolute inset-y-0 left-3 flex items-center text-on-surface-variant">
+<span class="material-symbols-outlined">search</span>
+</span>
+<input class="compact-input pl-10 pr-4 py-1.5 bg-surface-container-low border border-border-base rounded w-64 text-body-md" placeholder="Buscar pacientes o servicios..." type="text"/>
+</div>
+<div class="flex gap-4 items-center h-full">
+<span class="text-primary font-bold border-b-2 border-primary pb-1 cursor-pointer font-body-md">Sede Centro</span>
+<span class="text-on-surface-variant hover:text-primary transition-colors cursor-pointer font-body-md">Sede Playa</span>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="bg-primary text-on-primary px-4 py-1.5 rounded text-body-md font-semibold hover:bg-primary-container transition-all active:scale-95 flex items-center gap-1">
+<span class="material-symbols-outlined !text-[16px]">add</span>
+                    Crear
+                </button>
+<div class="flex gap-2">
+<span class="material-symbols-outlined text-on-surface-variant cursor-pointer p-1.5 hover:bg-surface-variant rounded transition-all">notifications</span>
+<span class="material-symbols-outlined text-on-surface-variant cursor-pointer p-1.5 hover:bg-surface-variant rounded transition-all">account_circle</span>
+</div>
+</div>
+</header>
+<!-- TopAppBar Component (JSON based - Contextual Header) -->
+<div class="bg-surface-container-low h-10 border-b border-border-subtle flex items-center px-4 shrink-0 transition-all">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-on-surface !text-sm">settings_suggest</span>
+<h2 class="font-headline-md text-on-surface font-semibold !text-sm">CFG-08 — Servicios y Procedimientos</h2>
+</div>
+<div class="ml-auto flex items-center gap-4">
+<span class="material-symbols-outlined text-secondary hover:bg-surface-variant cursor-pointer rounded transition-all !text-lg">warning</span>
+<span class="material-symbols-outlined text-secondary hover:bg-surface-variant cursor-pointer rounded transition-all !text-lg">account_balance_wallet</span>
+<span class="material-symbols-outlined text-secondary hover:bg-surface-variant cursor-pointer rounded transition-all !text-lg">quick_reference_all</span>
+</div>
+</div>
+<!-- Content Canvas -->
+<div class="flex-1 p-padding-compact overflow-y-auto bg-background">
+<!-- Filters & Search Row -->
+<div class="flex flex-wrap items-center justify-between gap-4 mb-4">
+<div class="flex items-center gap-2">
+<div class="relative">
+<select class="appearance-none bg-surface border border-border-base text-body-md px-3 py-1.5 pr-8 rounded focus:border-primary focus:ring-0 cursor-pointer">
+<option>Todas las especialidades</option>
+<option>Odontología General</option>
+<option>Implantología</option>
+<option>Ortodoncia</option>
+<option>Endodoncia</option>
+<option>Estética Dental</option>
+</select>
+<span class="material-symbols-outlined absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-on-surface-variant !text-[14px]">expand_more</span>
+</div>
+<div class="flex bg-surface border border-border-base rounded divide-x divide-border-base">
+<button class="px-3 py-1.5 text-label-xs font-semibold bg-surface-variant text-primary flex items-center gap-1">
+<span class="material-symbols-outlined !text-[14px]">view_list</span>
+                            TABLA
+                        </button>
+<button class="px-3 py-1.5 text-label-xs font-semibold text-on-surface-variant hover:bg-surface-alt flex items-center gap-1">
+<span class="material-symbols-outlined !text-[14px]">grid_view</span>
+                            TARJETAS
+                        </button>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<button class="flex items-center gap-1 px-3 py-1.5 border border-border-base text-body-md hover:bg-surface transition-all rounded">
+<span class="material-symbols-outlined !text-[16px]">file_download</span>
+                        Exportar
+                    </button>
+<button class="flex items-center gap-1 px-3 py-1.5 border border-border-base text-body-md hover:bg-surface transition-all rounded">
+<span class="material-symbols-outlined !text-[16px]">print</span>
+</button>
+</div>
+</div>
+<!-- Clinical Precision Table -->
+<div class="bg-surface border border-border-base rounded-sm overflow-hidden flex flex-col h-full max-h-[calc(100vh-210px)]">
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse min-w-[1000px]">
+<thead>
+<tr class="bg-surface-alt border-b border-border-base">
+<th class="px-4 py-2 text-label-xs text-on-surface-variant font-semibold uppercase tracking-wider w-20">Código</th>
+<th class="px-4 py-2 text-label-xs text-on-surface-variant font-semibold uppercase tracking-wider">Servicio / Procedimiento</th>
+<th class="px-4 py-2 text-label-xs text-on-surface-variant font-semibold uppercase tracking-wider">Categoría</th>
+<th class="px-4 py-2 text-label-xs text-on-surface-variant font-semibold uppercase tracking-wider w-24">Duración</th>
+<th class="px-4 py-2 text-label-xs text-on-surface-variant font-semibold uppercase tracking-wider w-28">Precio Base</th>
+<th class="px-4 py-2 text-label-xs text-on-surface-variant font-semibold uppercase tracking-wider w-32">Laboratorio</th>
+<th class="px-4 py-2 text-label-xs text-on-surface-variant font-semibold uppercase tracking-wider w-28">Consen.</th>
+<th class="px-4 py-2 text-label-xs text-on-surface-variant font-semibold uppercase tracking-wider w-16 text-center">Acción</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-border-subtle">
+<!-- Row 1 -->
+<tr class="clinical-table-row transition-colors h-[38px]">
+<td class="px-4 py-1 text-body-md font-mono text-secondary">OD-001</td>
+<td class="px-4 py-1 text-body-md font-semibold text-text-primary">Profilaxis Dental Completa</td>
+<td class="px-4 py-1">
+<span class="inline-flex items-center px-2 py-0.5 rounded-sm text-label-xs bg-surface-container-high text-on-surface-variant">General</span>
+</td>
+<td class="px-4 py-1 text-body-md text-on-surface-variant">45 min</td>
+<td class="px-4 py-1 text-body-md font-semibold">$85.00</td>
+<td class="px-4 py-1">
+<span class="text-on-surface-variant/40 material-symbols-outlined !text-lg">close</span>
+</td>
+<td class="px-4 py-1">
+<span class="text-success material-symbols-outlined !text-lg" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</td>
+<td class="px-4 py-1 text-center">
+<button class="material-symbols-outlined text-secondary hover:text-primary transition-colors">edit_note</button>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="clinical-table-row transition-colors h-[38px]">
+<td class="px-4 py-1 text-body-md font-mono text-secondary">IM-204</td>
+<td class="px-4 py-1 text-body-md font-semibold text-text-primary">Implante de Titanio Grado 5</td>
+<td class="px-4 py-1">
+<span class="inline-flex items-center px-2 py-0.5 rounded-sm text-label-xs bg-primary-container text-on-primary-container">Implantología</span>
+</td>
+<td class="px-4 py-1 text-body-md text-on-surface-variant">120 min</td>
+<td class="px-4 py-1 text-body-md font-semibold">$1,200.00</td>
+<td class="px-4 py-1">
+<span class="text-warning material-symbols-outlined !text-lg" style="font-variation-settings: 'FILL' 1;">biotech</span>
+</td>
+<td class="px-4 py-1">
+<span class="text-success material-symbols-outlined !text-lg" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</td>
+<td class="px-4 py-1 text-center">
+<button class="material-symbols-outlined text-secondary hover:text-primary transition-colors">edit_note</button>
+</td>
+</tr>
+<!-- Row 3 -->
+<tr class="clinical-table-row transition-colors h-[38px]">
+<td class="px-4 py-1 text-body-md font-mono text-secondary">EN-452</td>
+<td class="px-4 py-1 text-body-md font-semibold text-text-primary">Tratamiento de Conducto (Molar)</td>
+<td class="px-4 py-1">
+<span class="inline-flex items-center px-2 py-0.5 rounded-sm text-label-xs bg-tertiary-fixed text-on-tertiary-fixed-variant">Endodoncia</span>
+</td>
+<td class="px-4 py-1 text-body-md text-on-surface-variant">90 min</td>
+<td class="px-4 py-1 text-body-md font-semibold">$350.00</td>
+<td class="px-4 py-1">
+<span class="text-on-surface-variant/40 material-symbols-outlined !text-lg">close</span>
+</td>
+<td class="px-4 py-1">
+<span class="text-success material-symbols-outlined !text-lg" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</td>
+<td class="px-4 py-1 text-center">
+<button class="material-symbols-outlined text-secondary hover:text-primary transition-colors">edit_note</button>
+</td>
+</tr>
+<!-- Row 4 -->
+<tr class="clinical-table-row transition-colors h-[38px]">
+<td class="px-4 py-1 text-body-md font-mono text-secondary">ES-012</td>
+<td class="px-4 py-1 text-body-md font-semibold text-text-primary">Blanqueamiento LED Clinical</td>
+<td class="px-4 py-1">
+<span class="inline-flex items-center px-2 py-0.5 rounded-sm text-label-xs bg-secondary-fixed text-on-secondary-fixed-variant">Estética</span>
+</td>
+<td class="px-4 py-1 text-body-md text-on-surface-variant">60 min</td>
+<td class="px-4 py-1 text-body-md font-semibold">$210.00</td>
+<td class="px-4 py-1">
+<span class="text-on-surface-variant/40 material-symbols-outlined !text-lg">close</span>
+</td>
+<td class="px-4 py-1">
+<span class="text-on-surface-variant/40 material-symbols-outlined !text-lg">close</span>
+</td>
+<td class="px-4 py-1 text-center">
+<button class="material-symbols-outlined text-secondary hover:text-primary transition-colors">edit_note</button>
+</td>
+</tr>
+<!-- Row 5 -->
+<tr class="clinical-table-row transition-colors h-[38px]">
+<td class="px-4 py-1 text-body-md font-mono text-secondary">OD-044</td>
+<td class="px-4 py-1 text-body-md font-semibold text-text-primary">Resina Simple Anterior</td>
+<td class="px-4 py-1">
+<span class="inline-flex items-center px-2 py-0.5 rounded-sm text-label-xs bg-surface-container-high text-on-surface-variant">General</span>
+</td>
+<td class="px-4 py-1 text-body-md text-on-surface-variant">40 min</td>
+<td class="px-4 py-1 text-body-md font-semibold">$65.00</td>
+<td class="px-4 py-1">
+<span class="text-on-surface-variant/40 material-symbols-outlined !text-lg">close</span>
+</td>
+<td class="px-4 py-1">
+<span class="text-success material-symbols-outlined !text-lg" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</td>
+<td class="px-4 py-1 text-center">
+<button class="material-symbols-outlined text-secondary hover:text-primary transition-colors">edit_note</button>
+</td>
+</tr>
+<!-- Row 6 -->
+<tr class="clinical-table-row transition-colors h-[38px]">
+<td class="px-4 py-1 text-body-md font-mono text-secondary">OR-501</td>
+<td class="px-4 py-1 text-body-md font-semibold text-text-primary">Instalación Brackets Autoligables</td>
+<td class="px-4 py-1">
+<span class="inline-flex items-center px-2 py-0.5 rounded-sm text-label-xs bg-primary-container text-on-primary-container">Ortodoncia</span>
+</td>
+<td class="px-4 py-1 text-body-md text-on-surface-variant">90 min</td>
+<td class="px-4 py-1 text-body-md font-semibold">$850.00</td>
+<td class="px-4 py-1">
+<span class="text-on-surface-variant/40 material-symbols-outlined !text-lg">close</span>
+</td>
+<td class="px-4 py-1">
+<span class="text-success material-symbols-outlined !text-lg" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</td>
+<td class="px-4 py-1 text-center">
+<button class="material-symbols-outlined text-secondary hover:text-primary transition-colors">edit_note</button>
+</td>
+</tr>
+<!-- Row 7 -->
+<tr class="clinical-table-row transition-colors h-[38px]">
+<td class="px-4 py-1 text-body-md font-mono text-secondary">RE-102</td>
+<td class="px-4 py-1 text-body-md font-semibold text-text-primary">Corona Porcelana sobre Metal</td>
+<td class="px-4 py-1">
+<span class="inline-flex items-center px-2 py-0.5 rounded-sm text-label-xs bg-warning/10 text-warning">Rehabilitación</span>
+</td>
+<td class="px-4 py-1 text-body-md text-on-surface-variant">60 min</td>
+<td class="px-4 py-1 text-body-md font-semibold">$450.00</td>
+<td class="px-4 py-1">
+<span class="text-warning material-symbols-outlined !text-lg" style="font-variation-settings: 'FILL' 1;">biotech</span>
+</td>
+<td class="px-4 py-1">
+<span class="text-success material-symbols-outlined !text-lg" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</td>
+<td class="px-4 py-1 text-center">
+<button class="material-symbols-outlined text-secondary hover:text-primary transition-colors">edit_note</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Pagination Footer -->
+<div class="mt-auto border-t border-border-base bg-surface px-4 py-2 flex items-center justify-between">
+<span class="text-label-xs text-on-surface-variant">Mostrando 7 de 142 servicios</span>
+<div class="flex items-center gap-1">
+<button class="p-1 hover:bg-surface-alt rounded disabled:opacity-30" disabled="">
+<span class="material-symbols-outlined !text-lg">chevron_left</span>
+</button>
+<div class="flex gap-1">
+<button class="w-6 h-6 flex items-center justify-center text-label-xs bg-primary text-on-primary rounded-sm">1</button>
+<button class="w-6 h-6 flex items-center justify-center text-label-xs hover:bg-surface-alt rounded-sm">2</button>
+<button class="w-6 h-6 flex items-center justify-center text-label-xs hover:bg-surface-alt rounded-sm">3</button>
+<span class="text-label-xs text-on-surface-variant mx-1">...</span>
+<button class="w-6 h-6 flex items-center justify-center text-label-xs hover:bg-surface-alt rounded-sm">21</button>
+</div>
+<button class="p-1 hover:bg-surface-alt rounded">
+<span class="material-symbols-outlined !text-lg">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Bento Dashboard Snippet (Side Info) -->
+<div class="mt-6 grid grid-cols-1 md:grid-cols-4 gap-4">
+<div class="bg-surface border border-border-base p-3 rounded flex items-center gap-3">
+<div class="w-10 h-10 rounded bg-primary-fixed flex items-center justify-center text-primary">
+<span class="material-symbols-outlined">medical_information</span>
+</div>
+<div>
+<p class="text-label-xs text-on-surface-variant uppercase">Servicios Activos</p>
+<p class="text-headline-md font-bold">142</p>
+</div>
+</div>
+<div class="bg-surface border border-border-base p-3 rounded flex items-center gap-3">
+<div class="w-10 h-10 rounded bg-secondary-fixed flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined">biotech</span>
+</div>
+<div>
+<p class="text-label-xs text-on-surface-variant uppercase">Requieren Laboratorio</p>
+<p class="text-headline-md font-bold">34</p>
+</div>
+</div>
+<div class="bg-surface border border-border-base p-3 rounded flex items-center gap-3">
+<div class="w-10 h-10 rounded bg-tertiary-fixed flex items-center justify-center text-tertiary">
+<span class="material-symbols-outlined">schedule</span>
+</div>
+<div>
+<p class="text-label-xs text-on-surface-variant uppercase">Promedio Duración</p>
+<p class="text-headline-md font-bold">54 min</p>
+</div>
+</div>
+<div class="bg-surface border border-border-base p-3 rounded flex items-center gap-3">
+<div class="w-10 h-10 rounded bg-surface-container-highest flex items-center justify-center text-on-surface">
+<span class="material-symbols-outlined">history</span>
+</div>
+<div>
+<p class="text-label-xs text-on-surface-variant uppercase">Última Actualización</p>
+<p class="text-headline-md font-bold">Hoy, 09:12</p>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Micro-interaction Script -->
+<script>
+        document.querySelectorAll('.clinical-table-row').forEach(row => {
+            row.addEventListener('click', () => {
+                // Visual feedback for selection
+                document.querySelectorAll('.clinical-table-row').forEach(r => r.classList.remove('bg-surface-container'));
+                row.classList.add('bg-surface-container');
+            });
+        });
+    </script>
+</body></html>

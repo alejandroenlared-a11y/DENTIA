@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+
+<html class="light" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>DOC-01 — Biblioteca Documental | DENTIA</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #F5F6F7;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
+            font-size: 18px;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+            height: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #D9DEE3;
+            border-radius: 10px;
+        }
+        /* Clinic focus hover effect */
+        .row-hover:hover {
+            background-color: #F0F2F4;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "success": "#278561",
+                        "on-tertiary-fixed": "#2e1500",
+                        "tertiary-fixed-dim": "#ffb779",
+                        "tertiary-container": "#824701",
+                        "on-secondary-fixed": "#111d26",
+                        "text-primary": "#17212B",
+                        "tertiary": "#613300",
+                        "on-tertiary-container": "#ffbe87",
+                        "on-primary-fixed": "#001d32",
+                        "on-secondary-fixed-variant": "#3c4852",
+                        "surface-container-highest": "#e1e2e7",
+                        "secondary-fixed-dim": "#bcc8d4",
+                        "on-secondary-container": "#58646f",
+                        "background": "#F5F6F7",
+                        "surface-container-high": "#e7e8ed",
+                        "surface-variant": "#e1e2e7",
+                        "surface-container-lowest": "#ffffff",
+                        "surface-bright": "#f8f9fe",
+                        "tertiary-fixed": "#ffdcc1",
+                        "primary-fixed": "#cde5ff",
+                        "error": "#C53030",
+                        "on-error": "#ffffff",
+                        "outline": "#717880",
+                        "secondary-container": "#d5e1ee",
+                        "surface": "#FFFFFF",
+                        "on-secondary": "#ffffff",
+                        "inverse-on-surface": "#eff1f5",
+                        "surface-container-low": "#f2f3f8",
+                        "surface-container": "#eceef2",
+                        "primary": "#004268",
+                        "secondary": "#54606b",
+                        "on-background": "#191c1f",
+                        "secondary-fixed": "#d8e4f1",
+                        "surface-alt": "#F0F2F4",
+                        "warning": "#B37D00",
+                        "on-primary-fixed-variant": "#004a75",
+                        "border-subtle": "#E8EBEE",
+                        "on-surface": "#191c1f",
+                        "on-primary-container": "#9fd0ff",
+                        "primary-container": "#005a8c",
+                        "primary-fixed-dim": "#95ccff",
+                        "inverse-surface": "#2e3134",
+                        "error-container": "#ffdad6",
+                        "surface-dim": "#d8dadf",
+                        "on-tertiary-fixed-variant": "#6c3a00",
+                        "border-base": "#D9DEE3",
+                        "on-error-container": "#93000a",
+                        "on-surface-variant": "#41474f",
+                        "outline-variant": "#c1c7d0",
+                        "inverse-primary": "#95ccff",
+                        "on-primary": "#ffffff",
+                        "surface-tint": "#166395",
+                        "on-tertiary": "#ffffff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "sidebar-width": "224px",
+                        "padding-base": "1rem",
+                        "header-height": "52px",
+                        "gutter": "1rem",
+                        "sidebar-collapsed": "64px",
+                        "padding-compact": "0.75rem"
+                    },
+                    "fontFamily": {
+                        "label-xs": ["Inter"],
+                        "headline-lg": ["Inter"],
+                        "body-sm": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "body-md": ["Inter"]
+                    },
+                    "fontSize": {
+                        "label-xs": ["10px", {"lineHeight": "14px", "letterSpacing": "0.02em", "fontWeight": "500"}],
+                        "headline-lg": ["22px", {"lineHeight": "32px", "fontWeight": "600"}],
+                        "body-sm": ["11px", {"lineHeight": "16px", "fontWeight": "400"}],
+                        "headline-md": ["16px", {"lineHeight": "24px", "fontWeight": "600"}],
+                        "body-md": ["12px", {"lineHeight": "18px", "fontWeight": "400"}]
+                    }
+                },
+            },
+        }
+    </script>
+</head>
+<body class="bg-background text-on-surface">
+<!-- SideNavBar -->
+<aside class="w-sidebar-width h-screen fixed left-0 top-0 border-r border-border-base bg-surface dark:bg-on-surface flex flex-col h-full py-4 overflow-y-auto z-50">
+<div class="px-6 mb-8">
+<h1 class="font-headline-md text-headline-md font-bold text-primary dark:text-primary-fixed-dim">DENTIA</h1>
+<p class="text-[10px] uppercase tracking-widest text-on-surface-variant opacity-70">Dental Software</p>
+</div>
+<nav class="flex-1 space-y-1">
+<a class="flex items-center px-6 py-2.5 transition-colors duration-150 ease-in-out text-on-surface-variant dark:text-surface-variant hover:bg-surface-alt dark:hover:bg-on-secondary-fixed-variant hover:text-primary dark:hover:text-primary-fixed-dim font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined mr-3">home</span>
+<span>Inicio</span>
+</a>
+<a class="flex items-center px-6 py-2.5 transition-colors duration-150 ease-in-out text-on-surface-variant dark:text-surface-variant hover:bg-surface-alt dark:hover:bg-on-secondary-fixed-variant hover:text-primary dark:hover:text-primary-fixed-dim font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined mr-3">calendar_month</span>
+<span>Agenda</span>
+</a>
+<a class="flex items-center px-6 py-2.5 transition-colors duration-150 ease-in-out text-on-surface-variant dark:text-surface-variant hover:bg-surface-alt dark:hover:bg-on-secondary-fixed-variant hover:text-primary dark:hover:text-primary-fixed-dim font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined mr-3">group</span>
+<span>Pacientes</span>
+</a>
+<a class="flex items-center px-6 py-2.5 transition-colors duration-150 ease-in-out text-primary dark:text-primary-fixed-dim font-semibold border-r-2 border-primary dark:border-primary-fixed-dim bg-surface-alt dark:bg-on-secondary-fixed-variant font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined mr-3">folder_open</span>
+<span>Documentos</span>
+</a>
+<!-- Sub-links for the context -->
+<div class="pt-2 pb-2">
+<a class="flex items-center px-12 py-1.5 text-[11px] text-on-surface-variant hover:text-primary" href="#">Plantillas</a>
+<a class="flex items-center px-12 py-1.5 text-[11px] text-on-surface-variant hover:text-primary" href="#">Firma Digital</a>
+</div>
+<a class="flex items-center px-6 py-2.5 transition-colors duration-150 ease-in-out text-on-surface-variant dark:text-surface-variant hover:bg-surface-alt dark:hover:bg-on-secondary-fixed-variant hover:text-primary dark:hover:text-primary-fixed-dim font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined mr-3">payments</span>
+<span>Finanzas</span>
+</a>
+<a class="flex items-center px-6 py-2.5 transition-colors duration-150 ease-in-out text-on-surface-variant dark:text-surface-variant hover:bg-surface-alt dark:hover:bg-on-secondary-fixed-variant hover:text-primary dark:hover:text-primary-fixed-dim font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined mr-3">inventory_2</span>
+<span>Inventario</span>
+</a>
+<a class="flex items-center px-6 py-2.5 transition-colors duration-150 ease-in-out text-on-surface-variant dark:text-surface-variant hover:bg-surface-alt dark:hover:bg-on-secondary-fixed-variant hover:text-primary dark:hover:text-primary-fixed-dim font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined mr-3">settings</span>
+<span>Configuración</span>
+</a>
+</nav>
+<div class="px-6 py-4 border-t border-border-base">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-primary-container text-white flex items-center justify-center text-[10px] font-bold">DR</div>
+<div class="overflow-hidden">
+<p class="font-body-md text-body-md font-semibold truncate">Dr. Rodríguez</p>
+<p class="text-[10px] text-on-surface-variant truncate">Sede Centro</p>
+</div>
+</div>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="ml-sidebar-width min-h-screen flex flex-col">
+<!-- TopNavBar -->
+<header class="h-header-height fixed top-0 right-0 left-sidebar-width z-50 bg-surface dark:bg-on-surface border-b border-border-base dark:border-outline-variant flex items-center justify-between px-gutter w-full">
+<div class="flex items-center gap-6">
+<div class="relative flex items-center bg-surface-alt rounded px-3 py-1.5 w-64">
+<span class="material-symbols-outlined text-on-surface-variant text-[18px] mr-2">search</span>
+<input class="bg-transparent border-none focus:ring-0 text-body-md font-body-md w-full placeholder:text-outline" placeholder="Buscar paciente o doc..." type="text"/>
+</div>
+<div class="flex items-center gap-4">
+<span class="text-primary font-bold border-b-2 border-primary pb-1 font-body-md text-body-md cursor-pointer active:scale-95">Sede Centro</span>
+<span class="text-on-surface-variant hover:text-primary transition-colors font-body-md text-body-md cursor-pointer active:scale-95">Sede Playa</span>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="bg-primary text-white px-4 py-1.5 rounded text-body-md font-semibold flex items-center gap-2 hover:bg-primary-container transition-colors active:scale-95">
+<span class="material-symbols-outlined text-[18px]">add</span>
+                    + Crear
+                </button>
+<span class="material-symbols-outlined text-on-surface-variant cursor-pointer hover:text-primary transition-colors">notifications</span>
+<span class="material-symbols-outlined text-on-surface-variant cursor-pointer hover:text-primary transition-colors">account_circle</span>
+</div>
+</header>
+<!-- TopAppBar (Contextual Header) -->
+<div class="w-full h-10 mt-header-height bg-surface-container-low dark:bg-surface-container-highest border-b border-border-subtle dark:border-outline-variant flex items-center px-4 sticky top-header-height z-40">
+<div class="flex items-center gap-4 transition-all">
+<span class="material-symbols-outlined text-on-surface">person</span>
+<span class="font-headline-md text-headline-md text-on-surface">Paciente: Juan Pérez</span>
+<span class="text-[10px] bg-secondary-container text-secondary px-2 py-0.5 rounded uppercase font-bold">HC: 12904-B</span>
+</div>
+<div class="ml-auto flex items-center gap-4">
+<span class="material-symbols-outlined text-warning cursor-pointer">warning</span>
+<span class="material-symbols-outlined text-on-surface cursor-pointer">account_balance_wallet</span>
+<span class="material-symbols-outlined text-on-surface cursor-pointer">quick_reference_all</span>
+</div>
+</div>
+<!-- Content Canvas -->
+<div class="p-6 flex-1 flex flex-col gap-6">
+<!-- Page Header & Actions -->
+<div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
+<div>
+<h2 class="font-headline-lg text-headline-lg text-text-primary tracking-tight">Biblioteca Documental</h2>
+<p class="text-body-md text-on-surface-variant mt-1">Gestión avanzada de contratos, consentimientos y registros legales.</p>
+</div>
+<button class="bg-primary text-white h-[32px] px-4 rounded font-semibold text-body-md flex items-center gap-2 hover:bg-opacity-90 shadow-sm transition-all active:scale-95">
+<span class="material-symbols-outlined !text-[16px]">post_add</span>
+                    + Generar documento
+                </button>
+</div>
+<!-- Dashboard Overview Bento (Small) -->
+<div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+<div class="bg-surface border border-border-base p-4 flex flex-col">
+<span class="text-label-xs font-label-xs text-on-surface-variant uppercase tracking-wider mb-1">Total Documentos</span>
+<span class="text-2xl font-bold text-text-primary">24</span>
+</div>
+<div class="bg-surface border border-border-base p-4 flex flex-col border-l-4 border-l-success">
+<span class="text-label-xs font-label-xs text-on-surface-variant uppercase tracking-wider mb-1">Firmados</span>
+<span class="text-2xl font-bold text-success">18</span>
+</div>
+<div class="bg-surface border border-border-base p-4 flex flex-col border-l-4 border-l-warning">
+<span class="text-label-xs font-label-xs text-on-surface-variant uppercase tracking-wider mb-1">Pendientes</span>
+<span class="text-2xl font-bold text-warning">5</span>
+</div>
+<div class="bg-surface border border-border-base p-4 flex flex-col border-l-4 border-l-error">
+<span class="text-label-xs font-label-xs text-on-surface-variant uppercase tracking-wider mb-1">Revocados</span>
+<span class="text-2xl font-bold text-error">1</span>
+</div>
+</div>
+<!-- Filters Section -->
+<div class="bg-surface border border-border-base p-3 flex flex-wrap items-center gap-4">
+<div class="flex items-center gap-2">
+<span class="text-label-xs font-label-xs text-on-surface-variant">Categoría:</span>
+<select class="bg-surface-alt border border-border-base rounded text-body-md px-2 py-1 outline-none focus:border-primary">
+<option>Todos los tipos</option>
+<option>Consentimiento</option>
+<option>LOPD</option>
+<option>Contrato</option>
+<option>Presupuesto</option>
+</select>
+</div>
+<div class="flex items-center gap-2">
+<span class="text-label-xs font-label-xs text-on-surface-variant">Estado de firma:</span>
+<select class="bg-surface-alt border border-border-base rounded text-body-md px-2 py-1 outline-none focus:border-primary">
+<option>Todos los estados</option>
+<option>Firmado</option>
+<option>Pendiente</option>
+<option>Revocado</option>
+</select>
+</div>
+<div class="flex items-center gap-2 ml-auto">
+<div class="flex items-center bg-surface-alt border border-border-base rounded px-2 py-1">
+<span class="material-symbols-outlined !text-[16px] text-outline mr-2">calendar_today</span>
+<input class="bg-transparent border-none text-body-md p-0 focus:ring-0 w-32 placeholder:text-outline" placeholder="Rango de fechas" type="text"/>
+</div>
+<button class="p-1.5 text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined">filter_list</span>
+</button>
+</div>
+</div>
+<!-- Main Data Table Container -->
+<div class="bg-surface border border-border-base overflow-hidden">
+<div class="overflow-x-auto custom-scrollbar">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-surface-container-low border-b border-border-base">
+<th class="px-4 py-3 font-label-xs text-label-xs text-on-surface-variant uppercase tracking-wider w-8 text-center">
+<input class="rounded-sm border-border-base text-primary focus:ring-primary h-3 w-3" type="checkbox"/>
+</th>
+<th class="px-4 py-3 font-label-xs text-label-xs text-on-surface-variant uppercase tracking-wider">Nombre del documento</th>
+<th class="px-4 py-3 font-label-xs text-label-xs text-on-surface-variant uppercase tracking-wider">Tipo</th>
+<th class="px-4 py-3 font-label-xs text-label-xs text-on-surface-variant uppercase tracking-wider text-center">Estado</th>
+<th class="px-4 py-3 font-label-xs text-label-xs text-on-surface-variant uppercase tracking-wider">Fecha</th>
+<th class="px-4 py-3 font-label-xs text-label-xs text-on-surface-variant uppercase tracking-wider">Autor</th>
+<th class="px-4 py-3 font-label-xs text-label-xs text-on-surface-variant uppercase tracking-wider">Firmantes</th>
+<th class="px-4 py-3 font-label-xs text-label-xs text-on-surface-variant uppercase tracking-wider text-right">Acciones</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-border-subtle">
+<!-- Row 1 -->
+<tr class="row-hover transition-colors">
+<td class="px-4 py-3 text-center">
+<input class="rounded-sm border-border-base text-primary focus:ring-primary h-3 w-3" type="checkbox"/>
+</td>
+<td class="px-4 py-3 font-body-md text-body-md font-medium text-text-primary">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary !text-[18px]">description</span>
+                                        Consentimiento Informado - Implantes dentales
+                                    </div>
+</td>
+<td class="px-4 py-3">
+<span class="font-body-md text-body-md text-on-surface-variant">Consentimiento</span>
+</td>
+<td class="px-4 py-3 text-center">
+<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-green-50 text-success border border-success/20">Firmado</span>
+</td>
+<td class="px-4 py-3 font-body-md text-body-md text-on-surface-variant">12 oct 2023, 09:15</td>
+<td class="px-4 py-3 font-body-md text-body-md text-on-surface-variant">Dra. Marta Gómez</td>
+<td class="px-4 py-3 font-body-md text-body-md text-on-surface-variant">
+<div class="flex -space-x-2">
+<div class="w-6 h-6 rounded-full border-2 border-white bg-primary-container text-[8px] flex items-center justify-center text-white" title="Paciente">JP</div>
+<div class="w-6 h-6 rounded-full border-2 border-white bg-on-surface-variant text-[8px] flex items-center justify-center text-white" title="Doctor">MG</div>
+</div>
+</td>
+<td class="px-4 py-3 text-right">
+<button class="text-on-surface-variant hover:text-primary p-1"><span class="material-symbols-outlined">visibility</span></button>
+<button class="text-on-surface-variant hover:text-primary p-1"><span class="material-symbols-outlined">download</span></button>
+<button class="text-on-surface-variant hover:text-error p-1"><span class="material-symbols-outlined">delete</span></button>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="row-hover transition-colors">
+<td class="px-4 py-3 text-center">
+<input class="rounded-sm border-border-base text-primary focus:ring-primary h-3 w-3" type="checkbox"/>
+</td>
+<td class="px-4 py-3 font-body-md text-body-md font-medium text-text-primary">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary !text-[18px]">verified_user</span>
+                                        Política de Privacidad y LOPD - General
+                                    </div>
+</td>
+<td class="px-4 py-3">
+<span class="font-body-md text-body-md text-on-surface-variant">LOPD</span>
+</td>
+<td class="px-4 py-3 text-center">
+<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-green-50 text-success border border-success/20">Firmado</span>
+</td>
+<td class="px-4 py-3 font-body-md text-body-md text-on-surface-variant">12 oct 2023, 08:30</td>
+<td class="px-4 py-3 font-body-md text-body-md text-on-surface-variant">Admin Sede Centro</td>
+<td class="px-4 py-3 font-body-md text-body-md text-on-surface-variant">
+<div class="w-6 h-6 rounded-full border-2 border-white bg-primary-container text-[8px] flex items-center justify-center text-white" title="Paciente">JP</div>
+</td>
+<td class="px-4 py-3 text-right">
+<button class="text-on-surface-variant hover:text-primary p-1"><span class="material-symbols-outlined">visibility</span></button>
+<button class="text-on-surface-variant hover:text-primary p-1"><span class="material-symbols-outlined">download</span></button>
+<button class="text-on-surface-variant hover:text-error p-1"><span class="material-symbols-outlined">delete</span></button>
+</td>
+</tr>
+<!-- Row 3 -->
+<tr class="row-hover transition-colors bg-warning/5">
+<td class="px-4 py-3 text-center">
+<input class="rounded-sm border-border-base text-primary focus:ring-primary h-3 w-3" type="checkbox"/>
+</td>
+<td class="px-4 py-3 font-body-md text-body-md font-medium text-text-primary">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-warning !text-[18px]">signature</span>
+                                        Contrato Financiación - Presupuesto #8821
+                                    </div>
+</td>
+<td class="px-4 py-3">
+<span class="font-body-md text-body-md text-on-surface-variant">Contrato</span>
+</td>
+<td class="px-4 py-3 text-center">
+<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-orange-50 text-warning border border-warning/20">Pendiente</span>
+</td>
+<td class="px-4 py-3 font-body-md text-body-md text-on-surface-variant">25 oct 2023, 11:00</td>
+<td class="px-4 py-3 font-body-md text-body-md text-on-surface-variant">Dpto. Financiero</td>
+<td class="px-4 py-3 font-body-md text-body-md text-on-surface-variant">
+<div class="flex -space-x-2 grayscale opacity-50">
+<div class="w-6 h-6 rounded-full border-2 border-white bg-primary-container text-[8px] flex items-center justify-center text-white">JP</div>
+</div>
+</td>
+<td class="px-4 py-3 text-right">
+<button class="text-warning hover:text-primary font-semibold text-[11px] mr-2">Enviar a firmar</button>
+<button class="text-on-surface-variant hover:text-primary p-1"><span class="material-symbols-outlined">edit</span></button>
+</td>
+</tr>
+<!-- Row 4 -->
+<tr class="row-hover transition-colors">
+<td class="px-4 py-3 text-center">
+<input class="rounded-sm border-border-base text-primary focus:ring-primary h-3 w-3" type="checkbox"/>
+</td>
+<td class="px-4 py-3 font-body-md text-body-md font-medium text-text-primary opacity-60">
+<div class="flex items-center gap-2 line-through">
+<span class="material-symbols-outlined !text-[18px]">history</span>
+                                        Consentimiento Prevención Caries - Versión 2022
+                                    </div>
+</td>
+<td class="px-4 py-3 opacity-60">
+<span class="font-body-md text-body-md text-on-surface-variant">Consentimiento</span>
+</td>
+<td class="px-4 py-3 text-center">
+<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-red-50 text-error border border-error/20">Revocado</span>
+</td>
+<td class="px-4 py-3 font-body-md text-body-md text-on-surface-variant opacity-60">05 may 2022, 14:20</td>
+<td class="px-4 py-3 font-body-md text-body-md text-on-surface-variant opacity-60">Dr. Luis Paredes</td>
+<td class="px-4 py-3 font-body-md text-body-md text-on-surface-variant opacity-60">—</td>
+<td class="px-4 py-3 text-right">
+<button class="text-on-surface-variant hover:text-primary p-1"><span class="material-symbols-outlined">info</span></button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Pagination -->
+<div class="px-4 py-3 bg-surface-alt border-t border-border-base flex items-center justify-between">
+<span class="text-label-xs font-label-xs text-on-surface-variant">Mostrando 1-4 de 24 documentos</span>
+<div class="flex items-center gap-1">
+<button class="w-8 h-8 flex items-center justify-center border border-border-base rounded bg-surface hover:bg-surface-alt disabled:opacity-50" disabled="">
+<span class="material-symbols-outlined">chevron_left</span>
+</button>
+<button class="w-8 h-8 flex items-center justify-center border border-primary bg-primary text-white rounded font-bold text-body-md">1</button>
+<button class="w-8 h-8 flex items-center justify-center border border-border-base rounded bg-surface hover:bg-surface-alt font-body-md">2</button>
+<button class="w-8 h-8 flex items-center justify-center border border-border-base rounded bg-surface hover:bg-surface-alt font-body-md">3</button>
+<button class="w-8 h-8 flex items-center justify-center border border-border-base rounded bg-surface hover:bg-surface-alt">
+<span class="material-symbols-outlined">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Bottom Floating Action Info (Contextual) -->
+<div class="mt-auto pt-6 flex items-start gap-4">
+<div class="flex-1 bg-surface-container border border-border-base p-4 rounded flex items-start gap-4">
+<span class="material-symbols-outlined text-primary !text-[24px]">info</span>
+<div>
+<h4 class="font-bold text-body-md text-primary">Información LOPD</h4>
+<p class="text-body-sm text-on-surface-variant leading-relaxed">El paciente Juan Pérez tiene los consentimientos obligatorios firmados y vigentes según la normativa vigente de protección de datos. Última actualización de firma biométrica realizada el 12 de Octubre de 2023.</p>
+</div>
+</div>
+<div class="w-72 bg-primary-container p-4 rounded text-white flex flex-col gap-2">
+<div class="flex items-center justify-between">
+<span class="text-label-xs uppercase font-bold opacity-80">Firma Remota</span>
+<span class="material-symbols-outlined !text-[16px]">touch_app</span>
+</div>
+<p class="text-[11px]">Enviar enlace de firma por SMS/Email al paciente para documentos pendientes.</p>
+<button class="mt-2 w-full bg-white text-primary font-bold py-1.5 rounded text-[11px] hover:bg-opacity-90 transition-all">
+                        ENVIAR LOTE PENDIENTE
+                    </button>
+</div>
+</div>
+</div>
+</main>
+<!-- Modal Overlay Placeholder (Hidden) -->
+<div class="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100] hidden flex items-center justify-center">
+<div class="bg-surface w-[600px] border border-border-base shadow-xl">
+<div class="p-4 border-b border-border-base flex items-center justify-between">
+<h3 class="font-headline-md text-headline-md font-bold">Generar Nuevo Documento</h3>
+<button class="material-symbols-outlined hover:text-error transition-colors">close</button>
+</div>
+<div class="p-6">
+<!-- Content here -->
+</div>
+</div>
+</div>
+</body></html>

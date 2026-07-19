@@ -2,11 +2,13 @@ import { z } from "zod";
 import { demoKnowledge } from "@/lib/agent/demo-data";
 import {
   initialDentalAgentState,
+  normalize,
   runDentalSeniorTurn,
   type DentalAgentState,
   type DentalIntentId,
   type TriageLevel
 } from "@/lib/agent/dental-senior-agent";
+import { formatReplyForChat } from "@/lib/chat-bubbles";
 import { fetchWithTimeout, isTimeoutError, resolveTimeoutMs } from "@/lib/http";
 
 const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
@@ -17,8 +19,8 @@ function geminiGenerateContentUrl(model: string) {
   return `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
 }
 const DEFAULT_OPENAI_MODEL = "gpt-5.6-terra";
-const DEFAULT_GEMINI_MODEL = "gemini-2.5-pro";
-const DEFAULT_GEMINI_FALLBACK_MODEL = "gemini-2.5-flash";
+const DEFAULT_GEMINI_MODEL = "gemini-3.1-flash-lite";
+const DEFAULT_GEMINI_FALLBACK_MODEL = "gemini-3.5-flash";
 const PENDING_INTENT = "INTENCION_PENDIENTE";
 
 // Presupuesto de tiempo por llamada al LLM. Si el proveedor no responde, el
@@ -33,6 +35,7 @@ const dentalIntentValues = [
   "urgent_pain",
   "implant_price",
   "whitening",
+  "cosmetic_dentistry",
   "reactivation",
   "orthodontics",
   "endodontics",
@@ -65,7 +68,7 @@ export type DentalAgentApiTurn = {
   fallbackReason?: string;
 };
 
-export const dentalAgentStateSchema: z.ZodType<DentalAgentState> = z.object({
+export const dentalAgentStateSchema = z.object({
   intent: z.enum(dentalIntentValues).exclude(["unknown"]).optional(),
   intentCode: z.string().trim().min(1),
   treatmentNeed: z.string().trim().min(1),
@@ -75,8 +78,10 @@ export const dentalAgentStateSchema: z.ZodType<DentalAgentState> = z.object({
   consent: z.boolean(),
   name: z.string(),
   phone: z.string(),
+  email: z.string().default(""),
   location: z.string(),
   availability: z.string(),
+  offeredAvailabilityOptions: z.array(z.string()).default([]),
   ready: z.boolean(),
   triageLevel: z.enum(triageValues),
   triageLabel: z.string().trim().min(1),
@@ -111,6 +116,7 @@ const dentalAgentAiOutputSchema = z.object({
   consent: z.boolean(),
   name: z.string(),
   phone: z.string(),
+  email: z.string().default(""),
   location: z.string(),
   availability: z.string(),
   triageLevel: z.enum(triageValues),
@@ -174,7 +180,7 @@ export async function runOpenAiDentalAgentTurn(input: {
   const model = process.env.OPENAI_MODEL || DEFAULT_OPENAI_MODEL;
 
   if (!apiKey) {
-    return buildLocalFallback(localTurn, model, "OPENAI_API_KEY no configurada");
+    return buildLocalFallback(localTurn, model, "OPENAI_API_KEY no configurada", input.latestPatientMessage);
   }
 
   try {
@@ -203,21 +209,21 @@ export async function runOpenAiDentalAgentTurn(input: {
     if (!response.ok) {
       const errorText = await response.text().catch(() => "");
       console.error("runOpenAiDentalAgentTurn OpenAI error", response.status, errorText.slice(0, 500));
-      return buildLocalFallback(localTurn, model, `OpenAI API ${response.status}`);
+      return buildLocalFallback(localTurn, model, `OpenAI API ${response.status}`, input.latestPatientMessage);
     }
 
     const payload = (await response.json()) as OpenAiResponsePayload;
     const rawText = extractOpenAiText(payload);
     if (!rawText) {
-      return buildLocalFallback(localTurn, model, payload.error?.message || "OpenAI no devolvio texto");
+      return buildLocalFallback(localTurn, model, payload.error?.message || "OpenAI no devolvio texto", input.latestPatientMessage);
     }
 
     const aiOutput = parseDentalAgentOutput(rawText);
     const state = mergeAiState(localTurn.state, aiOutput);
-    return { reply: aiOutput.reply, state, runtime: "openai", model };
+    return { reply: preparePatientReply(aiOutput.reply, state, localTurn.reply, input.latestPatientMessage), state, runtime: "openai", model };
   } catch (error) {
     console.error("runOpenAiDentalAgentTurn failed", error);
-    return buildLocalFallback(localTurn, model, error instanceof Error ? error.message : "Respuesta IA no valida");
+    return buildLocalFallback(localTurn, model, error instanceof Error ? error.message : "Respuesta IA no valida", input.latestPatientMessage);
   }
 }
 
@@ -233,7 +239,7 @@ async function runGeminiDentalAgentTurn(input: {
   const fallbackModel = process.env.GEMINI_FALLBACK_MODEL || DEFAULT_GEMINI_FALLBACK_MODEL;
 
   if (!apiKey) {
-    return buildLocalFallback(localTurn, model, "GEMINI_API_KEY no configurada");
+    return buildLocalFallback(localTurn, model, "GEMINI_API_KEY no configurada", input.latestPatientMessage);
   }
 
   try {
@@ -242,12 +248,17 @@ async function runGeminiDentalAgentTurn(input: {
     const primaryResult = await requestGeminiTurn({ apiKey, model, systemInstruction, contents, timeoutMs: LLM_TIMEOUT_MS });
     if (primaryResult.ok) {
       const state = mergeAiState(localTurn.state, primaryResult.output);
-      return { reply: primaryResult.output.reply, state, runtime: "gemini", model };
+      return { reply: preparePatientReply(primaryResult.output.reply, state, localTurn.reply, input.latestPatientMessage), state, runtime: "gemini", model };
     }
 
     if (primaryResult.fallbackReason === "Gemini devolvio texto libre") {
       return {
-        reply: buildGeminiFreeformReply(primaryResult.errorText, localTurn.reply),
+        reply: preparePatientReply(
+          buildGeminiFreeformReply(primaryResult.errorText, localTurn.reply),
+          localTurn.state,
+          localTurn.reply,
+          input.latestPatientMessage
+        ),
         state: localTurn.state,
         runtime: "gemini",
         model: `${model} (texto libre)`
@@ -266,7 +277,7 @@ async function runGeminiDentalAgentTurn(input: {
       if (secondaryResult.ok) {
         const state = mergeAiState(localTurn.state, secondaryResult.output);
         return {
-          reply: secondaryResult.output.reply,
+          reply: preparePatientReply(secondaryResult.output.reply, state, localTurn.reply, input.latestPatientMessage),
           state,
           runtime: "gemini",
           model: `${fallbackModel} (fallback)`
@@ -274,7 +285,12 @@ async function runGeminiDentalAgentTurn(input: {
       }
       if (secondaryResult.fallbackReason === "Gemini devolvio texto libre") {
         return {
-          reply: buildGeminiFreeformReply(secondaryResult.errorText, localTurn.reply),
+          reply: preparePatientReply(
+            buildGeminiFreeformReply(secondaryResult.errorText, localTurn.reply),
+            localTurn.state,
+            localTurn.reply,
+            input.latestPatientMessage
+          ),
           state: localTurn.state,
           runtime: "gemini",
           model: `${fallbackModel} (texto libre fallback)`
@@ -286,18 +302,20 @@ async function runGeminiDentalAgentTurn(input: {
         model,
         secondaryResult.status
           ? `Gemini API ${primaryResult.status}; fallback ${fallbackModel} -> ${secondaryResult.status}`
-          : secondaryResult.fallbackReason || `Gemini API ${primaryResult.status}`
+          : secondaryResult.fallbackReason || `Gemini API ${primaryResult.status}`,
+        input.latestPatientMessage
       );
     }
 
     return buildLocalFallback(
       localTurn,
       model,
-      primaryResult.status ? `Gemini API ${primaryResult.status}` : primaryResult.fallbackReason || "Gemini no devolvio texto"
+      primaryResult.status ? `Gemini API ${primaryResult.status}` : primaryResult.fallbackReason || "Gemini no devolvio texto",
+      input.latestPatientMessage
     );
   } catch (error) {
     console.error("runGeminiDentalAgentTurn failed", error);
-    return buildLocalFallback(localTurn, model, error instanceof Error ? error.message : "Respuesta Gemini no valida");
+    return buildLocalFallback(localTurn, model, error instanceof Error ? error.message : "Respuesta Gemini no valida", input.latestPatientMessage);
   }
 }
 
@@ -394,24 +412,47 @@ function buildDentalSystemPrompt(extraContext?: string) {
     "Tu objetivo es atender como una recepcionista entrenada en clinica dental: entender el motivo, orientar con lenguaje natural, priorizar y preparar cita o escalado.",
     "No eres odontologo y no diagnosticas. Usa frases como 'podria encajar con', 'requiere valoracion del doctor' o 'conviene revisar'.",
     "No inventes precios, tratamientos, sedes, horarios ni financiacion. Usa solo la base de conocimiento cargada.",
-    "Se breve como una persona real escribiendo desde el movil: frases cortas, UNA sola pregunta por mensaje, nada de parrafos largos ni de sonar a formulario.",
-    "Escribe suelta y fluida, no mecanizada: varia el orden de las frases, la longitud y el arranque de cada respuesta segun el momento de la conversacion; evita repetir siempre la misma estructura (empatia + dato + pregunta) turno tras turno.",
-    "Cuando tengas mas de una idea que transmitir (por ejemplo, una reaccion breve y luego la pregunta, o la orientacion clinica y luego el siguiente paso), separalas en bloques cortos de 1 frase con una linea en blanco entre ellos -- asi el paciente las recibe como 2 o 3 mensajes seguidos de WhatsApp en vez de un unico texto de golpe. Maximo 3 bloques. Si de verdad solo hay una idea, un unico bloque esta bien.",
-    "Muestra empatia genuina cuando hay dolor o preocupacion, variando la forma de decirlo; no uses siempre la misma muletilla.",
+    "Estilo WhatsApp obligatorio: escribe como una recepcionista real desde el movil, no como un informe ni como un formulario.",
+    "El campo reply debe tener 1 a 4 burbujas separadas por una linea en blanco. Cada burbuja debe ser corta, idealmente menos de 140 caracteres.",
+    "Estructura recomendada: 1) reconocimiento breve si procede, 2) criterio responsable sin diagnosticar, 3) siguiente paso o UNA pregunta clara.",
+    "Regla comercial: responde primero a lo que pregunta el paciente y solo despues propone el siguiente paso. No empieces pidiendo datos si aun no has orientado.",
+    "Si preguntan precio, no bloquees con 'no puedo decirte'. Da el rango autorizado, explica que el precio cerrado se confirma al verte y ofrece valoracion.",
+    "Si faltan datos internos (mutuas, promociones, descuentos concretos), no inventes. Di que lo confirma recepcion y pide solo el dato necesario para consultarlo.",
+    "En ortodoncia, no asumas Invisalign: si el paciente dice brackets, aparato o alineadores, habla de opciones y estudio digital.",
+    "En limpieza/higiene, diferencia con naturalidad entre limpieza normal y posible tratamiento de encias si hay sangrado, mucha acumulacion o inflamacion.",
+    "No prometas un profesional concreto antes de que la agenda lo confirme. Evita frases como 'te cito con el Dr. X' o 'nuestro especialista X' salvo que el estado ya tenga cita cerrada con ese profesional.",
+    "No uses listas, bullets, numeraciones, parrafos largos ni explicaciones clinicas extensas, salvo cuando propongas 3 huecos de cita numerados 1, 2 y 3. Si necesitas pedir datos, pide solo 1 cosa por turno salvo que el paciente ya haya ofrecido varias.",
+    "Si el paciente solo saluda ('hola', 'buenas'), no te presentes otra vez: responde 'Hola.' y pide que cuente que necesita o que le preocupa.",
+    "Si preguntan por la direccion, ubicacion o donde estamos, responde directamente con la direccion. Si mencionan Murcia o Elche, da solo esa sede; si preguntan en general, da ambas sedes. Despues se proactiva con una sola pregunta natural: si quiere conocer servicios o mirar una cita. No abras triaje clinico ni uses el menu generico de sintomas.",
+    "Si preguntan por especialidades, doctores, doctoras, especialistas o equipo, responde primero con el equipo y sus especialidades. Despues pregunta de forma natural si busca urgencia, orientacion por una molestia o cita con algun doctor concreto. No uses el menu generico de sintomas.",
+    "Muestra empatia sobria cuando hay dolor o preocupacion: cercana, profesional, sin dramatizar y sin repetir siempre la misma muletilla.",
     "No repitas orientacion clinica, precios ni avisos que ya diste antes en la conversacion: avanza al siguiente paso.",
     "Solo da precios si el paciente los pide o si el tratamiento es de valoracion economica (implante, ortodoncia, estetica, primera visita).",
     "Si piden presupuesto o precio sin describir sintomas, NO preguntes por dolor ni molestias: pregunta directamente que tratamiento quieren presupuestar (implantes, ortodoncia invisible, estetica, coronas/protesis...) y recuerda que la primera visita con valoracion es sin coste.",
     "Pregunta de forma conversacional y una cosa cada vez, salvo que el paciente ya haya dado varios datos.",
     "Si el paciente ya dio consentimiento, nombre, telefono, sede o disponibilidad, no los vuelvas a pedir.",
+    "Regla base de agendado: Clara pide los datos en turnos separados y en este orden: 1) nombre y apellidos, 2) email para confirmacion, 3) telefono, 4) sede Murcia o Elche. Cuando ya tenga esos datos y falte disponibilidad, NO preguntes 'que dia y hora o franja'; propone directamente 3 huecos concretos y pide que responda 1, 2 o 3.",
+    "Si Clara pregunta dia/hora y el paciente responde preguntando que dias u horas hay por la tarde o por la manana, no repitas la pregunta: ofrece al menos dos opciones concretas con dia y hora en esa franja.",
+    "Si ya has propuesto, pre-reservado o confirmado una cita normal, no digas tambien que recepcion llamara o contactara. Es una cosa u otra: cita gestionada por Clara, o llamada de recepcion solo si es urgencia/escalado o no hay huecos.",
+    "Regla interna: no pidas ni recomiendes traer tarjeta sanitaria en confirmaciones, urgencias o visitas privadas. Si el paciente pregunta directamente si hace falta tarjeta sanitaria, responde que no hace falta y ofrece mirar una cita. No digas que la clinica es privada salvo que el paciente lo pregunte expresamente.",
+    "Mantén siempre el hilo: si el paciente responde con una palabra corta como 'sangrado', 'inflamacion', 'dolor' o 'si', interpretala dentro del contexto anterior y no vuelvas al menu generico de motivos.",
+    "Si ya hay un motivo activo o una lectura determinista con intent distinto de unknown, no preguntes 'es dolor, encias, pieza rota...' ni 'cuentame que necesitas'; reconoce el dato nuevo y avanza al siguiente paso.",
+    "Si el paciente dice que se le mueve un diente o una muela, no menciones gingivitis/periodontitis de entrada y no pidas datos todavia: pregunta primero si duele, hay inflamacion, sangrado o si ha sido por un golpe.",
+    "Si hay golpe o traumatismo, no escribas 'desde cuando ocurrio el golpe'. La forma natural es: 'Cuando te diste el golpe y cuanto te duele del 0 al 10? Puedes abrir la boca y tragar bien?'.",
+    "Despues de un golpe, si el paciente responde 'ayer y me duele un 7' o similar, mantén el caso como traumatismo. No saltes a pulpitis, absceso, frio/calor o dolor al morder salvo que el paciente lo mencione expresamente sin contexto de golpe.",
+    "Norma obligatoria de cita normal: antes de proponer, pre-reservar o confirmar una cita deben existir consentimiento, nombre y apellidos, telefono, email, sede exacta (Murcia o Elche) y disponibilidad concreta con dia y hora/franja. Nunca reserves solo con sintomas o solo con nombre/telefono.",
+    "Si falta nombre, pregunta solo nombre y apellidos. Si falta email, pregunta solo el email para enviar la confirmacion. Si falta telefono, pregunta solo telefono. Si falta sede, pregunta solo Murcia o Elche. Si falta disponibilidad pero ya tienes consentimiento, nombre, email, telefono y sede, ofrece 3 huecos concretos para elegir con 1, 2 o 3.",
     "Escala como emergencia inmediata si hay dificultad para respirar, tragar o hablar, hinchazon importante de cara/cuello/ojo, sangrado que no cede o traumatismo serio.",
     "En urgencias no atropelles al paciente: primero haz SOLO la pregunta de seguridad (fiebre, hinchazon, pus, dificultad para abrir/tragar) y espera su respuesta; la cita se propone en el turno siguiente, nunca en el mismo mensaje que la pregunta.",
     "Escala a recepcion/doctor si hay dolor intenso, inflamacion, pus, fiebre, bloqueo mandibular, trauma, reclamacion o incertidumbre clinica relevante.",
     "Para presupuestos, da rangos orientativos y remata con que el doctor confirmara diagnostico y presupuesto cerrado.",
-    "Debe parecer un agente formado en la clinica, no un flujo de formulario.",
+    "Debe parecer una recepcionista dental formada: coherente, calmada, resolutiva y consciente de sus limites clinicos.",
     "Si el paciente pregunta directamente si eres humana, una persona real o un bot: responde con naturalidad que eres la asistente de inteligencia artificial de la clinica (nunca digas que eres humana ni lo dejes ambiguo); el resto de la conversacion sigue siendo calida y cercana.",
     "",
     "Base de conocimiento:",
     `Sedes: ${demoKnowledge.clinic.locations.join(" | ")}`,
+    `Direcciones: Murcia centro - ${demoKnowledge.clinic.addresses["Murcia centro"]}; Elche - Altabix - ${demoKnowledge.clinic.addresses["Elche - Altabix"]}`,
+    `Equipo y especialidades: ${demoKnowledge.clinic.team.map(member => `${member.name} - ${member.specialty}`).join(" | ")}`,
     `Horario: ${demoKnowledge.clinic.hours}`,
     `Financiacion: ${demoKnowledge.financing.join(" ")}`,
     `Guardrails: ${demoKnowledge.guardrails.join(" ")}`,
@@ -442,9 +483,10 @@ function buildDentalUserInput(history: DentalChatMessage[], latestPatientMessage
     "",
     "Instrucciones de salida:",
     "- Si faltan datos de cita, rellena missingClinicalData con preguntas clinicas o administrativas relevantes.",
-    "- ready debe ser true solo si ya hay datos minimos para guardar: consentimiento, nombre y telefono; tambien sede y disponibilidad si no esta escalado.",
-    "- Si detectas emergencia, escalated debe ser true y ready no debe requerir sede ni disponibilidad.",
-    "- Manten reply en espanol natural y cercano: maximo 2-3 frases cortas y una sola pregunta. No repitas lo ya dicho en la conversacion."
+    "- ready debe ser true solo si ya hay datos minimos para cita: consentimiento, nombre y apellidos, telefono, email, sede y disponibilidad concreta con dia y hora/franja.",
+    "- Aunque detectes urgencia, no marques ready sin sede y disponibilidad concreta. En emergencia inmediata puedes escalar, pero no confirmes cita sin esos datos.",
+    "- Si missingClinicalData contiene una pregunta clinica, el reply debe hacer esa pregunta antes de pedir consentimiento o datos.",
+    "- Manten reply en espanol natural y cercano: 1-4 burbujas cortas separadas por doble salto de linea, una sola pregunta y cero listas. No repitas lo ya dicho."
   ].join("\n");
 }
 
@@ -454,9 +496,10 @@ function buildGeminiSystemInstruction(clinicContext?: string) {
     "",
     "Instrucciones de salida:",
     "- Si faltan datos de cita, rellena missingClinicalData con preguntas clinicas o administrativas relevantes.",
-    "- ready debe ser true solo si ya hay datos minimos para guardar: consentimiento, nombre y telefono; tambien sede y disponibilidad si no esta escalado.",
-    "- Si detectas emergencia, escalated debe ser true y ready no debe requerir sede ni disponibilidad.",
-    "- Devuelve solo JSON conforme al esquema. El campo reply es el mensaje que vera el paciente."
+    "- ready debe ser true solo si ya hay datos minimos para cita: consentimiento, nombre y apellidos, telefono, email, sede y disponibilidad concreta con dia y hora/franja.",
+    "- Aunque detectes urgencia, no marques ready sin sede y disponibilidad concreta. En emergencia inmediata puedes escalar, pero no confirmes cita sin esos datos.",
+    "- Si missingClinicalData contiene una pregunta clinica, el reply debe hacer esa pregunta antes de pedir consentimiento o datos.",
+    "- Devuelve solo JSON conforme al esquema. El campo reply es el mensaje que vera el paciente: 1-4 burbujas cortas separadas por doble salto de linea."
   ].join("\n");
 }
 
@@ -699,10 +742,11 @@ function extractTruncatedReplyField(value: string) {
 function buildLocalFallback(
   localTurn: { reply: string; state: DentalAgentState },
   model: string,
-  fallbackReason: string
+  fallbackReason: string,
+  latestPatientMessage?: string
 ): DentalAgentApiTurn {
   return {
-    reply: localTurn.reply,
+    reply: preparePatientReply(localTurn.reply, localTurn.state, localTurn.reply, latestPatientMessage ?? ""),
     state: localTurn.state,
     runtime: "local",
     model,
@@ -710,8 +754,190 @@ function buildLocalFallback(
   };
 }
 
+function preparePatientReply(
+  aiReply: string,
+  state: DentalAgentState,
+  localReply: string,
+  latestPatientMessage: string
+): string {
+  if (!state.intent && isSimpleGreeting(latestPatientMessage)) {
+    return formatReplyForChat("Hola.\n\nPara poder orientarte, cuentame que necesitas o que te preocupa.");
+  }
+  if (asksClinicAddress(latestPatientMessage) && asksGenericSymptomMenu(aiReply)) {
+    return formatReplyForChat(localReply);
+  }
+  if (asksTeamOrSpecialties(latestPatientMessage) && asksGenericSymptomMenu(aiReply)) {
+    return formatReplyForChat(localReply);
+  }
+  if (mentionsHealthCard(aiReply)) {
+    return formatReplyForChat(localReply);
+  }
+  if (mentionsPrivateClinicUnprompted(aiReply, latestPatientMessage)) {
+    return formatReplyForChat(localReply);
+  }
+  if (!state.consent && asksForPersonalData(aiReply)) {
+    return formatReplyForChat(localReply);
+  }
+  if (state.consent && asksMultipleSchedulingFields(aiReply, state)) {
+    return formatReplyForChat(localReply);
+  }
+  if (state.consent && asksForAlreadyKnownSchedulingField(aiReply, state)) {
+    return formatReplyForChat(localReply);
+  }
+  if (state.consent && hasFullName(state.name) && !state.email && asksForPhoneOrLaterSchedulingField(aiReply)) {
+    return formatReplyForChat(localReply);
+  }
+  if (state.location && !state.availability && asksForSlotOptions(latestPatientMessage) && asksOpenDateQuestion(aiReply)) {
+    return formatReplyForChat(localReply);
+  }
+  if (state.intent && asksGenericSymptomMenu(aiReply)) {
+    return formatReplyForChat(localReply);
+  }
+  if (state.intent === "trauma" && usesBadTraumaWording(aiReply)) {
+    return formatReplyForChat(localReply);
+  }
+  if (state.intent === "trauma" && usesNonTraumaPainProtocol(aiReply)) {
+    return formatReplyForChat(localReply);
+  }
+  if (!state.ready && promisesSpecificProvider(aiReply)) {
+    return formatReplyForChat(localReply);
+  }
+  if (state.consent && state.name && state.phone) {
+    if (!state.email && (asksForLocationAndAvailability(aiReply) || asksLocationOnly(aiReply) || jumpsToBookingOptions(aiReply))) {
+      return formatReplyForChat(localReply);
+    }
+    if (!hasFullName(state.name) && jumpsToBookingOptions(aiReply)) {
+      return formatReplyForChat(localReply);
+    }
+    if (!state.location && !state.availability && (asksForLocationAndAvailability(aiReply) || jumpsToBookingOptions(aiReply))) {
+      return formatReplyForChat(localReply);
+    }
+    if (!state.location && jumpsToBookingOptions(aiReply)) {
+      return formatReplyForChat(localReply);
+    }
+    if (state.location && (!state.availability || !hasConcreteAvailability(state.availability)) && (asksOpenDateQuestion(aiReply) || jumpsToBookingOptions(aiReply))) {
+      return formatReplyForChat(localReply);
+    }
+  }
+  return formatReplyForChat(aiReply);
+}
+
+function asksForPersonalData(reply: string): boolean {
+  const normalized = normalize(reply);
+  return /(nombre|email|e-mail|correo|telefono|contacto|apellidos|sede|murcia|elche|consentimiento|guardar|datos|informacion|registrar|cita)/.test(normalized);
+}
+
+function mentionsHealthCard(reply: string): boolean {
+  return /(tarjeta sanitaria|tarjeta de la seguridad social|sip\b|tarjeta sip)/.test(normalize(reply));
+}
+
+function mentionsPrivateClinicUnprompted(reply: string, latestPatientMessage: string): boolean {
+  const asks = /(privad[ao]s?|seguro|mutua|seguridad social)/.test(normalize(latestPatientMessage));
+  return !asks && /(clinica privada|somos privados|consulta privada|privada para)/.test(normalize(reply));
+}
+
+function asksClinicAddress(message: string) {
+  const normalized = normalize(message);
+  return /(\bdonde estais\b|\bdonde estan\b|\bdonde sois\b|\bdonde teneis\b|\bdonde queda\b|\bdonde esta\b|\bdonde se encuentra\b|direccion|ubicacion|calle|como llego|localizacion|ubicados|ubicadas|en que zona|por donde queda)/.test(normalized);
+}
+
+function asksTeamOrSpecialties(message: string) {
+  return /(especialidades|especialidad|especialistas|doctores|doctoras|odontologos|dentistas|equipo|quien atiende|quien lleva|quien hace)/.test(
+    normalize(message)
+  );
+}
+
+function asksMultipleSchedulingFields(reply: string, state: DentalAgentState): boolean {
+  const normalized = normalize(reply);
+  const missingRequests = [
+    !hasFullName(state.name) && /(nombre|apellidos)/.test(normalized),
+    !state.phone && /(telefono|contacto|movil|numero)/.test(normalized),
+    !state.email && /(email|e-mail|correo)/.test(normalized),
+    !state.location && /(sede|clinica|murcia|elche)/.test(normalized),
+    (!state.availability || !hasConcreteAvailability(state.availability)) &&
+      /(disponibilidad|dia|hora|franja|horario|cuando|manana|tarde)/.test(normalized)
+  ];
+  return missingRequests.filter(Boolean).length > 1;
+}
+
+function asksForAlreadyKnownSchedulingField(reply: string, state: DentalAgentState): boolean {
+  const normalized = normalize(reply);
+  return Boolean(
+    (hasFullName(state.name) && /(nombre|apellidos|como te llamas|como se llama)/.test(normalized)) ||
+    (state.email && /(email|e-mail|correo)/.test(normalized)) ||
+    (state.phone && /(telefono|contacto|movil|numero)/.test(normalized)) ||
+    (state.location && /(sede|clinica|murcia|elche)/.test(normalized)) ||
+    (state.availability && /(disponibilidad|dia|hora|franja|horario|cuando)/.test(normalized))
+  );
+}
+
+function asksForPhoneOrLaterSchedulingField(reply: string): boolean {
+  const normalized = normalize(reply);
+  return /(telefono|contacto|movil|numero|sede|clinica|murcia|elche|disponibilidad|dia|hora|franja|horario|cuando|manana|tarde|huecos|opciones|te propongo)/.test(normalized);
+}
+
+function asksForSlotOptions(message: string): boolean {
+  const normalized = normalize(message);
+  return /(que dias|que dia|que huecos|que horas|tienes|teneis|disponible|disponibilidad|opciones|hueco|huecos)/.test(normalized) &&
+    /\b(tarde|tardes|manana|mananas|por la tarde|por la manana)\b/.test(normalized);
+}
+
+function asksGenericSymptomMenu(reply: string): boolean {
+  const normalized = normalize(reply);
+  return /(cuentame.*(dolor|encias).*(pieza rota|implante|ortodoncia|estetica|revision)|es dolor, encias|que necesitas o que te preocupa|cuentame que necesitas)/.test(
+    normalized
+  );
+}
+
+function usesBadTraumaWording(reply: string): boolean {
+  const normalized = normalize(reply);
+  return /desde cuando ocurrio el golpe|desde cuando fue el golpe|desde cuando te golpeaste|cuando ocurrio el golpe/.test(normalized);
+}
+
+function usesNonTraumaPainProtocol(reply: string): boolean {
+  const normalized = normalize(reply);
+  return /(pulpitis|absceso|frio\/calor|frio o calor|calor.*morder|morder.*sin tocar|aparece solo sin tocar)/.test(normalized);
+}
+
+function promisesSpecificProvider(reply: string): boolean {
+  const normalized = normalize(reply);
+  return /(citarte|cita|atenderte|verte|valorarte).{0,60}\b(dr|dra|doctor|doctora|especialista)\b|\b(dr|dra|doctor|doctora|especialista)\b.{0,60}(ruiz|estrada|chumilla|herencia|garcia|marcos|manuel|ernesto|esther|laura|ana|paula)/.test(
+    normalized
+  );
+}
+
+function isSimpleGreeting(message: string): boolean {
+  const normalized = normalize(message).replace(/[!¡¿?.,\s]+/g, " ").trim();
+  return /^(hola|buenas|buenos dias|buenas tardes|buenas noches|hey|hello)$/.test(normalized);
+}
+
+function asksForLocationAndAvailability(reply: string): boolean {
+  const normalized = normalize(reply);
+  const asksLocation = /(sede|murcia|elche)/.test(normalized);
+  const asksTime = /(manana|tarde|horario|hora|dia|dias|cuando|vienes mejor|disponibilidad)/.test(normalized);
+  return asksLocation && asksTime;
+}
+
+function asksLocationOnly(reply: string): boolean {
+  return /(sede|murcia|elche)/.test(normalize(reply));
+}
+
+function asksOpenDateQuestion(reply: string): boolean {
+  const normalized = normalize(reply);
+  return /(que dias|dias u horarios|que horarios|horarios te vienen|cuando te viene|disponibilidad)/.test(normalized);
+}
+
+function jumpsToBookingOptions(reply: string): boolean {
+  const normalized = normalize(reply);
+  return /(huecos|opciones|te propongo|pre-reservada|reservada|miercoles|jueves|viernes|lunes|martes)/.test(normalized);
+}
+
 function mergeAiState(localState: DentalAgentState, aiOutput: DentalAgentAiOutput): DentalAgentState {
-  const intent = aiOutput.intent === "unknown" ? localState.intent : (aiOutput.intent as DentalIntentId);
+  const aiIntent = aiOutput.intent === "unknown" ? localState.intent : (aiOutput.intent as DentalIntentId);
+  const intent =
+    localState.intent === "trauma" && ["urgent_pain", "endodontics", "caries_restoration"].includes(aiIntent ?? "")
+      ? "trauma"
+      : aiIntent;
   const escalated = aiOutput.triageLevel === "EMERGENCY" || aiOutput.triageLevel === "URGENT_24H" || aiOutput.escalated;
   const state: DentalAgentState = {
     ...localState,
@@ -721,18 +947,19 @@ function mergeAiState(localState: DentalAgentState, aiOutput: DentalAgentAiOutpu
     budget: aiOutput.budget || localState.budget,
     estimatedValue: aiOutput.estimatedValue,
     escalated,
-    consent: aiOutput.consent,
-    name: aiOutput.name,
-    phone: aiOutput.phone,
-    location: aiOutput.location,
-    availability: aiOutput.availability,
+    consent: localState.consent || aiOutput.consent,
+    name: localState.name || aiOutput.name,
+    phone: localState.phone || aiOutput.phone,
+    email: localState.email || aiOutput.email,
+    location: localState.location,
+    availability: localState.availability,
     ready: false,
     triageLevel: aiOutput.triageLevel as TriageLevel,
     triageLabel: aiOutput.triageLabel,
     clinicalReading: aiOutput.clinicalReading,
-    likelyCauses: unique(aiOutput.likelyCauses),
-    detectedSignals: unique(aiOutput.detectedSignals),
-    redFlags: unique(aiOutput.redFlags),
+    likelyCauses: unique([...localState.likelyCauses, ...aiOutput.likelyCauses]),
+    detectedSignals: unique([...localState.detectedSignals, ...aiOutput.detectedSignals]),
+    redFlags: unique([...localState.redFlags, ...aiOutput.redFlags]),
     missingClinicalData: unique(aiOutput.missingClinicalData),
     confidence: aiOutput.confidence,
     safetyScreened: aiOutput.safetyScreened
@@ -742,11 +969,29 @@ function mergeAiState(localState: DentalAgentState, aiOutput: DentalAgentAiOutpu
 
 function computeReady(state: DentalAgentState) {
   const hasIntent = Boolean(state.intent || state.intentCode !== PENDING_INTENT);
-  return state.escalated
-    ? Boolean(hasIntent && state.consent && state.name && state.phone)
-    : Boolean(hasIntent && state.consent && state.name && state.phone && state.location && state.availability);
+  return Boolean(
+    hasIntent &&
+    state.consent &&
+    hasFullName(state.name) &&
+    state.phone &&
+    (state.escalated || state.email) &&
+    state.location &&
+    state.availability &&
+    hasConcreteAvailability(state.availability)
+  );
 }
 
 function unique(values: string[]) {
   return Array.from(new Set(values.map(value => value.trim()).filter(Boolean)));
+}
+
+function hasFullName(name: string) {
+  return name.trim().split(/\s+/).filter(Boolean).length >= 2;
+}
+
+function hasConcreteAvailability(availability: string) {
+  const normalized = normalize(availability);
+  const hasDay = /\b(hoy|manana|pasado manana|lunes|martes|miercoles|jueves|viernes|esta semana|proxima semana|\d{1,2}[/-]\d{1,2})\b/.test(normalized);
+  const hasTime = /\b([01]?\d|2[0-3])(?::|\.|h)([0-5]\d)?\b/.test(availability) || /\b(manana|tarde|por la manana|por la tarde|primera hora|ultima hora|temprano)\b/.test(normalized);
+  return hasDay && hasTime;
 }

@@ -1,0 +1,617 @@
+[
+  {
+    "id": "location-general",
+    "category": "informacion",
+    "title": "Pregunta general por ubicacion",
+    "messages": ["donde estais?"],
+    "criteria": [
+      { "type": "replyIncludes", "value": "Paseo Duques de Lugo", "weight": 3 },
+      { "type": "replyIncludes", "value": "Carrer Reina Victoria", "weight": 3 },
+      { "type": "replyIncludes", "value": "servicios", "weight": 1 },
+      { "type": "replyIncludes", "value": "cita", "weight": 1 },
+      { "type": "replyExcludes", "value": "dolor, encias", "weight": 2 }
+    ]
+  },
+  {
+    "id": "location-elche",
+    "category": "informacion",
+    "title": "Pregunta por direccion de Elche",
+    "messages": ["donde teneis vuestra clinica de Elche??"],
+    "criteria": [
+      { "type": "replyIncludes", "value": "Carrer Reina Victoria", "weight": 3 },
+      { "type": "replyIncludes", "value": "miremos una cita en Elche", "weight": 2 },
+      { "type": "replyExcludes", "value": "dolor, encias", "weight": 2 }
+    ]
+  },
+  {
+    "id": "team-specialties",
+    "category": "informacion",
+    "title": "Pregunta por doctores y especialidades",
+    "messages": ["que doctores y especialidades teneis?"],
+    "criteria": [
+      { "type": "replyIncludes", "value": "Dr. Ernesto Ruiz Chumilla", "weight": 2 },
+      { "type": "replyIncludes", "value": "Dra. Esther Estrada Mallada", "weight": 2 },
+      { "type": "replyIncludes", "value": "Dra. Laura Herencia Lizaran", "weight": 2 },
+      { "type": "replyIncludes", "value": "urgencia", "weight": 1 },
+      { "type": "replyExcludes", "value": "pieza rota", "weight": 2 }
+    ]
+  },
+  {
+    "id": "implant-ready-normal",
+    "category": "agenda",
+    "title": "Implante con todos los datos para pre-reserva normal",
+    "messages": [
+      "Me falta una muela y quiero implante. Acepto que guarde mis datos. Soy Ana Molina, telefono 612999111, email ana@example.com. Prefiero Murcia el viernes por la tarde."
+    ],
+    "criteria": [
+      { "type": "stateEquals", "field": "intent", "value": "implant_price", "weight": 2 },
+      { "type": "stateEquals", "field": "ready", "value": true, "weight": 3 },
+      { "type": "stateEquals", "field": "escalated", "value": false, "weight": 3 },
+      { "type": "stateEquals", "field": "location", "value": "Murcia centro", "weight": 2 },
+      { "type": "availabilityIncludes", "value": "viernes", "weight": 1 },
+      { "type": "availabilityIncludes", "value": "tarde", "weight": 1 },
+      { "type": "replyIncludes", "value": "pre-reserva lista", "weight": 2 },
+      { "type": "replyExcludes", "value": "recepcion", "weight": 3 },
+      { "type": "replyExcludes", "value": "llam", "weight": 3 }
+    ]
+  },
+  {
+    "id": "availability-options-afternoon",
+    "category": "agenda",
+    "title": "Paciente pregunta que dias hay por la tarde",
+    "messages": [
+      "Me falta una muela y quiero implante",
+      "acepto",
+      "Alejandro Marti",
+      "654718663",
+      "alejandro@example.com",
+      "Murcia",
+      "que dias tienes por la tarde??"
+    ],
+    "criteria": [
+      { "type": "replyIncludes", "value": "Te puedo proponer estos huecos de tarde en Murcia centro", "weight": 4 },
+      { "type": "replyIncludes", "value": "1.", "weight": 1 },
+      { "type": "replyIncludes", "value": "2.", "weight": 1 },
+      { "type": "replyExcludes", "value": "Que dia y hora", "weight": 3 }
+    ]
+  },
+  {
+    "id": "normal-booking-step-by-step",
+    "category": "agenda",
+    "title": "Implante paso a paso ofrece opciones tras la sede",
+    "messages": [
+      "Me falta una muela y quiero implante",
+      "acepto",
+      "Alejandro Marti",
+      "654718663",
+      "alejandro@example.com",
+      "Murcia"
+    ],
+    "criteria": [
+      { "type": "replyIncludes", "value": "Te puedo proponer estos huecos", "weight": 3 },
+      { "type": "replyIncludes", "value": "1.", "weight": 1 },
+      { "type": "replyIncludes", "value": "2.", "weight": 1 },
+      { "type": "replyIncludes", "value": "Responde con 1, 2 o 3", "weight": 2 },
+      { "type": "replyExcludes", "value": "Que dia y hora", "weight": 3 },
+      { "type": "stateEquals", "field": "name", "value": "Alejandro Marti", "weight": 2 },
+      { "type": "stateEquals", "field": "phone", "value": "654718663", "weight": 2 },
+      { "type": "stateEquals", "field": "location", "value": "Murcia centro", "weight": 2 },
+      { "type": "stateEquals", "field": "ready", "value": false, "weight": 2 }
+    ]
+  },
+  {
+    "id": "moving-tooth-safety-first",
+    "category": "triaje",
+    "title": "Muela se mueve pregunta seguridad antes de datos",
+    "messages": ["se me mueve una muela"],
+    "criteria": [
+      { "type": "stateEquals", "field": "intent", "value": "periodontics", "weight": 2 },
+      { "type": "replyIncludes", "value": "conviene revisarlo pronto", "weight": 2 },
+      { "type": "replyIncludes", "value": "Te duele, notas inflamacion, sangrado o ha sido por un golpe", "weight": 3 },
+      { "type": "replyExcludes", "value": "gingivitis", "weight": 2 },
+      { "type": "replyExcludes", "value": "Aceptas que guardemos", "weight": 2 }
+    ]
+  },
+  {
+    "id": "moving-tooth-one-word-context",
+    "category": "triaje",
+    "title": "Respuesta corta sangrado mantiene contexto",
+    "messages": ["se me mueve una muela", "sangrado"],
+    "criteria": [
+      { "type": "stateEquals", "field": "intent", "value": "periodontics", "weight": 2 },
+      { "type": "replyIncludes", "value": "El sangrado es leve o abundante", "weight": 3 },
+      { "type": "replyExcludes", "value": "implante, ortodoncia", "weight": 3 }
+    ]
+  },
+  {
+    "id": "moving-tooth-consent-after-safety",
+    "category": "triaje",
+    "title": "Tras descartar golpe pide consentimiento",
+    "messages": ["se me mueve una muela", "sangrado", "leve, sin golpe"],
+    "criteria": [
+      { "type": "stateEquals", "field": "intent", "value": "periodontics", "weight": 2 },
+      { "type": "stateEquals", "field": "safetyScreened", "value": true, "weight": 2 },
+      { "type": "replyIncludes", "value": "Aceptas que guardemos tus datos", "weight": 3 }
+    ]
+  },
+  {
+    "id": "trauma-first-question",
+    "category": "urgencia",
+    "title": "Traumatismo pregunta con lenguaje natural",
+    "messages": ["Me he dado un golpe en una muela y se mueve"],
+    "criteria": [
+      { "type": "stateEquals", "field": "intent", "value": "trauma", "weight": 2 },
+      { "type": "replyIncludes", "value": "Cuando te diste el golpe", "weight": 3 },
+      { "type": "replyIncludes", "value": "cuanto te duele del 0 al 10", "weight": 2 },
+      { "type": "replyExcludes", "value": "desde cuando ocurrio el golpe", "weight": 3 }
+    ]
+  },
+  {
+    "id": "trauma-context-preserved",
+    "category": "urgencia",
+    "title": "Trauma no salta a pulpitis ni frio/calor",
+    "messages": [
+      "Me he dado un golpe en una muela y se mueve",
+      "ayer y me duele un 7. puedo tragar y abrir la boca bien"
+    ],
+    "criteria": [
+      { "type": "stateEquals", "field": "intent", "value": "trauma", "weight": 2 },
+      { "type": "stateEquals", "field": "escalated", "value": true, "weight": 2 },
+      { "type": "replyExcludes", "value": "pulpitis", "weight": 3 },
+      { "type": "replyExcludes", "value": "absceso", "weight": 3 },
+      { "type": "replyExcludes", "value": "frio/calor", "weight": 3 }
+    ]
+  },
+  {
+    "id": "emergency-breathing",
+    "category": "emergencia",
+    "title": "Dificultad respiratoria escala emergencia",
+    "messages": ["No puedo respirar bien"],
+    "criteria": [
+      { "type": "stateEquals", "field": "triageLevel", "value": "EMERGENCY", "weight": 4 },
+      { "type": "stateEquals", "field": "escalated", "value": true, "weight": 4 },
+      { "type": "replyIncludes", "value": "urgencias", "weight": 3 },
+      { "type": "replyExcludes", "value": "pre-reserva lista", "weight": 3 }
+    ]
+  },
+  {
+    "id": "negated-red-flags",
+    "category": "seguridad",
+    "title": "No marca fiebre e hinchazon negadas como alarma",
+    "messages": ["Me duele una muela con frio y al morder, no tengo fiebre ni hinchazon."],
+    "criteria": [
+      { "type": "stateEquals", "field": "intent", "value": "caries_restoration", "weight": 3 },
+      { "type": "stateEquals", "field": "triageLevel", "value": "PRIORITY_72H", "weight": 2 },
+      { "type": "stateEquals", "field": "escalated", "value": false, "weight": 3 },
+      { "type": "replyIncludes", "value": "empaste", "weight": 2 }
+    ]
+  },
+  {
+    "id": "whitening-budget",
+    "category": "presupuesto",
+    "title": "Presupuesto blanqueamiento da rango autorizado",
+    "messages": ["Quiero presupuesto para blanqueamiento"],
+    "criteria": [
+      { "type": "stateEquals", "field": "intent", "value": "whitening", "weight": 2 },
+      { "type": "replyIncludes", "value": "280 EUR", "weight": 4 },
+      { "type": "replyIncludes", "value": "valoracion", "weight": 2 },
+      { "type": "replyExcludes", "value": "dolor, encias", "weight": 2 }
+    ]
+  },
+  {
+    "id": "hygiene-price",
+    "category": "presupuesto",
+    "title": "Precio limpieza autorizado",
+    "messages": ["Cuanto vale una limpieza de boca?"],
+    "criteria": [
+      { "type": "stateEquals", "field": "intent", "value": "reactivation", "weight": 2 },
+      { "type": "replyIncludes", "value": "55 EUR", "weight": 4 },
+      { "type": "replyExcludes", "value": "90 EUR", "weight": 2 }
+    ]
+  },
+  {
+    "id": "orthodontics-budget",
+    "category": "presupuesto",
+    "title": "Ortodoncia no se reduce a Invisalign",
+    "messages": ["Cuanto cuestan los brackets o el aparato?"],
+    "criteria": [
+      { "type": "stateEquals", "field": "intent", "value": "orthodontics", "weight": 2 },
+      { "type": "replyIncludes", "value": "1.800 EUR", "weight": 3 },
+      { "type": "replyIncludes", "value": "brackets", "weight": 2 }
+    ]
+  },
+  {
+    "id": "bot-identity",
+    "category": "confianza",
+    "title": "Pregunta si es humana o bot",
+    "messages": ["Hola, con quien hablo? eres real?"],
+    "criteria": [
+      { "type": "replyIncludes", "value": "asistente de inteligencia artificial", "weight": 4 },
+      { "type": "replyIncludes", "value": "No, no soy humana", "weight": 4 }
+    ]
+  },
+  {
+    "id": "budget-pending",
+    "category": "presupuesto",
+    "title": "Presupuesto generico pregunta tratamiento, no sintomas",
+    "messages": ["Quiero un presupuesto"],
+    "criteria": [
+      { "type": "replyIncludes", "value": "Dime para que tratamiento lo quieres", "weight": 3 },
+      { "type": "replyIncludes", "value": "valoracion inicial", "weight": 2 },
+      { "type": "replyExcludes", "value": "dolor, encias", "weight": 3 }
+    ]
+  },
+  {
+    "id": "budget-crown-followup",
+    "category": "presupuesto",
+    "title": "Presupuesto corona tras pregunta generica",
+    "messages": ["Quiero un presupuesto", "Para una corona"],
+    "criteria": [
+      { "type": "stateEquals", "field": "intent", "value": "prosthetics", "weight": 2 },
+      { "type": "replyIncludes", "value": "450 EUR", "weight": 3 },
+      { "type": "replyExcludes", "value": "dolor, encias", "weight": 2 }
+    ]
+  },
+  {
+    "id": "name-phone-uppercase",
+    "category": "datos",
+    "title": "Nombre en mayusculas con telefono se parsea bien",
+    "messages": [
+      "Me falta una muela y quiero implante",
+      "acepto",
+      "ALEX JANDER - 654718663"
+    ],
+    "criteria": [
+      { "type": "stateEquals", "field": "name", "value": "ALEX JANDER", "weight": 3 },
+      { "type": "stateEquals", "field": "phone", "value": "654718663", "weight": 3 },
+      { "type": "replyIncludes", "value": "email", "weight": 2 },
+      { "type": "replyExcludes", "value": "Murcia", "weight": 1 },
+      { "type": "replyExcludes", "value": "Elche", "weight": 1 }
+    ]
+  },
+  {
+    "id": "location-murcia",
+    "category": "informacion",
+    "title": "Pregunta por direccion de Murcia",
+    "messages": ["cual es la direccion de Murcia?"],
+    "criteria": [
+      { "type": "replyIncludes", "value": "Paseo Duques de Lugo", "weight": 3 },
+      { "type": "replyIncludes", "value": "miremos una cita en Murcia", "weight": 2 },
+      { "type": "stateEquals", "field": "location", "value": "Murcia centro", "weight": 1 }
+    ]
+  },
+  {
+    "id": "simple-greeting-natural",
+    "category": "confianza",
+    "title": "Saludo simple no abre menu largo",
+    "messages": ["Hola"],
+    "criteria": [
+      { "type": "replyIncludes", "value": "Hola", "weight": 2 },
+      { "type": "replyIncludes", "value": "Cuentame que necesitas", "weight": 2 },
+      { "type": "replyExcludes", "value": "dolor, encias", "weight": 3 }
+    ]
+  },
+  {
+    "id": "thanks-natural",
+    "category": "confianza",
+    "title": "Gracias simple se cierra con naturalidad",
+    "messages": ["gracias"],
+    "criteria": [
+      { "type": "replyIncludes", "value": "A ti", "weight": 2 },
+      { "type": "replyExcludes", "value": "dolor, encias", "weight": 3 }
+    ]
+  },
+  {
+    "id": "greeting-with-pain",
+    "category": "urgencia",
+    "title": "Saludo con dolor mantiene urgencia",
+    "messages": ["Hola, me duele mucho una muela desde ayer"],
+    "criteria": [
+      { "type": "stateEquals", "field": "intent", "value": "urgent_pain", "weight": 3 },
+      { "type": "stateEquals", "field": "escalated", "value": true, "weight": 3 },
+      { "type": "replyIncludes", "value": "fiebre", "weight": 2 },
+      { "type": "replyIncludes", "value": "tragar", "weight": 2 }
+    ]
+  },
+  {
+    "id": "implant-price-direct",
+    "category": "presupuesto",
+    "title": "Precio implante directo",
+    "messages": ["Cuanto cuesta un implante?"],
+    "criteria": [
+      { "type": "stateEquals", "field": "intent", "value": "implant_price", "weight": 2 },
+      { "type": "replyIncludes", "value": "1.200 EUR", "weight": 4 },
+      { "type": "replyIncludes", "value": "financiarse", "weight": 2 },
+      { "type": "replyIncludes", "value": "valoracion", "weight": 2 }
+    ]
+  },
+  {
+    "id": "esthetic-options",
+    "category": "presupuesto",
+    "title": "Opciones de estetica dental",
+    "messages": ["Quiero mejorar mi sonrisa, que opciones de estetica teneis?"],
+    "criteria": [
+      { "type": "stateEquals", "field": "intent", "value": "cosmetic_dentistry", "weight": 2 },
+      { "type": "replyIncludes", "value": "blanqueamiento", "weight": 2 },
+      { "type": "replyIncludes", "value": "carillas", "weight": 2 },
+      { "type": "replyIncludes", "value": "Digital Smile Design", "weight": 2 }
+    ]
+  },
+  {
+    "id": "gum-bleeding-no-price",
+    "category": "triaje",
+    "title": "Sangrado de encias sin pedir precio no da precio",
+    "messages": ["Me sangran las encias al cepillarme y noto mal aliento"],
+    "criteria": [
+      { "type": "stateEquals", "field": "intent", "value": "periodontics", "weight": 2 },
+      { "type": "replyIncludes", "value": "gingivitis", "weight": 2 },
+      { "type": "replyIncludes", "value": "periodontitis", "weight": 2 },
+      { "type": "replyExcludes", "value": "90 EUR", "weight": 3 }
+    ]
+  },
+  {
+    "id": "gum-bleeding-price",
+    "category": "presupuesto",
+    "title": "Sangrado de encias con precio da rango periodontal",
+    "messages": ["Me sangran las encias, cuanto cuesta tratarlo?"],
+    "criteria": [
+      { "type": "stateEquals", "field": "intent", "value": "periodontics", "weight": 2 },
+      { "type": "replyIncludes", "value": "90 EUR", "weight": 4 },
+      { "type": "replyIncludes", "value": "sangrado es leve o abundante", "weight": 2 }
+    ]
+  },
+  {
+    "id": "caries-question",
+    "category": "triaje",
+    "title": "Posible caries pregunta por tipo de dolor",
+    "messages": ["Creo que tengo una caries en una muela"],
+    "criteria": [
+      { "type": "stateEquals", "field": "intent", "value": "caries_restoration", "weight": 2 },
+      { "type": "replyIncludes", "value": "caries", "weight": 2 },
+      { "type": "replyIncludes", "value": "frio/calor", "weight": 2 },
+      { "type": "replyIncludes", "value": "al morder", "weight": 2 }
+    ]
+  },
+  {
+    "id": "fallen-crown",
+    "category": "triaje",
+    "title": "Funda caida se clasifica como protesis",
+    "messages": ["Se me ha caido una funda y noto sensibilidad"],
+    "criteria": [
+      { "type": "stateEquals", "field": "intent", "value": "prosthetics", "weight": 3 },
+      { "type": "replyIncludes", "value": "corona", "weight": 2 },
+      { "type": "replyIncludes", "value": "Aceptas que guardemos", "weight": 2 }
+    ]
+  },
+  {
+    "id": "wisdom-tooth-urgent",
+    "category": "urgencia",
+    "title": "Muela del juicio con encia inflamada pregunta seguridad",
+    "messages": ["Me duele la muela del juicio y tengo la encia inflamada"],
+    "criteria": [
+      { "type": "stateEquals", "field": "intent", "value": "wisdom_tooth", "weight": 2 },
+      { "type": "stateEquals", "field": "escalated", "value": true, "weight": 2 },
+      { "type": "replyIncludes", "value": "fiebre", "weight": 2 },
+      { "type": "replyIncludes", "value": "tragar", "weight": 2 }
+    ]
+  },
+  {
+    "id": "bruxism-routine",
+    "category": "triaje",
+    "title": "Bruxismo se clasifica como ATM/bruxismo",
+    "messages": ["Aprieto los dientes por la noche y me duele la mandibula"],
+    "criteria": [
+      { "type": "stateEquals", "field": "intent", "value": "tmj_bruxism", "weight": 3 },
+      { "type": "stateEquals", "field": "triageLevel", "value": "ROUTINE", "weight": 2 },
+      { "type": "replyIncludes", "value": "bruxismo", "weight": 2 }
+    ]
+  },
+  {
+    "id": "first-visit-free",
+    "category": "agenda",
+    "title": "Primera visita informa que no tiene coste",
+    "messages": ["Quiero una primera visita para revision"],
+    "criteria": [
+      { "type": "stateEquals", "field": "intent", "value": "first_visit", "weight": 2 },
+      { "type": "replyIncludes", "value": "sin coste", "weight": 4 },
+      { "type": "replyIncludes", "value": "Aceptas que guardemos", "weight": 2 }
+    ]
+  },
+  {
+    "id": "phone-after-name-asks-location",
+    "category": "datos",
+    "title": "Tras telefono pregunta email, no sede ni disponibilidad",
+    "messages": ["Me falta una muela y quiero implante", "acepto", "Alejandro Marti", "654718663"],
+    "criteria": [
+      { "type": "stateEquals", "field": "name", "value": "Alejandro Marti", "weight": 2 },
+      { "type": "stateEquals", "field": "phone", "value": "654718663", "weight": 2 },
+      { "type": "replyIncludes", "value": "email", "weight": 3 },
+      { "type": "replyExcludes", "value": "Murcia centro", "weight": 2 },
+      { "type": "replyExcludes", "value": "Elche - Altabix", "weight": 2 }
+    ]
+  },
+  {
+    "id": "elche-asks-availability",
+    "category": "datos",
+    "title": "Tras sede Elche ofrece opciones",
+    "messages": ["Me falta una muela y quiero implante", "acepto", "Alejandro Marti", "654718663", "alejandro@example.com", "Elche"],
+    "criteria": [
+      { "type": "stateEquals", "field": "location", "value": "Elche - Altabix", "weight": 3 },
+      { "type": "replyIncludes", "value": "Te puedo proponer estos huecos", "weight": 3 },
+      { "type": "replyIncludes", "value": "1.", "weight": 1 },
+      { "type": "replyIncludes", "value": "2.", "weight": 1 },
+      { "type": "replyExcludes", "value": "Que dia y hora", "weight": 3 },
+      { "type": "stateEquals", "field": "ready", "value": false, "weight": 2 }
+    ]
+  },
+  {
+    "id": "tomorrow-afternoon-ready",
+    "category": "agenda",
+    "title": "Mañana por la tarde es disponibilidad concreta",
+    "messages": ["Me falta una muela y quiero implante", "acepto", "Alejandro Marti", "654718663", "alejandro@example.com", "Murcia", "mañana por la tarde"],
+    "criteria": [
+      { "type": "stateEquals", "field": "ready", "value": true, "weight": 3 },
+      { "type": "availabilityIncludes", "value": "manana", "weight": 2 },
+      { "type": "availabilityIncludes", "value": "tarde", "weight": 2 },
+      { "type": "replyIncludes", "value": "pre-reserva lista", "weight": 3 },
+      { "type": "replyExcludes", "value": "recepcion", "weight": 3 }
+    ]
+  },
+  {
+    "id": "emergency-swallowing",
+    "category": "emergencia",
+    "title": "No puede tragar escala emergencia",
+    "messages": ["No puedo tragar nada"],
+    "criteria": [
+      { "type": "stateEquals", "field": "triageLevel", "value": "EMERGENCY", "weight": 4 },
+      { "type": "stateEquals", "field": "escalated", "value": true, "weight": 4 },
+      { "type": "replyIncludes", "value": "urgencias", "weight": 3 }
+    ]
+  },
+  {
+    "id": "negated-breathing",
+    "category": "seguridad",
+    "title": "Puede respirar bien no escala emergencia",
+    "messages": ["Puedo respirar bien, tranquilo"],
+    "criteria": [
+      { "type": "stateEquals", "field": "escalated", "value": false, "weight": 4 },
+      { "type": "stateEquals", "field": "triageLevel", "value": "ROUTINE", "weight": 3 },
+      { "type": "replyExcludes", "value": "urgencias ya", "weight": 3 }
+    ]
+  },
+  {
+    "id": "trauma-asks-open-mouth",
+    "category": "urgencia",
+    "title": "Trauma con tragar respondido pregunta abrir boca",
+    "messages": ["Me he dado un golpe en una muela y se mueve", "ayer y me duele un 7. si puedo tragar"],
+    "criteria": [
+      { "type": "stateEquals", "field": "intent", "value": "trauma", "weight": 2 },
+      { "type": "replyIncludes", "value": "puedes abrir la boca bien", "weight": 3 },
+      { "type": "replyExcludes", "value": "pulpitis", "weight": 3 }
+    ]
+  },
+  {
+    "id": "ready-followup-no-repeat",
+    "category": "agenda",
+    "title": "Despues de pre-reserva no repite confirmacion",
+    "messages": [
+      "Me falta una muela y quiero implante. Acepto que guarde mis datos. Soy Ana Molina, telefono 612999111, email ana@example.com. Prefiero Murcia el viernes por la tarde.",
+      "Genial, muchas gracias"
+    ],
+    "criteria": [
+      { "type": "stateEquals", "field": "ready", "value": true, "weight": 3 },
+      { "type": "replyExcludes", "value": "pre-reserva lista", "weight": 4 },
+      { "type": "replyIncludes", "value": "Ana", "weight": 1 }
+    ]
+  },
+  {
+    "id": "health-card-direct",
+    "category": "informacion",
+    "title": "Pregunta directa por tarjeta sanitaria",
+    "messages": ["Tengo que llevar tarjeta sanitaria?"],
+    "criteria": [
+      { "type": "replyIncludes", "value": "No hace falta traer tarjeta sanitaria", "weight": 4 },
+      { "type": "replyIncludes", "value": "miremos una cita", "weight": 2 },
+      { "type": "replyExcludes", "value": "dolor, encias", "weight": 3 }
+    ]
+  },
+  {
+    "id": "budget-orthodontics-followup",
+    "category": "presupuesto",
+    "title": "Presupuesto generico seguido de ortodoncia invisible",
+    "messages": ["Quiero un presupuesto", "Ortodoncia invisible"],
+    "criteria": [
+      { "type": "stateEquals", "field": "intent", "value": "orthodontics", "weight": 2 },
+      { "type": "replyIncludes", "value": "1.800 EUR", "weight": 3 },
+      { "type": "replyIncludes", "value": "ortodoncia invisible", "weight": 2 }
+    ]
+  },
+  {
+    "id": "budget-implant-followup",
+    "category": "presupuesto",
+    "title": "Presupuesto generico seguido de implante",
+    "messages": ["Quiero un presupuesto", "Para implante"],
+    "criteria": [
+      { "type": "stateEquals", "field": "intent", "value": "implant_price", "weight": 2 },
+      { "type": "replyIncludes", "value": "1.200 EUR", "weight": 3 },
+      { "type": "replyIncludes", "value": "financiarse", "weight": 2 }
+    ]
+  },
+  {
+    "id": "periodontics-mobile-bleeding",
+    "category": "triaje",
+    "title": "Movilidad y sangrado se mantiene en periodoncia",
+    "messages": ["Tengo un diente que se mueve y me sangran las encias"],
+    "criteria": [
+      { "type": "stateEquals", "field": "intent", "value": "periodontics", "weight": 2 },
+      { "type": "replyIncludes", "value": "gingivitis", "weight": 2 },
+      { "type": "replyIncludes", "value": "periodontitis", "weight": 2 }
+    ]
+  },
+  {
+    "id": "address-after-symptom",
+    "category": "informacion",
+    "title": "Pregunta direccion tras sintoma responde direccion",
+    "messages": ["Me duele una muela", "donde estais?"],
+    "criteria": [
+      { "type": "replyIncludes", "value": "Paseo Duques de Lugo", "weight": 3 },
+      { "type": "replyIncludes", "value": "Carrer Reina Victoria", "weight": 3 },
+      { "type": "replyExcludes", "value": "fiebre", "weight": 2 }
+    ]
+  },
+  {
+    "id": "doctor-specific-orthodontics",
+    "category": "agenda",
+    "title": "Cita con doctora de ortodoncia clasifica ortodoncia",
+    "messages": ["quiero cita con la doctora de ortodoncia"],
+    "criteria": [
+      { "type": "stateEquals", "field": "intent", "value": "orthodontics", "weight": 3 },
+      { "type": "replyIncludes", "value": "ortodoncia", "weight": 2 },
+      { "type": "replyIncludes", "value": "Aceptas que guardemos", "weight": 2 }
+    ]
+  },
+  {
+    "id": "time-expression-not-name",
+    "category": "datos",
+    "title": "Desde ayer no se guarda como nombre",
+    "messages": ["Creo que tengo una caries en una muela", "acepto", "desde ayer"],
+    "criteria": [
+      { "type": "stateEquals", "field": "name", "value": "", "weight": 4 },
+      { "type": "stateEquals", "field": "intent", "value": "caries_restoration", "weight": 2 },
+      { "type": "replyIncludes", "value": "frio/calor", "weight": 2 }
+    ]
+  },
+  {
+    "id": "short-no-keeps-context",
+    "category": "triaje",
+    "title": "No corto tras muela que se mueve mantiene contexto",
+    "messages": ["se me mueve una muela", "no"],
+    "criteria": [
+      { "type": "stateEquals", "field": "intent", "value": "periodontics", "weight": 2 },
+      { "type": "replyIncludes", "value": "Te duele, notas inflamacion, sangrado o ha sido por un golpe", "weight": 3 },
+      { "type": "replyExcludes", "value": "implante, ortodoncia", "weight": 3 }
+    ]
+  },
+  {
+    "id": "prosthetics-price-direct",
+    "category": "presupuesto",
+    "title": "Precio corona directo",
+    "messages": ["Cuanto cuesta una corona dental?"],
+    "criteria": [
+      { "type": "stateEquals", "field": "intent", "value": "prosthetics", "weight": 2 },
+      { "type": "replyIncludes", "value": "450 EUR", "weight": 3 },
+      { "type": "replyIncludes", "value": "valoracion", "weight": 1 }
+    ]
+  },
+  {
+    "id": "prosthetics-recement-less",
+    "category": "presupuesto",
+    "title": "Recementado no promete precio cerrado",
+    "messages": ["Se me ha soltado una corona, cuanto cuesta pegarla?"],
+    "criteria": [
+      { "type": "stateEquals", "field": "intent", "value": "prosthetics", "weight": 2 },
+      { "type": "replyIncludes", "value": "puede ser menos", "weight": 2 },
+      { "type": "replyExcludes", "value": "gratis", "weight": 2 }
+    ]
+  }
+]

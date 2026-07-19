@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+
+<html lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        body { font-family: 'Inter', sans-serif; }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
+            font-size: 18px;
+        }
+        /* Custom scrollbar for professional density */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-surface-variant": "#41474f",
+                        "border-subtle": "#E8EBEE",
+                        "on-secondary": "#ffffff",
+                        "outline": "#717880",
+                        "surface-container-lowest": "#ffffff",
+                        "on-tertiary-fixed": "#2e1500",
+                        "on-primary-container": "#9fd0ff",
+                        "on-background": "#191c1f",
+                        "on-secondary-fixed-variant": "#3c4852",
+                        "surface-container": "#eceef2",
+                        "border-base": "#D9DEE3",
+                        "tertiary-fixed": "#ffdcc1",
+                        "surface-container-high": "#e7e8ed",
+                        "on-primary-fixed-variant": "#004a75",
+                        "secondary-fixed": "#d8e4f1",
+                        "warning": "#B37D00",
+                        "secondary-container": "#d5e1ee",
+                        "on-primary-fixed": "#001d32",
+                        "surface-container-low": "#f2f3f8",
+                        "on-surface": "#191c1f",
+                        "on-secondary-fixed": "#111d26",
+                        "surface": "#FFFFFF",
+                        "primary-container": "#005a8c",
+                        "on-tertiary-fixed-variant": "#6c3a00",
+                        "inverse-on-surface": "#eff1f5",
+                        "tertiary": "#613300",
+                        "surface-tint": "#166395",
+                        "success": "#278561",
+                        "surface-dim": "#d8dadf",
+                        "on-tertiary": "#ffffff",
+                        "secondary-fixed-dim": "#bcc8d4",
+                        "surface-alt": "#F0F2F4",
+                        "surface-container-highest": "#e1e2e7",
+                        "tertiary-container": "#824701",
+                        "primary": "#004268",
+                        "secondary": "#54606b",
+                        "outline-variant": "#c1c7d0",
+                        "on-error": "#ffffff",
+                        "on-error-container": "#93000a",
+                        "inverse-surface": "#2e3134",
+                        "surface-bright": "#f8f9fe",
+                        "primary-fixed": "#cde5ff",
+                        "inverse-primary": "#95ccff",
+                        "tertiary-fixed-dim": "#ffb779",
+                        "on-tertiary-container": "#ffbe87",
+                        "background": "#F5F6F7",
+                        "primary-fixed-dim": "#95ccff",
+                        "surface-variant": "#e1e2e7",
+                        "error-container": "#ffdad6",
+                        "text-primary": "#17212B",
+                        "on-primary": "#ffffff",
+                        "error": "#C53030",
+                        "on-secondary-container": "#58646f"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "sidebar-collapsed": "64px",
+                        "gutter": "1rem",
+                        "sidebar-width": "224px",
+                        "padding-compact": "0.75rem",
+                        "padding-base": "1rem",
+                        "header-height": "52px"
+                    },
+                    "fontFamily": {
+                        "headline-md": ["Inter"],
+                        "headline-lg": ["Inter"],
+                        "label-xs": ["Inter"],
+                        "body-sm": ["Inter"],
+                        "body-md": ["Inter"]
+                    },
+                    "fontSize": {
+                        "headline-md": ["16px", { "lineHeight": "24px", "fontWeight": "600" }],
+                        "headline-lg": ["22px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "label-xs": ["10px", { "lineHeight": "14px", "letterSpacing": "0.02em", "fontWeight": "500" }],
+                        "body-sm": ["11px", { "lineHeight": "16px", "fontWeight": "400" }],
+                        "body-md": ["12px", { "lineHeight": "18px", "fontWeight": "400" }]
+                    }
+                },
+            },
+        }
+    </script>
+</head>
+<body class="bg-background text-on-surface">
+<!-- SideNavBar -->
+<aside class="w-sidebar-width h-screen fixed left-0 top-0 border-r border-border-base bg-surface flex flex-col py-4 overflow-y-auto z-50">
+<div class="px-6 mb-8 flex items-center gap-3">
+<div class="w-8 h-8 bg-primary rounded flex items-center justify-center">
+<span class="material-symbols-outlined text-white" style="font-variation-settings: 'FILL' 1;">dentistry</span>
+</div>
+<div>
+<h1 class="font-headline-md text-headline-md font-bold text-primary">DENTIA</h1>
+<p class="text-[10px] uppercase tracking-wider text-on-surface-variant font-semibold -mt-1">Dental Software</p>
+</div>
+</div>
+<nav class="flex-1">
+<ul class="space-y-0.5">
+<!-- Navigation Items -->
+<li>
+<a class="flex items-center gap-3 px-6 py-2.5 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors duration-150 ease-in-out font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined">home</span>
+<span>Inicio</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-6 py-2.5 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors duration-150 ease-in-out font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined">calendar_month</span>
+<span>Agenda</span>
+</a>
+</li>
+<!-- Active Item: Pacientes -->
+<li>
+<a class="flex items-center gap-3 px-6 py-2.5 text-primary font-semibold border-r-2 border-primary bg-surface-alt font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">group</span>
+<span>Pacientes</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-6 py-2.5 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors duration-150 ease-in-out font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined">medical_services</span>
+<span>Clínica</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-6 py-2.5 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors duration-150 ease-in-out font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined">dentistry</span>
+<span>Tratamientos</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-6 py-2.5 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors duration-150 ease-in-out font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined">payments</span>
+<span>Finanzas</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-6 py-2.5 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors duration-150 ease-in-out font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined">account_tree</span>
+<span>CRM</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-6 py-2.5 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors duration-150 ease-in-out font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined">folder_open</span>
+<span>Documentos</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-6 py-2.5 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors duration-150 ease-in-out font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined">inventory_2</span>
+<span>Inventario</span>
+</a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-6 py-2.5 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors duration-150 ease-in-out font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined">badge</span>
+<span>Equipo</span>
+</a>
+</li>
+</ul>
+</nav>
+<div class="mt-auto border-t border-border-base pt-4">
+<a class="flex items-center gap-3 px-6 py-2.5 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span>Configuración</span>
+</a>
+</div>
+</aside>
+<!-- TopNavBar -->
+<header class="h-header-height fixed top-0 right-0 left-sidebar-width z-40 bg-surface border-b border-border-base flex items-center justify-between px-gutter">
+<div class="flex items-center gap-6">
+<div class="relative w-64">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline">search</span>
+<input class="w-full bg-background border border-border-base rounded-lg pl-10 pr-4 py-1.5 font-body-md text-body-md focus:outline-none focus:border-primary transition-colors" placeholder="Buscar paciente, cita o historia..." type="text"/>
+</div>
+<nav class="flex items-center gap-4">
+<a class="text-primary font-bold border-b-2 border-primary pb-1 font-body-md text-body-md" href="#">Sede Centro</a>
+<a class="text-on-surface-variant hover:text-primary transition-colors font-body-md text-body-md" href="#">Sede Playa</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<button class="bg-primary text-white px-4 py-1.5 rounded font-body-md text-body-md font-semibold hover:bg-primary-container transition-all active:scale-95">
+                + Crear
+            </button>
+<div class="flex items-center gap-2">
+<button class="p-1.5 text-on-surface-variant hover:bg-surface-alt rounded-full transition-colors relative">
+<span class="material-symbols-outlined">notifications</span>
+<span class="absolute top-1.5 right-1.5 w-2 h-2 bg-error rounded-full border-2 border-surface"></span>
+</button>
+<button class="flex items-center gap-2 pl-2 border-l border-border-base ml-2">
+<div class="w-7 h-7 bg-secondary-container rounded-full overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="A professional studio portrait of a modern dental clinic manager, male, wearing a clean white clinical coat and a subtle blue tie. He has a friendly, authoritative expression. The background is a soft-focus clinical office with high-key lighting, maintaining a clean and trustworthy medical professional aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBojQGmzERW-ALjI_1gDD5dYlPYQRvEhUPioTD3UF4WEGquTcx4Vi2gprEPa2L9NbT3i2P3-FD1bUsai8S4rYKvjHXuVnLmL3XzRBTXHCzlDEtKkB02bZU69zE3OaMls8Xz7Tok-BX_camiFgrFjJ3wFzoqIW2elY0r_r_OPQjdHi9FvOhBuQoErhC3rTerY80gE_J2kn_qmd3TxF4ljPpeeDxbLzbSXohUmKDJHDjuTd0f8WLtIU7d"/>
+</div>
+<span class="material-symbols-outlined text-outline">expand_more</span>
+</button>
+</div>
+</div>
+</header>
+<!-- Main Content -->
+<main class="ml-sidebar-width pt-header-height min-h-screen">
+<!-- Page Title & Header Actions -->
+<div class="px-gutter py-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+<div>
+<h2 class="font-headline-lg text-headline-lg text-text-primary">Pacientes</h2>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Gestión y control de la base de datos clínica.</p>
+</div>
+<div class="flex items-center gap-2">
+<button class="flex items-center gap-2 px-3 py-1.5 border border-border-base bg-surface text-on-surface-variant hover:bg-surface-alt rounded transition-colors font-body-md text-body-md">
+<span class="material-symbols-outlined">download</span>
+                    Exportar
+                </button>
+<button class="flex items-center gap-2 px-4 py-1.5 bg-primary text-white hover:bg-primary-container rounded transition-all active:scale-95 font-body-md text-body-md font-semibold">
+<span class="material-symbols-outlined text-[18px]">person_add</span>
+                    + Nuevo paciente
+                </button>
+</div>
+</div>
+<!-- Filters Section -->
+<div class="px-gutter mb-6">
+<div class="bg-surface border border-border-base p-3 flex flex-wrap items-center gap-4">
+<div class="flex flex-col gap-1">
+<label class="font-label-xs text-label-xs text-outline uppercase tracking-wider">Sede</label>
+<select class="border border-border-base bg-surface-alt px-2 py-1.5 rounded font-body-md text-body-md min-w-[140px] focus:outline-none focus:border-primary">
+<option>Todas las sedes</option>
+<option>Sede Centro</option>
+<option>Sede Playa</option>
+</select>
+</div>
+<div class="flex flex-col gap-1">
+<label class="font-label-xs text-label-xs text-outline uppercase tracking-wider">Profesional</label>
+<select class="border border-border-base bg-surface-alt px-2 py-1.5 rounded font-body-md text-body-md min-w-[160px] focus:outline-none focus:border-primary">
+<option>Todos los profesionales</option>
+<option>Dr. Ricardo Gómez</option>
+<option>Dra. Elena Martínez</option>
+<option>Dr. Carlos Ruiz</option>
+</select>
+</div>
+<div class="flex flex-col gap-1">
+<label class="font-label-xs text-label-xs text-outline uppercase tracking-wider">Deuda</label>
+<select class="border border-border-base bg-surface-alt px-2 py-1.5 rounded font-body-md text-body-md min-w-[140px] focus:outline-none focus:border-primary text-error font-medium">
+<option class="text-on-surface">Cualquier estado</option>
+<option class="text-error">Con Deuda</option>
+<option class="text-success">Sin Deuda</option>
+</select>
+</div>
+<div class="flex flex-col gap-1">
+<label class="font-label-xs text-label-xs text-outline uppercase tracking-wider">Estado</label>
+<div class="flex items-center gap-1">
+<button class="px-3 py-1.5 bg-secondary-container text-on-secondary-container rounded-lg font-body-md text-body-md font-medium">Activos</button>
+<button class="px-3 py-1.5 text-on-surface-variant hover:bg-surface-alt rounded-lg font-body-md text-body-md">Inactivos</button>
+</div>
+</div>
+<div class="ml-auto flex items-center gap-2 self-end pb-0.5">
+<span class="font-body-sm text-body-sm text-on-surface-variant">Mostrando 124 pacientes</span>
+<button class="p-1.5 hover:bg-surface-alt rounded text-outline"><span class="material-symbols-outlined">filter_list</span></button>
+</div>
+</div>
+</div>
+<!-- Patients Table Section -->
+<div class="px-gutter pb-12">
+<div class="bg-surface border border-border-base overflow-hidden">
+<table class="w-full text-left border-collapse">
+<thead class="bg-surface-container-low border-b border-border-base">
+<tr>
+<th class="px-4 py-2.5 font-label-xs text-label-xs text-outline uppercase tracking-wider">Paciente</th>
+<th class="px-4 py-2.5 font-label-xs text-label-xs text-outline uppercase tracking-wider">Historia</th>
+<th class="px-4 py-2.5 font-label-xs text-label-xs text-outline uppercase tracking-wider">Teléfono</th>
+<th class="px-4 py-2.5 font-label-xs text-label-xs text-outline uppercase tracking-wider text-center">Edad</th>
+<th class="px-4 py-2.5 font-label-xs text-label-xs text-outline uppercase tracking-wider">Próxima cita</th>
+<th class="px-4 py-2.5 font-label-xs text-label-xs text-outline uppercase tracking-wider">Última visita</th>
+<th class="px-4 py-2.5 font-label-xs text-label-xs text-outline uppercase tracking-wider text-right">Saldo</th>
+<th class="px-4 py-2.5 font-label-xs text-label-xs text-outline uppercase tracking-wider text-center">Estado</th>
+<th class="px-4 py-2.5"></th>
+</tr>
+</thead>
+<tbody class="divide-y divide-border-subtle">
+<!-- Patient Row 1 -->
+<tr class="hover:bg-surface-bright transition-colors cursor-pointer group">
+<td class="px-4 py-3">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-primary-fixed flex-shrink-0 overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="Close-up headshot of a mature woman with soft features, graying hair tied back, and a gentle smile. She looks like a regular dental patient in a professional medical record photo. High-key lighting, minimalist neutral background, clean healthcare aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBGQs0Us6KCOJ5lmnMeMkPmq1PXi1rB9yURGDurpnC2MMfjiQ_YwZrzzUCij0siTwEdP_6lbMB-t7_V1d1obTUziD0bQ-Fe71Ttr4kgX8JDMh17iQzvBy6N3tKdIiECT6Dkvi-YFxRHSGaEBY9D1zUwQoZ6sJ8ka3xUEBmMyj4-fzrTGxCSn45GwZiKkYQp4gxB37iWZYmG-jVWlZu2Pfu33rrRMnwpvRcFcDPR2_U7tbB9nbBUYEEr"/>
+</div>
+<div>
+<div class="font-body-md text-body-md font-semibold text-text-primary">Juan Pérez García</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant">juan.perez@email.com</div>
+</div>
+</div>
+</td>
+<td class="px-4 py-3 font-body-md text-body-md text-on-surface-variant">H-88291</td>
+<td class="px-4 py-3 font-body-md text-body-md text-on-surface-variant">644 123 456</td>
+<td class="px-4 py-3 font-body-md text-body-md text-on-surface-variant text-center">45</td>
+<td class="px-4 py-3">
+<div class="font-body-md text-body-md text-primary font-medium">12 Oct, 10:00</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant">Limpieza General</div>
+</td>
+<td class="px-4 py-3 font-body-md text-body-md text-on-surface-variant">15 Sep 2023</td>
+<td class="px-4 py-3 font-body-md text-body-md text-right text-error font-semibold">-$45.00</td>
+<td class="px-4 py-3 text-center">
+<span class="px-2 py-0.5 rounded bg-success/10 text-success font-label-xs text-label-xs font-bold uppercase">Activo</span>
+</td>
+<td class="px-4 py-3 text-right">
+<button class="p-1 hover:bg-surface-alt rounded opacity-0 group-hover:opacity-100 transition-opacity">
+<span class="material-symbols-outlined text-outline">more_vert</span>
+</button>
+</td>
+</tr>
+<!-- Patient Row 2 -->
+<tr class="hover:bg-surface-bright transition-colors cursor-pointer group">
+<td class="px-4 py-3">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-secondary-fixed flex-shrink-0 overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="A portrait of a young man with a friendly expression, short dark hair, wearing a casual light blue shirt. He is a typical dental clinic patient. The lighting is bright and even, typical of a professional medical environment, against a solid off-white background." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBZ0IZFeTyg7DIVdIlmgQE1paBbWI5oTVMDHQP_PqzYVZp-m_DTGhKjk_3Phkxqbfz4RsU7PhkoDrrz_lutPeWyDQrqE4h3oVdGCCS79AGFW2JiN113S5TQD6FUj7dAm-0IVxBL1GeaUJbDxLRLpYfUyAkGskFhiLCAQyaC7AhzCq5Uka2q4NQWC7PuteZoOKnhgEp2Z6WcbFKAdG473BXl0I6XtsGYoDHnuyK2ucj2rNvo8g7hOYDE"/>
+</div>
+<div>
+<div class="font-body-md text-body-md font-semibold text-text-primary">María Luisa Torres</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant">ml.torres@provider.es</div>
+</div>
+</div>
+</td>
+<td class="px-4 py-3 font-body-md text-body-md text-on-surface-variant">H-88295</td>
+<td class="px-4 py-3 font-body-md text-body-md text-on-surface-variant">611 987 321</td>
+<td class="px-4 py-3 font-body-md text-body-md text-on-surface-variant text-center">32</td>
+<td class="px-4 py-3">
+<div class="font-body-md text-body-md text-on-surface-variant">Sin cita</div>
+</td>
+<td class="px-4 py-3 font-body-md text-body-md text-on-surface-variant">22 Ago 2023</td>
+<td class="px-4 py-3 font-body-md text-body-md text-right text-on-surface-variant font-medium">$0.00</td>
+<td class="px-4 py-3 text-center">
+<span class="px-2 py-0.5 rounded bg-success/10 text-success font-label-xs text-label-xs font-bold uppercase">Activo</span>
+</td>
+<td class="px-4 py-3 text-right">
+<button class="p-1 hover:bg-surface-alt rounded opacity-0 group-hover:opacity-100 transition-opacity">
+<span class="material-symbols-outlined text-outline">more_vert</span>
+</button>
+</td>
+</tr>
+<!-- Patient Row 3 (Debt highlighted) -->
+<tr class="hover:bg-surface-bright transition-colors cursor-pointer group">
+<td class="px-4 py-3">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-tertiary-fixed flex-shrink-0 overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="Professional medical identification portrait of an elderly man with white hair and glasses, wearing a neutral gray polo shirt. He has a calm and dignified expression. Lighting is soft and bright, typical of a modern healthcare facility. White clinical background." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDW8474SvhsSJi2JF4oHJNCDHBaghCUihRgwRxCM9VVX4x3QJyeyQOejInRsekKhdP5nYNSWl8q1pFwWr36k3MZ7MdfWUdEHAhayBaNiKHbKmdlUC0JUhSgmvIDS8dD4CIZXiynuZmp6EF_nK2E62B_GXgyyjI_qhx62eKUPRFlWPQ9I6OLEgYIgj9mitwBI1cHlQvNJZLppSvAL_AJqdiYlDSYH3g6ZIY48sUr6dA3HQDOVFdAYjyb"/>
+</div>
+<div>
+<div class="font-body-md text-body-md font-semibold text-text-primary">Carlos Mendez Ruiz</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant">cmendez@corp.com</div>
+</div>
+</div>
+</td>
+<td class="px-4 py-3 font-body-md text-body-md text-on-surface-variant">H-88302</td>
+<td class="px-4 py-3 font-body-md text-body-md text-on-surface-variant">633 445 566</td>
+<td class="px-4 py-3 font-body-md text-body-md text-on-surface-variant text-center">68</td>
+<td class="px-4 py-3">
+<div class="font-body-md text-body-md text-primary font-medium">18 Oct, 16:30</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant">Revisión Implante</div>
+</td>
+<td class="px-4 py-3 font-body-md text-body-md text-on-surface-variant">05 Jul 2023</td>
+<td class="px-4 py-3 font-body-md text-body-md text-right text-error font-semibold">-$840.00</td>
+<td class="px-4 py-3 text-center">
+<span class="px-2 py-0.5 rounded bg-success/10 text-success font-label-xs text-label-xs font-bold uppercase">Activo</span>
+</td>
+<td class="px-4 py-3 text-right">
+<button class="p-1 hover:bg-surface-alt rounded opacity-0 group-hover:opacity-100 transition-opacity">
+<span class="material-symbols-outlined text-outline">more_vert</span>
+</button>
+</td>
+</tr>
+<!-- Patient Row 4 -->
+<tr class="hover:bg-surface-bright transition-colors cursor-pointer group">
+<td class="px-4 py-3">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-outline-variant flex-shrink-0 flex items-center justify-center text-white">
+<span class="material-symbols-outlined">person</span>
+</div>
+<div>
+<div class="font-body-md text-body-md font-semibold text-text-primary">Elena Vázquez</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant">evazquez@email.com</div>
+</div>
+</div>
+</td>
+<td class="px-4 py-3 font-body-md text-body-md text-on-surface-variant">H-88410</td>
+<td class="px-4 py-3 font-body-md text-body-md text-on-surface-variant">688 000 111</td>
+<td class="px-4 py-3 font-body-md text-body-md text-on-surface-variant text-center">27</td>
+<td class="px-4 py-3">
+<div class="font-body-md text-body-md text-on-surface-variant">Sin cita</div>
+</td>
+<td class="px-4 py-3 font-body-md text-body-md text-on-surface-variant">10 Ene 2023</td>
+<td class="px-4 py-3 font-body-md text-body-md text-right text-on-surface-variant font-medium">$0.00</td>
+<td class="px-4 py-3 text-center">
+<span class="px-2 py-0.5 rounded bg-on-surface-variant/10 text-on-surface-variant font-label-xs text-label-xs font-bold uppercase">Inactivo</span>
+</td>
+<td class="px-4 py-3 text-right">
+<button class="p-1 hover:bg-surface-alt rounded opacity-0 group-hover:opacity-100 transition-opacity">
+<span class="material-symbols-outlined text-outline">more_vert</span>
+</button>
+</td>
+</tr>
+<!-- Row 5 (Urgency indicator) -->
+<tr class="hover:bg-surface-bright transition-colors cursor-pointer group">
+<td class="px-4 py-3">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-error-container flex-shrink-0 overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="Headshot portrait of a young girl with a shy smile, wearing a pink sweater. A patient photo for a pediatric dentistry file. The lighting is soft and bright, creating a friendly and safe dental office atmosphere. The background is a blurred soft-white medical wall." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDlMZcYph-wOFcdntmT7tgp2WC4uBNY45I8iAXuTqkU_QGnTK7bQZVC9Z3MohJ6AbQAgr5lZCWzgN456fNfUR_6zIiJ3QZbUZNPGUDmf2h-cGdq1GZijhlLs-BpxGvkvhV-O3a4f2NUO4JNIvhyyqZGs7OJT0qyLvGBv4cWQhEUxEM5OGK6OVdOUKPlv2jg9KpspREHARjVi2OzPvd1UJEuwnZsed_uOztI4E9ryTX-7fjSP2B7JlGj"/>
+</div>
+<div>
+<div class="font-body-md text-body-md font-semibold text-text-primary">Sofía Martín</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant">padre.martin@email.com</div>
+</div>
+</div>
+</td>
+<td class="px-4 py-3 font-body-md text-body-md text-on-surface-variant">H-88450</td>
+<td class="px-4 py-3 font-body-md text-body-md text-on-surface-variant">600 555 999</td>
+<td class="px-4 py-3 font-body-md text-body-md text-on-surface-variant text-center">9</td>
+<td class="px-4 py-3">
+<div class="font-body-md text-body-md text-warning font-semibold">Hoy, 18:00</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant">Urgencia</div>
+</td>
+<td class="px-4 py-3 font-body-md text-body-md text-on-surface-variant">02 Oct 2023</td>
+<td class="px-4 py-3 font-body-md text-body-md text-right text-success font-semibold">+$25.00</td>
+<td class="px-4 py-3 text-center">
+<span class="px-2 py-0.5 rounded bg-success/10 text-success font-label-xs text-label-xs font-bold uppercase">Activo</span>
+</td>
+<td class="px-4 py-3 text-right">
+<button class="p-1 hover:bg-surface-alt rounded opacity-0 group-hover:opacity-100 transition-opacity">
+<span class="material-symbols-outlined text-outline">more_vert</span>
+</button>
+</td>
+</tr>
+</tbody>
+</table>
+<!-- Pagination -->
+<div class="px-4 py-3 bg-surface-container-low border-t border-border-base flex items-center justify-between">
+<span class="font-body-sm text-body-sm text-on-surface-variant">Página 1 de 12</span>
+<div class="flex items-center gap-1">
+<button class="p-1 hover:bg-surface-alt rounded text-outline disabled:opacity-30" disabled="">
+<span class="material-symbols-outlined">chevron_left</span>
+</button>
+<button class="w-8 h-8 flex items-center justify-center rounded bg-primary text-white font-body-md text-body-md font-semibold">1</button>
+<button class="w-8 h-8 flex items-center justify-center rounded hover:bg-surface-alt font-body-md text-body-md">2</button>
+<button class="w-8 h-8 flex items-center justify-center rounded hover:bg-surface-alt font-body-md text-body-md">3</button>
+<span class="px-2 text-outline">...</span>
+<button class="w-8 h-8 flex items-center justify-center rounded hover:bg-surface-alt font-body-md text-body-md">12</button>
+<button class="p-1 hover:bg-surface-alt rounded text-outline">
+<span class="material-symbols-outlined">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Floating Stats Summary (Contextual Detail) -->
+<div class="fixed bottom-6 right-6 flex flex-col gap-2 pointer-events-none">
+<div class="bg-inverse-surface text-inverse-on-surface px-4 py-2 rounded shadow-lg pointer-events-auto flex items-center gap-4">
+<div class="flex items-center gap-2 border-r border-outline-variant pr-4">
+<span class="material-symbols-outlined text-primary-fixed-dim">group</span>
+<div>
+<div class="text-[10px] uppercase font-bold text-outline-variant">Total Pacientes</div>
+<div class="text-sm font-bold">1,482</div>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-error">account_balance_wallet</span>
+<div>
+<div class="text-[10px] uppercase font-bold text-outline-variant">Deuda Total</div>
+<div class="text-sm font-bold text-error">-$12,450.00</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Micro-interaction script -->
+<script>
+        // Adding simple row hover effects and select handling
+        document.querySelectorAll('tbody tr').forEach(row => {
+            row.addEventListener('click', () => {
+                // In a real app, this would navigate to the patient profile
+                console.log('Navegando a la historia clínica del paciente...');
+            });
+        });
+
+        // Simple feedback for action buttons
+        document.querySelectorAll('button').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                if (btn.innerText.includes('Nuevo')) {
+                    console.log('Abriendo modal de nuevo paciente');
+                }
+            });
+        });
+    </script>
+</body></html>

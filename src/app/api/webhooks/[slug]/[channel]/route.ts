@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { processInboundMessage } from "@/lib/agent";
 import { prisma } from "@/lib/prisma";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { constantTimeEqual, isConfiguredSecret } from "@/lib/security";
 import { firstErrorMessage, inboundMessageSchema } from "@/lib/validation";
 
 // Margen suficiente para el turno LLM (12s) + persistencia, sin depender del
@@ -21,6 +22,11 @@ type RouteParams = { params: Promise<{ slug: string; channel: string }> };
 
 export async function POST(request: NextRequest, { params }: RouteParams) {
   const { slug, channel } = await params;
+
+  const secretResponse = validateWebhookSecret(request);
+  if (secretResponse) {
+    return secretResponse;
+  }
 
   const mappedChannel = channelMap[channel.toLowerCase()];
   if (!mappedChannel) {
@@ -80,4 +86,50 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       { status: 500 }
     );
   }
+}
+
+function validateWebhookSecret(request: NextRequest) {
+  const configuredSecret = process.env.WEBHOOK_SHARED_SECRET;
+  if (isSameOriginBrowserRequest(request)) {
+    return null;
+  }
+
+  if (!isConfiguredSecret(configuredSecret)) {
+    if (process.env.NODE_ENV === "production") {
+      console.error("WEBHOOK_SHARED_SECRET must be configured in production");
+      return NextResponse.json(
+        { success: false, data: null, error: "Webhook no configurado." },
+        { status: 500 }
+      );
+    }
+    return null;
+  }
+
+  const receivedSecret = request.headers.get("x-webhook-secret");
+  if (!receivedSecret || !constantTimeEqual(receivedSecret, configuredSecret)) {
+    return NextResponse.json(
+      { success: false, data: null, error: "Firma de webhook no valida." },
+      { status: 401 }
+    );
+  }
+
+  return null;
+}
+
+function isSameOriginBrowserRequest(request: NextRequest): boolean {
+  const origin = request.headers.get("origin");
+  if (!origin) {
+    return false;
+  }
+
+  const allowedOrigins = new Set([request.nextUrl.origin]);
+  if (process.env.APP_BASE_URL) {
+    try {
+      allowedOrigins.add(new URL(process.env.APP_BASE_URL).origin);
+    } catch {
+      console.error("APP_BASE_URL is not a valid URL");
+    }
+  }
+
+  return allowedOrigins.has(origin);
 }

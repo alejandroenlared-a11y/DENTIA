@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+
+<html lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>DENTIA - Workspace Clínico CLIN-03</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        body { font-family: 'Inter', sans-serif; }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
+            font-size: 18px;
+        }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #D9DEE3; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #c1c7d0; }
+        .clinical-editor:focus { outline: none; border-color: #004268; }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "on-surface-variant": "#41474f",
+                      "border-subtle": "#E8EBEE",
+                      "on-secondary": "#ffffff",
+                      "outline": "#717880",
+                      "surface-container-lowest": "#ffffff",
+                      "on-tertiary-fixed": "#2e1500",
+                      "on-primary-container": "#9fd0ff",
+                      "on-background": "#191c1f",
+                      "on-secondary-fixed-variant": "#3c4852",
+                      "surface-container": "#eceef2",
+                      "border-base": "#D9DEE3",
+                      "tertiary-fixed": "#ffdcc1",
+                      "surface-container-high": "#e7e8ed",
+                      "on-primary-fixed-variant": "#004a75",
+                      "secondary-fixed": "#d8e4f1",
+                      "warning": "#B37D00",
+                      "secondary-container": "#d5e1ee",
+                      "on-primary-fixed": "#001d32",
+                      "surface-container-low": "#f2f3f8",
+                      "on-surface": "#191c1f",
+                      "on-secondary-fixed": "#111d26",
+                      "surface": "#FFFFFF",
+                      "primary-container": "#005a8c",
+                      "on-tertiary-fixed-variant": "#6c3a00",
+                      "inverse-on-surface": "#eff1f5",
+                      "tertiary": "#613300",
+                      "surface-tint": "#166395",
+                      "success": "#278561",
+                      "surface-dim": "#d8dadf",
+                      "on-tertiary": "#ffffff",
+                      "secondary-fixed-dim": "#bcc8d4",
+                      "surface-alt": "#F0F2F4",
+                      "surface-container-highest": "#e1e2e7",
+                      "tertiary-container": "#824701",
+                      "primary": "#004268",
+                      "secondary": "#54606b",
+                      "outline-variant": "#c1c7d0",
+                      "on-error": "#ffffff",
+                      "on-error-container": "#93000a",
+                      "inverse-surface": "#2e3134",
+                      "surface-bright": "#f8f9fe",
+                      "primary-fixed": "#cde5ff",
+                      "inverse-primary": "#95ccff",
+                      "tertiary-fixed-dim": "#ffb779",
+                      "on-tertiary-container": "#ffbe87",
+                      "background": "#F5F6F7",
+                      "primary-fixed-dim": "#95ccff",
+                      "surface-variant": "#e1e2e7",
+                      "error-container": "#ffdad6",
+                      "text-primary": "#17212B",
+                      "on-primary": "#ffffff",
+                      "error": "#C53030",
+                      "on-secondary-container": "#58646f"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.125rem",
+                      "lg": "0.25rem",
+                      "xl": "0.5rem",
+                      "full": "0.75rem"
+              },
+              "spacing": {
+                      "sidebar-collapsed": "64px",
+                      "gutter": "1rem",
+                      "sidebar-width": "224px",
+                      "padding-compact": "0.75rem",
+                      "padding-base": "1rem",
+                      "header-height": "52px"
+              },
+              "fontFamily": {
+                      "headline-md": ["Inter"],
+                      "headline-lg": ["Inter"],
+                      "label-xs": ["Inter"],
+                      "body-sm": ["Inter"],
+                      "body-md": ["Inter"]
+              },
+              "fontSize": {
+                      "headline-md": ["16px", {"lineHeight": "24px", "fontWeight": "600"}],
+                      "headline-lg": ["22px", {"lineHeight": "32px", "fontWeight": "600"}],
+                      "label-xs": ["10px", {"lineHeight": "14px", "letterSpacing": "0.02em", "fontWeight": "500"}],
+                      "body-sm": ["11px", {"lineHeight": "16px", "fontWeight": "400"}],
+                      "body-md": ["12px", {"lineHeight": "18px", "fontWeight": "400"}]
+              }
+            },
+          },
+        }
+    </script>
+</head>
+<body class="bg-background text-on-surface overflow-hidden">
+<!-- SideNavBar Integration -->
+<aside class="w-sidebar-width h-screen fixed left-0 top-0 border-r border-border-base bg-surface dark:bg-on-surface flex flex-col py-4 z-50">
+<div class="px-6 mb-8">
+<h1 class="font-headline-md text-headline-md font-bold text-primary dark:text-primary-fixed-dim">DENTIA</h1>
+<p class="text-[10px] uppercase tracking-widest text-on-surface-variant font-medium">Software Dental</p>
+</div>
+<nav class="flex-1 space-y-1">
+<!-- Labels based on JSON: "Pacientes" is active for CLIN-03 context -->
+<a class="flex items-center px-6 py-2.5 text-on-surface-variant hover:bg-surface-alt transition-colors duration-150" href="#">
+<span class="material-symbols-outlined mr-3">home</span>
+<span class="font-body-md text-body-md">Inicio</span>
+</a>
+<a class="flex items-center px-6 py-2.5 text-on-surface-variant hover:bg-surface-alt transition-colors duration-150" href="#">
+<span class="material-symbols-outlined mr-3">calendar_month</span>
+<span class="font-body-md text-body-md">Agenda</span>
+</a>
+<a class="flex items-center px-6 py-2.5 text-primary dark:text-primary-fixed-dim font-semibold border-r-2 border-primary dark:border-primary-fixed-dim bg-surface-alt dark:bg-on-secondary-fixed-variant" href="#">
+<span class="material-symbols-outlined mr-3">group</span>
+<span class="font-body-md text-body-md">Pacientes</span>
+</a>
+<a class="flex items-center px-6 py-2.5 text-on-surface-variant hover:bg-surface-alt transition-colors duration-150" href="#">
+<span class="material-symbols-outlined mr-3">medical_services</span>
+<span class="font-body-md text-body-md">Clínica</span>
+</a>
+<a class="flex items-center px-6 py-2.5 text-on-surface-variant hover:bg-surface-alt transition-colors duration-150" href="#">
+<span class="material-symbols-outlined mr-3">dentistry</span>
+<span class="font-body-md text-body-md">Tratamientos</span>
+</a>
+<a class="flex items-center px-6 py-2.5 text-on-surface-variant hover:bg-surface-alt transition-colors duration-150" href="#">
+<span class="material-symbols-outlined mr-3">payments</span>
+<span class="font-body-md text-body-md">Finanzas</span>
+</a>
+<a class="flex items-center px-6 py-2.5 text-on-surface-variant hover:bg-surface-alt transition-colors duration-150" href="#">
+<span class="material-symbols-outlined mr-3">folder_open</span>
+<span class="font-body-md text-body-md">Documentos</span>
+</a>
+</nav>
+<div class="px-6 pt-4 border-t border-border-subtle">
+<a class="flex items-center py-2 text-on-surface-variant hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined mr-3">settings</span>
+<span class="font-body-md text-body-md">Configuración</span>
+</a>
+</div>
+</aside>
+<!-- Main Workspace -->
+<main class="ml-sidebar-width h-screen flex flex-col relative">
+<!-- TopNavBar (Fixed Header) -->
+<header class="h-header-height bg-surface border-b border-border-base flex items-center justify-between px-gutter shrink-0">
+<div class="flex items-center gap-6">
+<div class="flex items-center gap-2 px-3 py-1.5 bg-surface-container rounded border border-border-subtle">
+<span class="material-symbols-outlined text-primary">search</span>
+<input class="bg-transparent border-none focus:ring-0 font-body-md text-body-md w-64 p-0" placeholder="Buscar paciente o cita..." type="text"/>
+</div>
+<nav class="flex items-center gap-4">
+<span class="text-primary font-bold border-b-2 border-primary pb-1 font-body-md text-body-md cursor-pointer">Sede Centro</span>
+<span class="text-on-surface-variant hover:text-primary transition-colors font-body-md text-body-md cursor-pointer">Sede Playa</span>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<button class="bg-primary text-on-primary px-4 py-1.5 rounded font-body-md text-body-md font-semibold active:scale-95 transition-all">+ Crear</button>
+<div class="flex items-center gap-2 border-l border-border-subtle pl-4">
+<span class="material-symbols-outlined text-on-surface-variant cursor-pointer p-1.5 hover:bg-surface-alt rounded">notifications</span>
+<div class="flex items-center gap-2 cursor-pointer p-1 hover:bg-surface-alt rounded">
+<span class="material-symbols-outlined text-on-surface-variant">account_circle</span>
+<span class="font-body-md text-body-md font-medium">Dr. M. Martínez</span>
+</div>
+</div>
+</div>
+</header>
+<!-- TopAppBar (Patient Context) -->
+<div class="h-10 bg-surface-container-low border-b border-border-subtle flex items-center px-4 shrink-0 justify-between">
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary" style="font-size: 20px;">person</span>
+<h2 class="font-headline-md text-headline-md text-on-surface">Paciente: Juan Pérez</h2>
+</div>
+<div class="h-4 w-px bg-border-base"></div>
+<div class="flex gap-4">
+<span class="font-label-xs text-label-xs text-secondary flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">cake</span> 42 años</span>
+<span class="font-label-xs text-label-xs text-secondary flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">fingerprint</span> 48293021-K</span>
+</div>
+</div>
+<div class="flex items-center gap-3">
+<span class="bg-error/10 text-error px-2 py-0.5 rounded-full font-label-xs text-label-xs font-bold uppercase tracking-wider flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">warning</span> Alergia: Penicilina
+                </span>
+<div class="flex items-center gap-1">
+<button class="p-1 hover:bg-surface-variant rounded text-on-surface-variant" title="Alertas"><span class="material-symbols-outlined">warning</span></button>
+<button class="p-1 hover:bg-surface-variant rounded text-on-surface-variant" title="Cartera"><span class="material-symbols-outlined">account_balance_wallet</span></button>
+<button class="p-1 hover:bg-surface-variant rounded text-on-surface-variant" title="Historial Rápido"><span class="material-symbols-outlined">quick_reference_all</span></button>
+</div>
+</div>
+</div>
+<!-- Scrollable Content Area -->
+<div class="flex-1 flex overflow-hidden">
+<!-- Central Workspace Column -->
+<section class="flex-1 overflow-y-auto p-6 bg-white">
+<div class="max-w-4xl mx-auto space-y-8">
+<!-- Motivo de consulta -->
+<div class="space-y-3">
+<label class="flex items-center gap-2 font-headline-md text-headline-md text-primary">
+<span class="material-symbols-outlined">medical_information</span>
+                            Motivo de consulta
+                        </label>
+<textarea class="w-full border-border-base focus:border-primary focus:ring-0 rounded-lg p-3 font-body-md text-body-md placeholder-on-surface-variant/50" placeholder="Ej: Dolor agudo en molar inferior derecho desde hace 48h..." rows="2"></textarea>
+</div>
+<!-- Exploración -->
+<div class="space-y-3">
+<label class="flex items-center gap-2 font-headline-md text-headline-md text-primary">
+<span class="material-symbols-outlined">clinical_notes</span>
+                            Exploración Clínica
+                        </label>
+<div class="grid grid-cols-2 gap-4">
+<div class="p-4 border border-border-base rounded-lg bg-surface-bright">
+<span class="font-label-xs text-label-xs text-on-surface-variant uppercase mb-2 block">Tejidos Blandos</span>
+<p class="font-body-md text-body-md text-on-surface">Mucosas normocoloreadas, ausencia de lesiones aparentes. Inflamación gingival localizada en sector 4.</p>
+</div>
+<div class="p-4 border border-border-base rounded-lg bg-surface-bright flex flex-col justify-center items-center text-center group cursor-pointer hover:border-primary transition-colors">
+<span class="material-symbols-outlined text-primary mb-1">add_a_photo</span>
+<span class="font-label-xs text-label-xs text-primary font-bold">Añadir Hallazgo Visual</span>
+</div>
+</div>
+</div>
+<!-- Nota Clínica (Editor Sobrio) -->
+<div class="space-y-3 pb-24">
+<div class="flex items-center justify-between">
+<label class="flex items-center gap-2 font-headline-md text-headline-md text-primary">
+<span class="material-symbols-outlined">edit_note</span>
+                                Evolución y Nota Clínica
+                            </label>
+<div class="flex gap-1">
+<button class="p-1 hover:bg-surface-alt rounded text-on-surface-variant"><span class="material-symbols-outlined" style="font-size: 16px;">format_bold</span></button>
+<button class="p-1 hover:bg-surface-alt rounded text-on-surface-variant"><span class="material-symbols-outlined" style="font-size: 16px;">format_italic</span></button>
+<button class="p-1 hover:bg-surface-alt rounded text-on-surface-variant"><span class="material-symbols-outlined" style="font-size: 16px;">format_list_bulleted</span></button>
+</div>
+</div>
+<div class="clinical-editor min-h-[300px] w-full border border-border-base rounded-lg p-4 font-body-md text-body-md bg-white leading-relaxed text-on-surface" contenteditable="true">
+                            Se procede a realizar apertura de cámara en pieza 46. Se observa necrosis pulpar. Conductometría realizada a 18mm. Irrigación profusa con hipoclorito al 5.25%. Sellado provisional con IRM. Paciente refiere alivio inmediato tras apertura. Se cita en una semana para continuar instrumentación.
+                        </div>
+</div>
+</div>
+</section>
+<!-- Right Context Panel -->
+<aside class="w-80 border-l border-border-base bg-surface-container-low flex flex-col shrink-0">
+<!-- Alertas Section -->
+<div class="p-4 border-b border-border-subtle bg-white">
+<h3 class="font-label-xs text-label-xs font-bold text-on-surface-variant uppercase tracking-widest mb-3 flex items-center justify-between">
+                        Alertas Médicas
+                        <span class="material-symbols-outlined text-error" style="font-variation-settings: 'FILL' 1;">error</span>
+</h3>
+<div class="space-y-2">
+<div class="p-2 bg-error-container/30 border border-error/20 rounded flex items-start gap-2">
+<span class="material-symbols-outlined text-error text-[16px] mt-0.5">priority_high</span>
+<span class="font-body-sm text-body-sm text-on-error-container">Alérgico a Penicilinas y derivados.</span>
+</div>
+<div class="p-2 bg-warning/10 border border-warning/20 rounded flex items-start gap-2">
+<span class="material-symbols-outlined text-warning text-[16px] mt-0.5">info</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Paciente con hipertensión controlada.</span>
+</div>
+</div>
+</div>
+<!-- Procedimientos previstos -->
+<div class="p-4 border-b border-border-subtle bg-surface-container-low/50">
+<h3 class="font-label-xs text-label-xs font-bold text-on-surface-variant uppercase tracking-widest mb-3">Plan para hoy</h3>
+<div class="space-y-3">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded bg-primary-container/30 flex items-center justify-center text-primary shrink-0">
+<span class="font-label-xs font-bold">46</span>
+</div>
+<div class="flex-1">
+<p class="font-body-md text-body-md font-medium text-on-surface leading-tight">Endodoncia Multirradicular</p>
+<p class="font-label-xs text-label-xs text-secondary">Fase 1: Apertura y Limpieza</p>
+</div>
+<span class="material-symbols-outlined text-success">check_circle</span>
+</div>
+<div class="flex items-center gap-3 opacity-50">
+<div class="w-8 h-8 rounded bg-surface-container-highest flex items-center justify-center text-secondary shrink-0">
+<span class="font-label-xs font-bold">45</span>
+</div>
+<div class="flex-1">
+<p class="font-body-md text-body-md font-medium text-on-surface leading-tight">Obturación Composite</p>
+<p class="font-label-xs text-label-xs text-secondary">Simple Oclusal</p>
+</div>
+<span class="material-symbols-outlined text-border-base">radio_button_unchecked</span>
+</div>
+</div>
+<button class="w-full mt-4 py-2 border border-dashed border-border-base rounded font-label-xs text-label-xs text-primary font-bold hover:bg-white transition-colors">+ Añadir procedimiento</button>
+</div>
+<!-- Tareas/Pendientes -->
+<div class="p-4 flex-1 overflow-y-auto">
+<h3 class="font-label-xs text-label-xs font-bold text-on-surface-variant uppercase tracking-widest mb-3">Tareas Administrativas</h3>
+<ul class="space-y-3">
+<li class="flex items-start gap-2 group">
+<input class="mt-0.5 rounded text-primary focus:ring-primary border-border-base" type="checkbox"/>
+<span class="font-body-sm text-body-sm text-on-surface leading-tight">Actualizar consentimiento informado (Firma pendiente)</span>
+</li>
+<li class="flex items-start gap-2 group">
+<input class="mt-0.5 rounded text-primary focus:ring-primary border-border-base" type="checkbox"/>
+<span class="font-body-sm text-body-sm text-on-surface leading-tight">Agendar cita de revisión 7 días</span>
+</li>
+<li class="flex items-start gap-2 group">
+<input class="mt-0.5 rounded text-primary focus:ring-primary border-border-base" type="checkbox"/>
+<span class="font-body-sm text-body-sm text-on-surface leading-tight">Emitir presupuesto para corona porcelana</span>
+</li>
+</ul>
+</div>
+<!-- Doctor Info Overlay (Small visual element for realism) -->
+<div class="p-4 bg-white border-t border-border-subtle">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-surface-container-high flex items-center justify-center text-primary font-bold">MM</div>
+<div>
+<p class="font-body-md text-body-md font-semibold text-on-surface leading-none">Dra. María Martínez</p>
+<p class="font-label-xs text-label-xs text-secondary">Endodoncista Responsable</p>
+</div>
+</div>
+</div>
+</aside>
+</div>
+<!-- Footer Bar (Fixed) -->
+<footer class="h-16 bg-surface border-t border-border-base flex items-center justify-between px-gutter sticky bottom-0 z-40 shadow-[0_-2px_8px_rgba(0,0,0,0.05)]">
+<div class="flex items-center gap-6">
+<button class="flex items-center gap-2 text-on-surface-variant hover:text-primary transition-colors font-body-md text-body-md">
+<span class="material-symbols-outlined">attachment</span>
+                    Adjuntar Archivo
+                </button>
+<button class="flex items-center gap-2 text-on-surface-variant hover:text-primary transition-colors font-body-md text-body-md">
+<span class="material-symbols-outlined">print</span>
+                    Imprimir Receta
+                </button>
+</div>
+<div class="flex items-center gap-3">
+<button class="px-6 py-2 border border-border-base text-on-surface-variant rounded font-body-md text-body-md font-semibold hover:bg-surface-alt transition-all">Guardar Borrador</button>
+<button class="px-8 py-2 bg-primary text-on-primary rounded font-body-md text-body-md font-bold shadow-sm active:scale-95 transition-all flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px]">draw</span>
+                    Firmar y cerrar encuentro
+                </button>
+</div>
+</footer>
+</main>
+<!-- Floating Micro-Interaction Scripts -->
+<script>
+        // Tab switching simulation (visual only)
+        document.querySelectorAll('nav a').forEach(link => {
+            link.addEventListener('click', function(e) {
+                if (!this.classList.contains('active')) {
+                    // Logic for real app would go here
+                }
+            });
+        });
+
+        // Quick search focus interaction
+        const searchInput = document.querySelector('input[type="text"]');
+        searchInput.addEventListener('focus', () => {
+            searchInput.parentElement.classList.add('border-primary');
+        });
+        searchInput.addEventListener('blur', () => {
+            searchInput.parentElement.classList.remove('border-primary');
+        });
+    </script>
+</body></html>

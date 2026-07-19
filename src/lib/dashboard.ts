@@ -6,16 +6,84 @@ export type AppView =
   | "calendar"
   | "inbox"
   | "agent"
+  | "aiReview"
   | "patients"
+  | "clinic"
   | "treatments"
   | "tasks"
+  | "crm"
   | "billing"
+  | "documents"
+  | "inventory"
+  | "lab"
+  | "team"
+  | "analytics"
+  | "automations"
+  | "imaging"
   | "settings";
 
-export async function getDashboardData() {
+export function getDashboardDataRequirements(view: AppView) {
+  const needsHome = view === "home";
+  const needsCalendar = view === "calendar";
+  const needsInbox = view === "inbox";
+  const needsPatients = view === "patients";
+  const needsTasks = view === "tasks";
+  const needsAgent = view === "agent" || view === "aiReview";
+  const needsTreatments = view === "treatments";
+  const needsBilling = view === "billing";
+  const needsSettings = view === "settings";
+  const needsClinical = view === "clinic" || view === "lab" || view === "imaging";
+  const needsCrm = view === "crm" || view === "automations";
+  const needsDocuments = view === "documents";
+  const needsInventory = view === "inventory";
+  const needsTeam = view === "team";
+  const needsAnalytics = view === "analytics";
+
+  return {
+    needsCalendar,
+    needsPatients,
+    needsAgent,
+    needsSettings,
+    needsTeam,
+    needsPatientRows: needsHome || needsCalendar || needsInbox || needsPatients || needsTasks || needsBilling || needsClinical || needsCrm || needsDocuments || needsAnalytics || needsTeam || needsAgent,
+    needsAppointmentRows: needsHome || needsCalendar || needsInbox || needsPatients || needsClinical || needsCrm || needsInventory || needsTeam || needsAnalytics || needsAgent,
+    needsConversationRows: needsHome || needsInbox || needsCrm || needsAnalytics || needsAgent,
+    needsTaskRows: needsHome || needsTasks || needsClinical || needsCrm || needsDocuments || needsAnalytics || needsTeam || needsAgent,
+    needsTreatmentRows: needsCalendar || needsTreatments || needsClinical || needsCrm || needsAnalytics || needsAgent,
+    needsProviderRows: needsCalendar || needsClinical || needsTeam,
+    needsOperatoryRows: needsCalendar || needsClinical || needsTeam,
+    needsBillingRows: needsHome || needsPatients || needsBilling || needsCrm || needsAnalytics || needsDocuments,
+    needsPatientIntakeRows: needsInbox || needsCrm || needsAgent,
+    needsRecoveredAppointmentRows: needsHome || needsAnalytics
+  };
+}
+
+export async function getDashboardData(view: AppView = "home") {
   const { user: currentUser, tenant } = await getCurrentContext();
+  const {
+    needsPatientRows,
+    needsAppointmentRows,
+    needsConversationRows,
+    needsTaskRows,
+    needsTreatmentRows,
+    needsProviderRows,
+    needsOperatoryRows,
+    needsBillingRows,
+    needsPatientIntakeRows,
+    needsRecoveredAppointmentRows,
+    needsCalendar,
+    needsAgent,
+    needsSettings,
+    needsTeam,
+    needsPatients
+  } = getDashboardDataRequirements(view);
 
   const [
+    unreadConversationCount,
+    appointmentCount,
+    openTaskCount,
+    activePatientCount,
+    recoveredAppointments,
     patients,
     appointments,
     calendarEvents,
@@ -27,78 +95,130 @@ export async function getDashboardData() {
     agentSessions,
     users,
     auditLogs,
+    patientIntakes,
     invoices,
     expenses
   ] = await Promise.all([
-    prisma.patient.findMany({
-      where: { tenantId: tenant.id },
-      orderBy: { createdAt: "desc" },
-      include: { consents: true }
-    }),
-    prisma.appointment.findMany({
-      where: { tenantId: tenant.id },
-      orderBy: { startsAt: "asc" },
-      include: { patient: true, provider: true, operatory: true, treatment: true }
-    }),
-    prisma.calendarEvent.findMany({
-      where: { tenantId: tenant.id },
-      orderBy: { startsAt: "asc" },
-      include: { provider: true, operatory: true }
-    }),
-    prisma.conversation.findMany({
-      where: { tenantId: tenant.id },
-      orderBy: { updatedAt: "desc" },
-      include: { patient: true, messages: { orderBy: { createdAt: "asc" } } }
-    }),
-    prisma.task.findMany({
-      where: { tenantId: tenant.id },
-      orderBy: [{ status: "asc" }, { dueAt: "asc" }],
-      include: { patient: true }
-    }),
-    prisma.treatment.findMany({
-      where: { tenantId: tenant.id },
-      orderBy: { name: "asc" }
-    }),
-    prisma.provider.findMany({
-      where: { tenantId: tenant.id, active: true },
-      orderBy: { name: "asc" }
-    }),
-    prisma.operatory.findMany({
-      where: { tenantId: tenant.id, active: true },
-      orderBy: { name: "asc" }
-    }),
-    prisma.agentSession.findMany({
-      where: { tenantId: tenant.id },
-      orderBy: { createdAt: "desc" },
-      take: 50
-    }),
-    prisma.user.findMany({
-      where: { tenantId: tenant.id },
-      orderBy: { createdAt: "asc" },
-      select: { id: true, name: true, email: true, role: true, createdAt: true }
-    }),
-    prisma.auditLog.findMany({
-      where: { tenantId: tenant.id },
-      orderBy: { createdAt: "desc" },
-      take: 15
-    }),
-    prisma.invoice.findMany({
-      where: { tenantId: tenant.id },
-      orderBy: { issuedAt: "desc" },
-      include: { patient: true }
-    }),
-    prisma.expense.findMany({
-      where: { tenantId: tenant.id },
-      orderBy: { incurredAt: "desc" }
-    })
+    prisma.conversation.count({ where: { tenantId: tenant.id, unread: true } }),
+    prisma.appointment.count({ where: { tenantId: tenant.id } }),
+    prisma.task.count({ where: { tenantId: tenant.id, status: { not: "COMPLETED" } } }),
+    prisma.patient.count({ where: { tenantId: tenant.id, status: { not: "INACTIVE" } } }),
+    needsRecoveredAppointmentRows
+      ? prisma.appointment.findMany({
+          where: { tenantId: tenant.id, createdByAi: true },
+          select: { patient: { select: { estimatedValue: true } } }
+        })
+      : Promise.resolve([]),
+    needsPatientRows
+      ? prisma.patient.findMany({
+          where: { tenantId: tenant.id },
+          orderBy: { createdAt: "desc" },
+          include: { consents: true }
+        })
+      : Promise.resolve([]),
+    needsAppointmentRows
+      ? prisma.appointment.findMany({
+          where: { tenantId: tenant.id },
+          orderBy: { startsAt: "asc" },
+          include: { patient: true, provider: true, operatory: true, treatment: true }
+        })
+      : Promise.resolve([]),
+    needsCalendar
+      ? prisma.calendarEvent.findMany({
+          where: { tenantId: tenant.id },
+          orderBy: { startsAt: "asc" },
+          include: { provider: true, operatory: true }
+        })
+      : Promise.resolve([]),
+    needsConversationRows
+      ? prisma.conversation.findMany({
+          where: { tenantId: tenant.id },
+          orderBy: { updatedAt: "desc" },
+          include: { patient: true, messages: { orderBy: { createdAt: "asc" } } }
+        })
+      : Promise.resolve([]),
+    needsTaskRows
+      ? prisma.task.findMany({
+          where: { tenantId: tenant.id },
+          orderBy: [{ status: "asc" }, { dueAt: "asc" }],
+          include: { patient: true }
+        })
+      : Promise.resolve([]),
+    needsTreatmentRows
+      ? prisma.treatment.findMany({
+          where: { tenantId: tenant.id },
+          orderBy: { name: "asc" }
+        })
+      : Promise.resolve([]),
+    needsProviderRows
+      ? prisma.provider.findMany({
+          where: { tenantId: tenant.id, active: true },
+          orderBy: { name: "asc" }
+        })
+      : Promise.resolve([]),
+    needsOperatoryRows
+      ? prisma.operatory.findMany({
+          where: { tenantId: tenant.id, active: true },
+          orderBy: { name: "asc" }
+        })
+      : Promise.resolve([]),
+    needsAgent
+      ? prisma.agentSession.findMany({
+          where: { tenantId: tenant.id },
+          orderBy: { createdAt: "desc" },
+          take: 50
+        })
+      : Promise.resolve([]),
+    needsSettings || needsTeam
+      ? prisma.user.findMany({
+          where: { tenantId: tenant.id },
+          orderBy: { createdAt: "asc" },
+          select: { id: true, name: true, email: true, role: true, createdAt: true }
+        })
+      : Promise.resolve([]),
+    needsSettings || needsPatients
+      ? prisma.auditLog.findMany({
+          where: needsPatients ? { tenantId: tenant.id, entityType: "Appointment" } : { tenantId: tenant.id },
+          orderBy: { createdAt: "desc" },
+          take: needsPatients ? 300 : 15
+        })
+      : Promise.resolve([]),
+    needsPatientIntakeRows
+      ? prisma.patientIntake.findMany({
+          where: { tenantId: tenant.id },
+          orderBy: { updatedAt: "desc" },
+          include: {
+            patient: true,
+            conversation: {
+              include: {
+                messages: {
+                  orderBy: { createdAt: "asc" },
+                  take: 8
+                }
+              }
+            }
+          }
+        }).catch(error => {
+          console.error("patientIntake dashboard query failed", error);
+          return [];
+        })
+      : Promise.resolve([]),
+    needsBillingRows
+      ? prisma.invoice.findMany({
+          where: { tenantId: tenant.id },
+          orderBy: { issuedAt: "desc" },
+          include: { patient: true }
+        })
+      : Promise.resolve([]),
+    needsBillingRows
+      ? prisma.expense.findMany({
+          where: { tenantId: tenant.id },
+          orderBy: { incurredAt: "desc" }
+        })
+      : Promise.resolve([])
   ]);
 
-  const unreadConversations = conversations.filter(conversation => conversation.unread).length;
-  const openTasks = tasks.filter(task => task.status !== "COMPLETED").length;
-  const activePatients = patients.filter(patient => patient.status !== "INACTIVE").length;
-  const recoveredCents = appointments
-    .filter(appointment => appointment.createdByAi)
-    .reduce((sum, appointment) => sum + appointment.patient.estimatedValue, 0);
+  const recoveredCents = recoveredAppointments.reduce((sum, appointment) => sum + appointment.patient.estimatedValue, 0);
 
   return {
     tenant,
@@ -114,13 +234,14 @@ export async function getDashboardData() {
     agentSessions,
     users,
     auditLogs,
+    patientIntakes,
     invoices,
     expenses,
     metrics: {
-      unreadConversations,
-      appointmentCount: appointments.length,
-      openTasks,
-      activePatients,
+      unreadConversations: unreadConversationCount,
+      appointmentCount,
+      openTasks: openTaskCount,
+      activePatients: activePatientCount,
       recoveredCents
     },
     billing: buildBillingMetrics(invoices, expenses, patients)
@@ -147,6 +268,10 @@ function buildBillingMetrics(invoices: DashboardInvoice[], expenses: DashboardEx
   const expensesThisMonth = expenses.filter(expense => monthKey(expense.incurredAt) === currentMonthKey);
   const unpaidExpenses = expenses.filter(expense => expense.status === "PENDING");
   const openBudgetPatients = patients.filter(patient => patient.status === "OPEN_BUDGET");
+  const electronicInvoices = invoices.filter(invoice => invoice.electronicStatus !== "NOT_REQUIRED");
+  const electronicReady = electronicInvoices.filter(invoice => invoice.electronicStatus === "READY" || invoice.electronicStatus === "PENDING");
+  const electronicAccepted = electronicInvoices.filter(invoice => invoice.electronicStatus === "ACCEPTED" || invoice.electronicStatus === "PAID");
+  const electronicRejected = electronicInvoices.filter(invoice => invoice.electronicStatus === "REJECTED" || invoice.electronicStatus === "FAILED");
 
   const pendingBillingByPatient = new Map<string, number>();
   for (const invoice of invoices) {
@@ -209,6 +334,11 @@ function buildBillingMetrics(invoices: DashboardInvoice[], expenses: DashboardEx
     forecastBuckets,
     treatmentRanking,
     maxTreatmentCents,
+    electronicCount: electronicInvoices.length,
+    electronicReadyCount: electronicReady.length,
+    electronicAcceptedCount: electronicAccepted.length,
+    electronicRejectedCount: electronicRejected.length,
+    electronicInvoices: electronicInvoices.slice().sort((a, b) => b.issuedAt.getTime() - a.issuedAt.getTime()).slice(0, 8),
     pendingInvoices: pending.slice().sort((a, b) => b.amountCents - a.amountCents).slice(0, 5),
     openBudgetPatients: openBudgetPatients.slice(0, 5),
     unpaidExpenseList: unpaidExpenses.slice().sort((a, b) => b.amountCents - a.amountCents).slice(0, 5)

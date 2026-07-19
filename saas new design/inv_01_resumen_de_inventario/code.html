@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+
+<html class="light" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>DENTIA - Resumen de Inventario</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 20;
+            font-size: 18px;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #F5F6F7;
+        }
+        .sidebar-scroll::-webkit-scrollbar {
+            width: 4px;
+        }
+        .sidebar-scroll::-webkit-scrollbar-thumb {
+            background: #D9DEE3;
+            border-radius: 10px;
+        }
+        .custom-shadow {
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "border-base": "#D9DEE3",
+                        "success": "#278561",
+                        "surface": "#FFFFFF",
+                        "error-container": "#ffdad6",
+                        "surface-variant": "#e1e2e7",
+                        "on-error-container": "#93000a",
+                        "primary-container": "#005a8c",
+                        "on-secondary": "#ffffff",
+                        "text-primary": "#17212B",
+                        "surface-container-high": "#e7e8ed",
+                        "on-primary-container": "#9fd0ff",
+                        "tertiary-fixed-dim": "#ffb779",
+                        "on-background": "#191c1f",
+                        "background": "#F5F6F7",
+                        "surface-container": "#eceef2",
+                        "surface-container-lowest": "#ffffff",
+                        "surface-bright": "#f8f9fe",
+                        "on-primary-fixed": "#001d32",
+                        "surface-tint": "#166395",
+                        "primary": "#004268",
+                        "on-tertiary-fixed": "#2e1500",
+                        "warning": "#B37D00",
+                        "border-subtle": "#E8EBEE",
+                        "on-tertiary-container": "#ffbe87",
+                        "on-tertiary-fixed-variant": "#6c3a00",
+                        "on-surface-variant": "#41474f",
+                        "outline-variant": "#c1c7d0",
+                        "on-surface": "#191c1f",
+                        "inverse-surface": "#2e3134",
+                        "surface-dim": "#d8dadf",
+                        "on-secondary-container": "#58646f",
+                        "on-tertiary": "#ffffff",
+                        "surface-alt": "#F0F2F4",
+                        "secondary": "#54606b",
+                        "secondary-fixed": "#d8e4f1",
+                        "secondary-container": "#d5e1ee",
+                        "outline": "#717880",
+                        "tertiary": "#613300",
+                        "tertiary-container": "#824701",
+                        "primary-fixed": "#cde5ff",
+                        "inverse-primary": "#95ccff",
+                        "on-primary-fixed-variant": "#004a75",
+                        "on-primary": "#ffffff",
+                        "on-error": "#ffffff",
+                        "error": "#C53030",
+                        "primary-fixed-dim": "#95ccff",
+                        "inverse-on-surface": "#eff1f5",
+                        "on-secondary-fixed-variant": "#3c4852",
+                        "surface-container-low": "#f2f3f8",
+                        "surface-container-highest": "#e1e2e7",
+                        "on-secondary-fixed": "#111d26",
+                        "tertiary-fixed": "#ffdcc1",
+                        "secondary-fixed-dim": "#bcc8d4"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "gutter": "1rem",
+                        "padding-base": "1rem",
+                        "header-height": "52px",
+                        "padding-compact": "0.75rem",
+                        "sidebar-collapsed": "64px",
+                        "sidebar-width": "224px"
+                    },
+                    "fontFamily": {
+                        "headline-lg": ["Inter"],
+                        "body-sm": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "body-md": ["Inter"],
+                        "label-xs": ["Inter"]
+                    },
+                    "fontSize": {
+                        "headline-lg": ["22px", {"lineHeight": "32px", "fontWeight": "600"}],
+                        "body-sm": ["11px", {"lineHeight": "16px", "fontWeight": "400"}],
+                        "headline-md": ["16px", {"lineHeight": "24px", "fontWeight": "600"}],
+                        "body-md": ["12px", {"lineHeight": "18px", "fontWeight": "400"}],
+                        "label-xs": ["10px", {"lineHeight": "14px", "letterSpacing": "0.02em", "fontWeight": "500"}]
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-background text-on-surface antialiased">
+<!-- SideNavBar (Shared Component) -->
+<aside class="w-sidebar-width h-screen fixed left-0 top-0 border-r border-border-base bg-surface flex flex-col py-4 overflow-y-auto sidebar-scroll z-50">
+<div class="px-6 mb-8 flex items-center gap-3">
+<div class="w-8 h-8 bg-primary rounded flex items-center justify-center text-on-primary">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">dentistry</span>
+</div>
+<div>
+<h1 class="font-headline-md text-headline-md font-bold text-primary">DENTIA</h1>
+<p class="text-[9px] uppercase tracking-wider text-on-surface-variant font-bold leading-none">Dental Software</p>
+</div>
+</div>
+<nav class="flex-1 space-y-0.5 px-3">
+<!-- Nav Item - Active Logic: Inventario is active -->
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined">home</span> Inicio
+            </a>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined">calendar_month</span> Agenda
+            </a>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined">group</span> Pacientes
+            </a>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors font-body-md text-body-md text-primary font-semibold border-r-2 border-primary bg-surface-alt" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">inventory_2</span> Inventario
+            </a>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined">medical_services</span> Clínica
+            </a>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined">payments</span> Finanzas
+            </a>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined">query_stats</span> Analítica
+            </a>
+<a class="flex items-center gap-3 px-3 py-2 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined">settings</span> Configuración
+            </a>
+</nav>
+<div class="mt-auto px-4 pt-4 border-t border-border-subtle">
+<div class="flex items-center gap-3 p-2 bg-surface-container-low rounded-lg">
+<img class="w-8 h-8 rounded-full border border-border-base object-cover" data-alt="A professional close-up portrait of a male dentist wearing a clean white clinical uniform. He has a friendly and trustworthy expression, set against a softly blurred dental clinic background with clinical precision lighting in tones of light blue and white." src="https://lh3.googleusercontent.com/aida-public/AB6AXuD_DBOlJUGecwLEEr7BtFa_Xa2V7SYem7XxYSBWQ__Hy6AdHlUwlJgxTIVmnT79BCFxYcH5Kjkl4_ENBUEr3VhMAMIMwHedjI5ucoSPRSRXTUybt3eDTnavSgE4CRHfi-SfFdiYsFTaPjwJ4G_zRJRNqn2OhRs10307B_Xvm8lWga6MNq3MADAOX50VAQxQmOCI9z9zJA5k8BnDNvkxWuOz5fMxZyeRn8w62zsLOkoRubrCZuA-iwPK"/>
+<div class="overflow-hidden">
+<p class="font-body-md text-body-md font-semibold truncate text-text-primary">Dr. Julián R.</p>
+<p class="text-[10px] text-on-surface-variant">Director Médico</p>
+</div>
+</div>
+</div>
+</aside>
+<!-- TopNavBar (Shared Component) -->
+<header class="h-header-height fixed top-0 right-0 left-sidebar-width z-50 bg-surface border-b border-border-base flex items-center justify-between px-gutter">
+<div class="flex items-center gap-6">
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant">search</span>
+<input class="pl-10 pr-4 py-1.5 bg-surface-container-low border border-border-base rounded text-body-md focus:ring-0 focus:border-primary w-80" placeholder="Buscar productos, lotes o proveedores..." type="text"/>
+</div>
+<nav class="flex gap-4">
+<span class="font-body-md text-body-md text-primary font-bold border-b-2 border-primary pb-1 cursor-pointer">Sede Centro</span>
+<span class="font-body-md text-body-md text-on-surface-variant hover:text-primary transition-colors cursor-pointer">Sede Playa</span>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<button class="bg-primary text-on-primary px-4 py-1.5 rounded font-body-md text-body-md font-semibold active:scale-95 transition-transform">
+                + Crear Pedido
+            </button>
+<div class="flex items-center gap-2">
+<button class="p-2 text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="p-2 text-on-surface-variant hover:text-primary transition-colors">
+<span class="material-symbols-outlined">account_circle</span>
+</button>
+</div>
+</div>
+</header>
+<!-- Main Content -->
+<main class="ml-sidebar-width pt-header-height min-h-screen">
+<!-- Screen Header -->
+<div class="px-gutter py-6 bg-surface-container-low border-b border-border-subtle">
+<div class="flex items-center justify-between">
+<div>
+<nav class="flex items-center gap-2 text-label-xs font-label-xs text-on-surface-variant mb-1">
+<span>Inventario</span>
+<span class="material-symbols-outlined !text-[12px]">chevron_right</span>
+<span class="text-primary font-semibold">Resumen General</span>
+</nav>
+<h2 class="font-headline-lg text-headline-lg text-text-primary">Resumen de Inventario</h2>
+</div>
+<div class="flex gap-2">
+<button class="flex items-center gap-2 px-3 py-1.5 bg-surface border border-border-base text-body-md hover:bg-surface-alt transition-colors">
+<span class="material-symbols-outlined">download</span> Exportar PDF
+                    </button>
+<button class="flex items-center gap-2 px-3 py-1.5 bg-surface border border-border-base text-body-md hover:bg-surface-alt transition-colors">
+<span class="material-symbols-outlined">history</span> Historial
+                    </button>
+</div>
+</div>
+</div>
+<div class="p-gutter space-y-6">
+<!-- Metrics Bento Grid -->
+<div class="grid grid-cols-12 gap-4">
+<!-- Under Minimum -->
+<div class="col-span-12 md:col-span-4 bg-surface border border-border-base p-5 flex flex-col justify-between hover:border-error transition-colors cursor-default">
+<div>
+<div class="flex items-center justify-between mb-4">
+<span class="text-error bg-error-container/20 px-2 py-0.5 text-label-xs font-semibold rounded">STOCK BAJO</span>
+<span class="material-symbols-outlined text-error">priority_high</span>
+</div>
+<h3 class="font-headline-lg text-[32px] text-text-primary leading-none mb-1">12</h3>
+<p class="text-body-md text-on-surface-variant">Productos bajo el mínimo</p>
+</div>
+<div class="mt-4 pt-4 border-t border-border-subtle">
+<a class="text-label-xs font-semibold text-primary flex items-center gap-1 hover:underline" href="#">
+                            Ver listado de reposición <span class="material-symbols-outlined !text-[14px]">arrow_forward</span>
+</a>
+</div>
+</div>
+<!-- Expiring Soon -->
+<div class="col-span-12 md:col-span-4 bg-surface border border-border-base p-5 flex flex-col justify-between hover:border-warning transition-colors cursor-default">
+<div>
+<div class="flex items-center justify-between mb-4">
+<span class="text-warning bg-warning/10 px-2 py-0.5 text-label-xs font-semibold rounded">PRÓXIMA CADUCIDAD</span>
+<span class="material-symbols-outlined text-warning">event_busy</span>
+</div>
+<h3 class="font-headline-lg text-[32px] text-text-primary leading-none mb-1">08</h3>
+<p class="text-body-md text-on-surface-variant">Lotes vencen en &lt; 30 días</p>
+</div>
+<div class="mt-4 pt-4 border-t border-border-subtle">
+<a class="text-label-xs font-semibold text-primary flex items-center gap-1 hover:underline" href="#">
+                            Revisar lotes críticos <span class="material-symbols-outlined !text-[14px]">arrow_forward</span>
+</a>
+</div>
+</div>
+<!-- Pending Orders -->
+<div class="col-span-12 md:col-span-4 bg-surface border border-border-base p-5 flex flex-col justify-between hover:border-primary transition-colors cursor-default">
+<div>
+<div class="flex items-center justify-between mb-4">
+<span class="text-primary bg-primary-fixed/30 px-2 py-0.5 text-label-xs font-semibold rounded">PEDIDOS ACTIVOS</span>
+<span class="material-symbols-outlined text-primary">local_shipping</span>
+</div>
+<h3 class="font-headline-lg text-[32px] text-text-primary leading-none mb-1">05</h3>
+<p class="text-body-md text-on-surface-variant">Órdenes pendientes de entrega</p>
+</div>
+<div class="mt-4 pt-4 border-t border-border-subtle">
+<div class="flex justify-between items-center text-label-xs text-on-surface-variant">
+<span>Próxima entrega: Mañana</span>
+<span class="text-success font-bold">En camino</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Main Inventory Table Section -->
+<div class="bg-surface border border-border-base">
+<div class="px-4 py-3 border-b border-border-base flex items-center justify-between">
+<h3 class="font-headline-md text-headline-md text-text-primary">Inventario Detallado</h3>
+<div class="flex gap-2">
+<select class="text-body-md border-border-base rounded py-1 pl-2 pr-8 focus:ring-0 focus:border-primary">
+<option>Todas las categorías</option>
+<option>Desechables</option>
+<option>Instrumental</option>
+<option>Ortodoncia</option>
+</select>
+<button class="p-1.5 bg-surface-alt border border-border-base rounded flex items-center">
+<span class="material-symbols-outlined">filter_list</span>
+</button>
+</div>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-surface-container-low">
+<th class="px-4 py-2.5 font-label-xs text-label-xs text-on-surface-variant uppercase tracking-wider border-b border-border-base">Producto</th>
+<th class="px-4 py-2.5 font-label-xs text-label-xs text-on-surface-variant uppercase tracking-wider border-b border-border-base">Categoría</th>
+<th class="px-4 py-2.5 font-label-xs text-label-xs text-on-surface-variant uppercase tracking-wider border-b border-border-base">Stock Sede Centro</th>
+<th class="px-4 py-2.5 font-label-xs text-label-xs text-on-surface-variant uppercase tracking-wider border-b border-border-base">Stock Sede Playa</th>
+<th class="px-4 py-2.5 font-label-xs text-label-xs text-on-surface-variant uppercase tracking-wider border-b border-border-base">Proveedor</th>
+<th class="px-4 py-2.5 font-label-xs text-label-xs text-on-surface-variant uppercase tracking-wider border-b border-border-base">Último Lote / Venc.</th>
+<th class="px-4 py-2.5 font-label-xs text-label-xs text-on-surface-variant uppercase tracking-wider border-b border-border-base text-right">Estado</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-border-subtle">
+<!-- Row 1 -->
+<tr class="hover:bg-surface-container-lowest transition-colors group">
+<td class="px-4 py-3">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 bg-surface-alt rounded flex items-center justify-center border border-border-base">
+<span class="material-symbols-outlined text-on-surface-variant !text-sm">medication</span>
+</div>
+<div>
+<p class="font-body-md text-body-md font-semibold text-text-primary">Anestesia Lidocaína 2%</p>
+<p class="text-label-xs text-on-surface-variant">Caja x 50 carpules</p>
+</div>
+</div>
+</td>
+<td class="px-4 py-3 font-body-md text-body-md text-on-surface-variant">Farmacia</td>
+<td class="px-4 py-3 font-body-md text-body-md text-text-primary">45 uds.</td>
+<td class="px-4 py-3 font-body-md text-body-md text-text-primary">12 uds.</td>
+<td class="px-4 py-3 font-body-md text-body-md text-on-surface-variant">DentaSupplies S.A.</td>
+<td class="px-4 py-3">
+<p class="font-body-md text-body-md text-text-primary">L-90234</p>
+<p class="text-label-xs text-on-surface-variant">15 May 2024</p>
+</td>
+<td class="px-4 py-3 text-right">
+<span class="inline-flex items-center px-2 py-0.5 rounded text-label-xs font-semibold bg-green-100 text-success">Óptimo</span>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="hover:bg-surface-container-lowest transition-colors group">
+<td class="px-4 py-3">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 bg-surface-alt rounded flex items-center justify-center border border-border-base">
+<span class="material-symbols-outlined text-on-surface-variant !text-sm">clean_hands</span>
+</div>
+<div>
+<p class="font-body-md text-body-md font-semibold text-text-primary">Guantes de Nitrilo (M)</p>
+<p class="text-label-xs text-on-surface-variant">Caja x 100 uds.</p>
+</div>
+</div>
+</td>
+<td class="px-4 py-3 font-body-md text-body-md text-on-surface-variant">Desechables</td>
+<td class="px-4 py-3 font-body-md text-body-md text-error font-bold">04 uds.</td>
+<td class="px-4 py-3 font-body-md text-body-md text-text-primary">08 uds.</td>
+<td class="px-4 py-3 font-body-md text-body-md text-on-surface-variant">MedCorp Int.</td>
+<td class="px-4 py-3">
+<p class="font-body-md text-body-md text-text-primary">L-88211</p>
+<p class="text-label-xs text-on-surface-variant">N/A</p>
+</td>
+<td class="px-4 py-3 text-right">
+<span class="inline-flex items-center px-2 py-0.5 rounded text-label-xs font-semibold bg-error-container text-error">Crítico</span>
+</td>
+</tr>
+<!-- Row 3 -->
+<tr class="hover:bg-surface-container-lowest transition-colors group">
+<td class="px-4 py-3">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 bg-surface-alt rounded flex items-center justify-center border border-border-base">
+<span class="material-symbols-outlined text-on-surface-variant !text-sm">brush</span>
+</div>
+<div>
+<p class="font-body-md text-body-md font-semibold text-text-primary">Resina Filtek Z350 XT</p>
+<p class="text-label-xs text-on-surface-variant">Jeringa 4g - A2</p>
+</div>
+</div>
+</td>
+<td class="px-4 py-3 font-body-md text-body-md text-on-surface-variant">Restauración</td>
+<td class="px-4 py-3 font-body-md text-body-md text-text-primary">15 uds.</td>
+<td class="px-4 py-3 font-body-md text-body-md text-text-primary">05 uds.</td>
+<td class="px-4 py-3 font-body-md text-body-md text-on-surface-variant">3M Dental Div.</td>
+<td class="px-4 py-3">
+<p class="font-body-md text-body-md text-warning font-semibold">L-77402</p>
+<p class="text-label-xs text-warning font-semibold">12 Mar 2024</p>
+</td>
+<td class="px-4 py-3 text-right">
+<span class="inline-flex items-center px-2 py-0.5 rounded text-label-xs font-semibold bg-orange-100 text-warning">Caducidad</span>
+</td>
+</tr>
+<!-- Row 4 -->
+<tr class="hover:bg-surface-container-lowest transition-colors group">
+<td class="px-4 py-3">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 bg-surface-alt rounded flex items-center justify-center border border-border-base">
+<span class="material-symbols-outlined text-on-surface-variant !text-sm">medical_mask</span>
+</div>
+<div>
+<p class="font-body-md text-body-md font-semibold text-text-primary">Mascarillas Quirúrgicas</p>
+<p class="text-label-xs text-on-surface-variant">Caja x 50 uds.</p>
+</div>
+</div>
+</td>
+<td class="px-4 py-3 font-body-md text-body-md text-on-surface-variant">Protección</td>
+<td class="px-4 py-3 font-body-md text-body-md text-text-primary">120 uds.</td>
+<td class="px-4 py-3 font-body-md text-body-md text-text-primary">85 uds.</td>
+<td class="px-4 py-3 font-body-md text-body-md text-on-surface-variant">ProtecPlus Ltd.</td>
+<td class="px-4 py-3">
+<p class="font-body-md text-body-md text-text-primary">L-11200</p>
+<p class="text-label-xs text-on-surface-variant">01 Ene 2026</p>
+</td>
+<td class="px-4 py-3 text-right">
+<span class="inline-flex items-center px-2 py-0.5 rounded text-label-xs font-semibold bg-green-100 text-success">Óptimo</span>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="px-4 py-3 border-t border-border-base bg-surface-container-low flex items-center justify-between">
+<p class="font-body-sm text-body-sm text-on-surface-variant">Mostrando 4 de 156 productos</p>
+<div class="flex gap-1">
+<button class="w-8 h-8 flex items-center justify-center border border-border-base bg-surface rounded hover:bg-surface-alt text-on-surface-variant disabled:opacity-50" disabled="">
+<span class="material-symbols-outlined !text-sm">chevron_left</span>
+</button>
+<button class="w-8 h-8 flex items-center justify-center border border-primary bg-primary-container/10 text-primary font-bold text-body-sm rounded">1</button>
+<button class="w-8 h-8 flex items-center justify-center border border-border-base bg-surface rounded hover:bg-surface-alt text-on-surface-variant text-body-sm">2</button>
+<button class="w-8 h-8 flex items-center justify-center border border-border-base bg-surface rounded hover:bg-surface-alt text-on-surface-variant">
+<span class="material-symbols-outlined !text-sm">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Suppliers & Recent Movement Side-by-side -->
+<div class="grid grid-cols-12 gap-6">
+<!-- Top Suppliers -->
+<div class="col-span-12 lg:col-span-7 bg-surface border border-border-base">
+<div class="px-4 py-3 border-b border-border-base flex items-center justify-between">
+<h3 class="font-headline-md text-headline-md text-text-primary">Proveedores con Pedidos Activos</h3>
+</div>
+<div class="p-4 space-y-4">
+<div class="flex items-center justify-between p-3 border border-border-subtle rounded hover:bg-surface-alt transition-colors">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 bg-primary/5 rounded flex items-center justify-center">
+<span class="material-symbols-outlined text-primary">store</span>
+</div>
+<div>
+<p class="font-body-md text-body-md font-semibold text-text-primary">DentaSupplies S.A.</p>
+<p class="text-label-xs text-on-surface-variant">ID: PROV-2311 • 2 pedidos activos</p>
+</div>
+</div>
+<div class="text-right">
+<p class="font-body-md text-body-md font-bold text-text-primary">$1,250.00</p>
+<p class="text-label-xs text-primary">Ver detalle</p>
+</div>
+</div>
+<div class="flex items-center justify-between p-3 border border-border-subtle rounded hover:bg-surface-alt transition-colors">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 bg-primary/5 rounded flex items-center justify-center">
+<span class="material-symbols-outlined text-primary">store</span>
+</div>
+<div>
+<p class="font-body-md text-body-md font-semibold text-text-primary">MedCorp Int.</p>
+<p class="text-label-xs text-on-surface-variant">ID: PROV-0042 • 1 pedido activo</p>
+</div>
+</div>
+<div class="text-right">
+<p class="font-body-md text-body-md font-bold text-text-primary">$450.00</p>
+<p class="text-label-xs text-primary">Ver detalle</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Recent Movements -->
+<div class="col-span-12 lg:col-span-5 bg-surface border border-border-base">
+<div class="px-4 py-3 border-b border-border-base">
+<h3 class="font-headline-md text-headline-md text-text-primary">Movimientos Recientes</h3>
+</div>
+<div class="p-4 relative">
+<!-- Timeline -->
+<div class="absolute left-[35px] top-6 bottom-6 w-px bg-border-base"></div>
+<div class="space-y-6">
+<div class="flex gap-4 relative z-10">
+<div class="w-10 h-10 bg-success/10 rounded-full flex items-center justify-center border-4 border-surface shrink-0">
+<span class="material-symbols-outlined text-success !text-sm" style="font-variation-settings: 'FILL' 1;">add_circle</span>
+</div>
+<div>
+<p class="font-body-md text-body-md text-text-primary">Entrada de stock: <strong>Anestesia Lidocaína</strong></p>
+<p class="text-label-xs text-on-surface-variant">Hoy, 10:45 AM • Dr. Julián R.</p>
+</div>
+</div>
+<div class="flex gap-4 relative z-10">
+<div class="w-10 h-10 bg-error/10 rounded-full flex items-center justify-center border-4 border-surface shrink-0">
+<span class="material-symbols-outlined text-error !text-sm" style="font-variation-settings: 'FILL' 1;">remove_circle</span>
+</div>
+<div>
+<p class="font-body-md text-body-md text-text-primary">Salida de stock: <strong>Resina Filtek A2</strong></p>
+<p class="text-label-xs text-on-surface-variant">Hoy, 09:12 AM • Dra. Ana L.</p>
+</div>
+</div>
+<div class="flex gap-4 relative z-10">
+<div class="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center border-4 border-surface shrink-0">
+<span class="material-symbols-outlined text-primary !text-sm" style="font-variation-settings: 'FILL' 1;">local_shipping</span>
+</div>
+<div>
+<p class="font-body-md text-body-md text-text-primary">Pedido recibido: <strong>Suministros Desechables</strong></p>
+<p class="text-label-xs text-on-surface-variant">Ayer, 04:30 PM • Recepción Sede Centro</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Success Toast Notification (hidden by default) -->
+<div class="fixed bottom-6 right-6 bg-inverse-surface text-inverse-on-surface px-4 py-3 rounded shadow-lg flex items-center gap-3 translate-y-24 transition-transform duration-300 z-[100]" id="toast">
+<span class="material-symbols-outlined text-success">check_circle</span>
+<p class="font-body-md text-body-md">Inventario actualizado correctamente.</p>
+</div>
+<script>
+        // Micro-interactions and effects
+        const createOrderBtn = document.querySelector('button');
+        const toast = document.getElementById('toast');
+
+        // Simple toast mock action
+        function showToast() {
+            toast.classList.remove('translate-y-24');
+            toast.classList.add('translate-y-0');
+            setTimeout(() => {
+                toast.classList.remove('translate-y-0');
+                toast.classList.add('translate-y-24');
+            }, 3000);
+        }
+
+        // Simulating interactive hover states on rows with JS for extra precision if needed,
+        // though Tailwind handles most of it.
+        document.querySelectorAll('tbody tr').forEach(row => {
+            row.addEventListener('click', () => {
+                // Mock selection
+                console.log('Fila seleccionada');
+            });
+        });
+    </script>
+</body></html>

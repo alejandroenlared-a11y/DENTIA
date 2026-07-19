@@ -1,4 +1,5 @@
 import { AppointmentStatus, CalendarEventType, type Prisma } from "@prisma/client";
+import { notifyAppointmentEvent } from "@/lib/notifications/appointment-notifications";
 import { prisma } from "@/lib/prisma";
 
 export const SLOT_MINUTES = 30;
@@ -291,6 +292,15 @@ export async function cancelAppointment(
     }
   });
 
+  await notifyAppointmentEvent({
+    tenantId,
+    appointmentId,
+    eventType: "cancelled",
+    actor,
+    previousStartsAt: appointment.startsAt,
+    reason: reason ?? null
+  });
+
   return updated;
 }
 
@@ -333,6 +343,14 @@ export async function rescheduleAppointment(
       entityId: appointmentId,
       metadata: { previousStartsAt, newStartsAt } as Prisma.InputJsonValue
     }
+  });
+
+  await notifyAppointmentEvent({
+    tenantId,
+    appointmentId,
+    eventType: "rescheduled",
+    actor,
+    previousStartsAt
   });
 
   return updated;

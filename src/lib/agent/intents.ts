@@ -63,8 +63,7 @@ export function buildReply(intent: AgentIntent, ctx: ReplyContext): string {
     case "CITA":
       return (
         `Encantada de ayudarte a reservar. La primera visita con valoracion es a coste cero. ` +
-        `Dime que dia y franja te viene mejor (manana o tarde) y te propongo hueco. ` +
-        `Tambien he dejado nota a recepcion de ${ctx.clinicName} para confirmarte la cita cuanto antes.`
+        `Dime que dia y franja te viene mejor (manana o tarde) y te propongo hueco.`
       );
     case "PRECIO": {
       const priced = ctx.treatments.filter(treatment => treatment.priceCents !== null).slice(0, 3);

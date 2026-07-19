@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+
+<html class="light" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>DENTIA - Directorio del Equipo</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        body {
+            font-family: 'Inter', sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 20;
+            font-size: 18px;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+            height: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #D9DEE3;
+            border-radius: 10px;
+        }
+        /* Sanitary Blue Accent */
+        .btn-primary {
+            background-color: #004268;
+            color: #ffffff;
+            transition: all 0.2s ease;
+        }
+        .btn-primary:hover {
+            background-color: #005a8c;
+        }
+    </style>
+<!-- CSS and Tailwind Config Injection -->
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "border-base": "#D9DEE3",
+                    "success": "#278561",
+                    "surface": "#FFFFFF",
+                    "error-container": "#ffdad6",
+                    "surface-variant": "#e1e2e7",
+                    "on-error-container": "#93000a",
+                    "primary-container": "#005a8c",
+                    "on-secondary": "#ffffff",
+                    "text-primary": "#17212B",
+                    "surface-container-high": "#e7e8ed",
+                    "on-primary-container": "#9fd0ff",
+                    "tertiary-fixed-dim": "#ffb779",
+                    "on-background": "#191c1f",
+                    "background": "#F5F6F7",
+                    "surface-container": "#eceef2",
+                    "surface-container-lowest": "#ffffff",
+                    "surface-bright": "#f8f9fe",
+                    "on-primary-fixed": "#001d32",
+                    "surface-tint": "#166395",
+                    "primary": "#004268",
+                    "on-tertiary-fixed": "#2e1500",
+                    "warning": "#B37D00",
+                    "border-subtle": "#E8EBEE",
+                    "on-tertiary-container": "#ffbe87",
+                    "on-tertiary-fixed-variant": "#6c3a00",
+                    "on-surface-variant": "#41474f",
+                    "outline-variant": "#c1c7d0",
+                    "on-surface": "#191c1f",
+                    "inverse-surface": "#2e3134",
+                    "surface-dim": "#d8dadf",
+                    "on-secondary-container": "#58646f",
+                    "on-tertiary": "#ffffff",
+                    "surface-alt": "#F0F2F4",
+                    "secondary": "#54606b",
+                    "secondary-fixed": "#d8e4f1",
+                    "secondary-container": "#d5e1ee",
+                    "outline": "#717880",
+                    "tertiary": "#613300",
+                    "tertiary-container": "#824701",
+                    "primary-fixed": "#cde5ff",
+                    "inverse-primary": "#95ccff",
+                    "on-primary-fixed-variant": "#004a75",
+                    "on-primary": "#ffffff",
+                    "on-error": "#ffffff",
+                    "error": "#C53030",
+                    "primary-fixed-dim": "#95ccff",
+                    "inverse-on-surface": "#eff1f5",
+                    "on-secondary-fixed-variant": "#3c4852",
+                    "surface-container-low": "#f2f3f8",
+                    "surface-container-highest": "#e1e2e7",
+                    "on-secondary-fixed": "#111d26",
+                    "tertiary-fixed": "#ffdcc1",
+                    "secondary-fixed-dim": "#bcc8d4"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "gutter": "1rem",
+                    "padding-base": "1rem",
+                    "header-height": "52px",
+                    "padding-compact": "0.75rem",
+                    "sidebar-collapsed": "64px",
+                    "sidebar-width": "224px"
+            },
+            "fontFamily": {
+                    "headline-lg": ["Inter"],
+                    "body-sm": ["Inter"],
+                    "headline-md": ["Inter"],
+                    "body-md": ["Inter"],
+                    "label-xs": ["Inter"]
+            },
+            "fontSize": {
+                    "headline-lg": ["22px", {"lineHeight": "32px", "fontWeight": "600"}],
+                    "body-sm": ["11px", {"lineHeight": "16px", "fontWeight": "400"}],
+                    "headline-md": ["16px", {"lineHeight": "24px", "fontWeight": "600"}],
+                    "body-md": ["12px", {"lineHeight": "18px", "fontWeight": "400"}],
+                    "label-xs": ["10px", {"lineHeight": "14px", "letterSpacing": "0.02em", "fontWeight": "500"}]
+            }
+          },
+        },
+      }
+    </script>
+</head>
+<body class="bg-background text-on-surface overflow-hidden">
+<!-- SideNavBar (JSON Derived) -->
+<aside class="w-sidebar-width h-screen fixed left-0 top-0 border-r border-border-base bg-surface flex flex-col h-full py-4 overflow-y-auto">
+<div class="px-6 mb-8 flex items-center gap-3">
+<div class="w-8 h-8 bg-primary rounded flex items-center justify-center">
+<span class="material-symbols-outlined text-white" style="font-variation-settings: 'FILL' 1;">dentistry</span>
+</div>
+<div>
+<h1 class="font-headline-md text-headline-md font-bold text-primary">DENTIA</h1>
+<p class="font-label-xs text-label-xs text-on-surface-variant leading-none">Dental Software</p>
+</div>
+</div>
+<nav class="flex-1 px-3 space-y-1">
+<!-- Nav items based on JSON labels and icons -->
+<a class="flex items-center gap-3 px-3 py-2.5 rounded text-on-surface-variant font-body-md text-body-md hover:bg-surface-alt hover:text-primary transition-colors duration-150 ease-in-out" href="#">
+<span class="material-symbols-outlined">home</span>
+<span>Inicio</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded text-on-surface-variant font-body-md text-body-md hover:bg-surface-alt hover:text-primary transition-colors duration-150 ease-in-out" href="#">
+<span class="material-symbols-outlined">calendar_month</span>
+<span>Agenda</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded text-on-surface-variant font-body-md text-body-md hover:bg-surface-alt hover:text-primary transition-colors duration-150 ease-in-out" href="#">
+<span class="material-symbols-outlined">group</span>
+<span>Pacientes</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded text-on-surface-variant font-body-md text-body-md hover:bg-surface-alt hover:text-primary transition-colors duration-150 ease-in-out" href="#">
+<span class="material-symbols-outlined">medical_services</span>
+<span>Clínica</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded text-on-surface-variant font-body-md text-body-md hover:bg-surface-alt hover:text-primary transition-colors duration-150 ease-in-out" href="#">
+<span class="material-symbols-outlined">dentistry</span>
+<span>Tratamientos</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded text-on-surface-variant font-body-md text-body-md hover:bg-surface-alt hover:text-primary transition-colors duration-150 ease-in-out" href="#">
+<span class="material-symbols-outlined">payments</span>
+<span>Finanzas</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded text-on-surface-variant font-body-md text-body-md hover:bg-surface-alt hover:text-primary transition-colors duration-150 ease-in-out" href="#">
+<span class="material-symbols-outlined">account_tree</span>
+<span>CRM</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded text-on-surface-variant font-body-md text-body-md hover:bg-surface-alt hover:text-primary transition-colors duration-150 ease-in-out" href="#">
+<span class="material-symbols-outlined">folder_open</span>
+<span>Documentos</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded text-on-surface-variant font-body-md text-body-md hover:bg-surface-alt hover:text-primary transition-colors duration-150 ease-in-out" href="#">
+<span class="material-symbols-outlined">inventory_2</span>
+<span>Inventario</span>
+</a>
+<!-- Active State Logic for "Equipo" -->
+<a class="flex items-center gap-3 px-3 py-2.5 text-primary font-semibold border-r-2 border-primary bg-surface-alt transition-colors duration-150 ease-in-out font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">badge</span>
+<span>Equipo</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded text-on-surface-variant font-body-md text-body-md hover:bg-surface-alt hover:text-primary transition-colors duration-150 ease-in-out" href="#">
+<span class="material-symbols-outlined">query_stats</span>
+<span>Analítica</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded text-on-surface-variant font-body-md text-body-md hover:bg-surface-alt hover:text-primary transition-colors duration-150 ease-in-out" href="#">
+<span class="material-symbols-outlined">auto_mode</span>
+<span>Automatizaciones</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded text-on-surface-variant font-body-md text-body-md hover:bg-surface-alt hover:text-primary transition-colors duration-150 ease-in-out" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span>Configuración</span>
+</a>
+</nav>
+<div class="px-6 pt-4 mt-4 border-t border-border-base">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded bg-surface-container-high overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="A clinical headshot of a professional female dentist wearing a pristine white lab coat against a clean, softly lit medical office background. Her expression is welcoming and professional, embodying the sanitary and authoritative aesthetic of the dental software." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCGHnpyHsmKWq1PMLFYN4QUYKIb_z4EmKxCYCs6hGt2JTLMfaRMMEWBM4VhwFGi8l3j3NSaM-yDlC9fAtOZII5mX4ZQSHAPMtOPRhlQmFRo1jCcRFwbXE8tBv61IBq2zrZiaqkvuKH3dzH-8ZNiZG-1IN4n_kuiQvvwrJt9nTevUYbXEItlhafRXDM5_IcaKfB4JwMU6OAKabcM4z9TRrTtWuSFOIkAbD_wxfDoA724nhiD58k3WW8u"/>
+</div>
+<div class="overflow-hidden">
+<p class="font-body-md text-body-md font-semibold truncate">Dra. M. Ortega</p>
+<p class="font-label-xs text-label-xs text-on-surface-variant">Administrador</p>
+</div>
+</div>
+</div>
+</aside>
+<!-- TopNavBar (JSON Derived) -->
+<header class="h-header-height fixed top-0 right-0 left-sidebar-width z-50 bg-surface border-b border-border-base flex items-center justify-between px-gutter">
+<div class="flex items-center gap-6">
+<div class="relative w-64">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant">search</span>
+<input class="w-full pl-10 pr-4 py-1.5 bg-surface-alt border-none rounded text-body-md font-body-md focus:ring-1 focus:ring-primary" placeholder="Buscar en el equipo..." type="text"/>
+</div>
+<nav class="flex items-center gap-4">
+<a class="text-primary font-bold border-b-2 border-primary pb-1 text-body-md font-body-md" href="#">Sede Centro</a>
+<a class="text-on-surface-variant hover:text-primary transition-colors text-body-md font-body-md" href="#">Sede Playa</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<button class="btn-primary flex items-center gap-2 px-4 h-8 rounded text-body-md font-semibold active:scale-95 transition-all">
+<span class="material-symbols-outlined !text-[18px]">add</span>
+<span>+ Crear</span>
+</button>
+<div class="flex items-center gap-3 ml-2">
+<button class="text-on-surface-variant hover:text-primary transition-colors cursor-pointer">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="text-on-surface-variant hover:text-primary transition-colors cursor-pointer">
+<span class="material-symbols-outlined">account_circle</span>
+</button>
+</div>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="ml-sidebar-width mt-header-height h-[calc(100vh-52px)] overflow-hidden flex flex-col">
+<!-- Secondary Context Header (TopAppBar) -->
+<div class="bg-surface-container-low border-b border-border-subtle h-10 px-4 flex items-center justify-between sticky top-0 z-40">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-on-surface-variant !text-[16px]">badge</span>
+<h2 class="font-label-xs text-label-xs font-semibold text-on-surface uppercase tracking-wider">Directorio del Equipo</h2>
+<div class="h-4 w-px bg-border-base mx-1"></div>
+<span class="font-label-xs text-label-xs text-on-surface-variant">24 miembros activos</span>
+</div>
+<div class="flex items-center gap-4">
+<button class="flex items-center gap-1.5 text-on-surface-variant hover:text-primary transition-all">
+<span class="material-symbols-outlined !text-[16px]">filter_list</span>
+<span class="font-label-xs text-label-xs">Filtrar</span>
+</button>
+<button class="flex items-center gap-1.5 text-on-surface-variant hover:text-primary transition-all">
+<span class="material-symbols-outlined !text-[16px]">download</span>
+<span class="font-label-xs text-label-xs">Exportar</span>
+</button>
+</div>
+</div>
+<!-- Content Area -->
+<div class="flex-1 p-6 overflow-y-auto custom-scrollbar">
+<!-- Table Container -->
+<div class="bg-surface border border-border-base rounded shadow-sm overflow-hidden">
+<table class="w-full text-left border-collapse">
+<thead class="bg-surface-alt">
+<tr>
+<th class="px-4 py-2 font-label-xs text-label-xs text-on-surface-variant uppercase tracking-wider border-b border-border-base">Nombre y Apellido</th>
+<th class="px-4 py-2 font-label-xs text-label-xs text-on-surface-variant uppercase tracking-wider border-b border-border-base">Rol</th>
+<th class="px-4 py-2 font-label-xs text-label-xs text-on-surface-variant uppercase tracking-wider border-b border-border-base">Especialidad</th>
+<th class="px-4 py-2 font-label-xs text-label-xs text-on-surface-variant uppercase tracking-wider border-b border-border-base">Sede</th>
+<th class="px-4 py-2 font-label-xs text-label-xs text-on-surface-variant uppercase tracking-wider border-b border-border-base">Estado</th>
+<th class="px-4 py-2 font-label-xs text-label-xs text-on-surface-variant uppercase tracking-wider border-b border-border-base text-right">Último Acceso</th>
+<th class="px-4 py-2 border-b border-border-base w-10"></th>
+</tr>
+</thead>
+<tbody class="divide-y divide-border-subtle">
+<!-- Table Row 1 -->
+<tr class="hover:bg-surface-bright transition-colors group">
+<td class="px-4 py-2.5">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded bg-surface-container flex items-center justify-center font-bold text-primary font-label-xs text-label-xs">JO</div>
+<span class="font-body-md text-body-md font-medium text-text-primary">Dr. Javier Ortega</span>
+</div>
+</td>
+<td class="px-4 py-2.5 font-body-md text-body-md text-on-surface-variant">Director Clínico</td>
+<td class="px-4 py-2.5">
+<span class="bg-surface-container px-2 py-0.5 rounded text-label-xs font-label-xs text-on-surface-variant">Implantología</span>
+</td>
+<td class="px-4 py-2.5 font-body-md text-body-md text-on-surface-variant">Sede Centro</td>
+<td class="px-4 py-2.5">
+<div class="flex items-center gap-1.5">
+<span class="w-2 h-2 rounded-full bg-success"></span>
+<span class="font-label-xs text-label-xs text-success font-medium">Disponible</span>
+</div>
+</td>
+<td class="px-4 py-2.5 font-body-md text-body-md text-on-surface-variant text-right">Hoy, 08:30 AM</td>
+<td class="px-4 py-2.5 text-right">
+<button class="p-1 rounded hover:bg-surface-variant opacity-0 group-hover:opacity-100 transition-opacity">
+<span class="material-symbols-outlined !text-[18px]">more_vert</span>
+</button>
+</td>
+</tr>
+<!-- Table Row 2 -->
+<tr class="hover:bg-surface-bright transition-colors group">
+<td class="px-4 py-2.5">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded bg-surface-container flex items-center justify-center font-bold text-primary font-label-xs text-label-xs">AR</div>
+<span class="font-body-md text-body-md font-medium text-text-primary">Dra. Ana Rodríguez</span>
+</div>
+</td>
+<td class="px-4 py-2.5 font-body-md text-body-md text-on-surface-variant">Especialista</td>
+<td class="px-4 py-2.5">
+<span class="bg-surface-container px-2 py-0.5 rounded text-label-xs font-label-xs text-on-surface-variant">Ortodoncia</span>
+</td>
+<td class="px-4 py-2.5 font-body-md text-body-md text-on-surface-variant">Sede Centro</td>
+<td class="px-4 py-2.5">
+<div class="flex items-center gap-1.5">
+<span class="w-2 h-2 rounded-full bg-warning"></span>
+<span class="font-label-xs text-label-xs text-warning font-medium">En Consulta</span>
+</div>
+</td>
+<td class="px-4 py-2.5 font-body-md text-body-md text-on-surface-variant text-right">Hoy, 09:12 AM</td>
+<td class="px-4 py-2.5 text-right">
+<button class="p-1 rounded hover:bg-surface-variant opacity-0 group-hover:opacity-100 transition-opacity">
+<span class="material-symbols-outlined !text-[18px]">more_vert</span>
+</button>
+</td>
+</tr>
+<!-- Table Row 3 -->
+<tr class="hover:bg-surface-bright transition-colors group">
+<td class="px-4 py-2.5">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded bg-surface-container flex items-center justify-center font-bold text-primary font-label-xs text-label-xs">MC</div>
+<span class="font-body-md text-body-md font-medium text-text-primary">Marta Calvo</span>
+</div>
+</td>
+<td class="px-4 py-2.5 font-body-md text-body-md text-on-surface-variant">Higienista</td>
+<td class="px-4 py-2.5">
+<span class="bg-surface-container px-2 py-0.5 rounded text-label-xs font-label-xs text-on-surface-variant">Profilaxis</span>
+</td>
+<td class="px-4 py-2.5 font-body-md text-body-md text-on-surface-variant">Sede Playa</td>
+<td class="px-4 py-2.5">
+<div class="flex items-center gap-1.5">
+<span class="w-2 h-2 rounded-full bg-success"></span>
+<span class="font-label-xs text-label-xs text-success font-medium">Disponible</span>
+</div>
+</td>
+<td class="px-4 py-2.5 font-body-md text-body-md text-on-surface-variant text-right">Ayer, 18:45 PM</td>
+<td class="px-4 py-2.5 text-right">
+<button class="p-1 rounded hover:bg-surface-variant opacity-0 group-hover:opacity-100 transition-opacity">
+<span class="material-symbols-outlined !text-[18px]">more_vert</span>
+</button>
+</td>
+</tr>
+<!-- Table Row 4 -->
+<tr class="hover:bg-surface-bright transition-colors group">
+<td class="px-4 py-2.5">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded bg-surface-container flex items-center justify-center font-bold text-primary font-label-xs text-label-xs">PL</div>
+<span class="font-body-md text-body-md font-medium text-text-primary">Pedro López</span>
+</div>
+</td>
+<td class="px-4 py-2.5 font-body-md text-body-md text-on-surface-variant">Administración</td>
+<td class="px-4 py-2.5">
+<span class="bg-surface-container px-2 py-0.5 rounded text-label-xs font-label-xs text-on-surface-variant">Atención al Paciente</span>
+</td>
+<td class="px-4 py-2.5 font-body-md text-body-md text-on-surface-variant">Sede Playa</td>
+<td class="px-4 py-2.5">
+<div class="flex items-center gap-1.5">
+<span class="w-2 h-2 rounded-full bg-border-base"></span>
+<span class="font-label-xs text-label-xs text-on-surface-variant font-medium">Ausente</span>
+</div>
+</td>
+<td class="px-4 py-2.5 font-body-md text-body-md text-on-surface-variant text-right">02/11/2023</td>
+<td class="px-4 py-2.5 text-right">
+<button class="p-1 rounded hover:bg-surface-variant opacity-0 group-hover:opacity-100 transition-opacity">
+<span class="material-symbols-outlined !text-[18px]">more_vert</span>
+</button>
+</td>
+</tr>
+<!-- Table Row 5 -->
+<tr class="hover:bg-surface-bright transition-colors group">
+<td class="px-4 py-2.5">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded bg-surface-container flex items-center justify-center font-bold text-primary font-label-xs text-label-xs">SL</div>
+<span class="font-body-md text-body-md font-medium text-text-primary">Dra. Silvia Luna</span>
+</div>
+</td>
+<td class="px-4 py-2.5 font-body-md text-body-md text-on-surface-variant">Especialista</td>
+<td class="px-4 py-2.5">
+<span class="bg-surface-container px-2 py-0.5 rounded text-label-xs font-label-xs text-on-surface-variant">Endodoncia</span>
+</td>
+<td class="px-4 py-2.5 font-body-md text-body-md text-on-surface-variant">Sede Centro</td>
+<td class="px-4 py-2.5">
+<div class="flex items-center gap-1.5">
+<span class="w-2 h-2 rounded-full bg-success"></span>
+<span class="font-label-xs text-label-xs text-success font-medium">Disponible</span>
+</div>
+</td>
+<td class="px-4 py-2.5 font-body-md text-body-md text-on-surface-variant text-right">Hoy, 07:45 AM</td>
+<td class="px-4 py-2.5 text-right">
+<button class="p-1 rounded hover:bg-surface-variant opacity-0 group-hover:opacity-100 transition-opacity">
+<span class="material-symbols-outlined !text-[18px]">more_vert</span>
+</button>
+</td>
+</tr>
+<!-- Table Row 6 -->
+<tr class="hover:bg-surface-bright transition-colors group">
+<td class="px-4 py-2.5">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded bg-surface-container flex items-center justify-center font-bold text-primary font-label-xs text-label-xs">CA</div>
+<span class="font-body-md text-body-md font-medium text-text-primary">Carlos Alva</span>
+</div>
+</td>
+<td class="px-4 py-2.5 font-body-md text-body-md text-on-surface-variant">Auxiliar</td>
+<td class="px-4 py-2.5">
+<span class="bg-surface-container px-2 py-0.5 rounded text-label-xs font-label-xs text-on-surface-variant">Cirugía</span>
+</td>
+<td class="px-4 py-2.5 font-body-md text-body-md text-on-surface-variant">Sede Playa</td>
+<td class="px-4 py-2.5">
+<div class="flex items-center gap-1.5">
+<span class="w-2 h-2 rounded-full bg-error"></span>
+<span class="font-label-xs text-label-xs text-error font-medium">No Molestar</span>
+</div>
+</td>
+<td class="px-4 py-2.5 font-body-md text-body-md text-on-surface-variant text-right">Hoy, 10:05 AM</td>
+<td class="px-4 py-2.5 text-right">
+<button class="p-1 rounded hover:bg-surface-variant opacity-0 group-hover:opacity-100 transition-opacity">
+<span class="material-symbols-outlined !text-[18px]">more_vert</span>
+</button>
+</td>
+</tr>
+</tbody>
+</table>
+<div class="p-3 border-t border-border-subtle bg-surface-alt flex items-center justify-between">
+<span class="font-label-xs text-label-xs text-on-surface-variant">Mostrando 6 de 24 miembros</span>
+<div class="flex items-center gap-2">
+<button class="p-1 rounded border border-border-base text-on-surface-variant hover:bg-surface cursor-pointer disabled:opacity-50" disabled="">
+<span class="material-symbols-outlined !text-[18px]">chevron_left</span>
+</button>
+<span class="font-label-xs text-label-xs font-semibold px-2">1</span>
+<button class="p-1 rounded border border-border-base text-on-surface-variant hover:bg-surface cursor-pointer">
+<span class="material-symbols-outlined !text-[18px]">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Bento Summary Cards -->
+<div class="mt-8 grid grid-cols-12 gap-4">
+<div class="col-span-12 md:col-span-4 bg-surface border border-border-base p-4 rounded flex flex-col gap-2">
+<div class="flex items-center justify-between">
+<h3 class="font-label-xs text-label-xs font-bold text-on-surface-variant uppercase">Especialidades más activas</h3>
+<span class="material-symbols-outlined text-primary !text-[18px]">analytics</span>
+</div>
+<div class="space-y-2 mt-2">
+<div class="flex justify-between items-center">
+<span class="font-body-md text-body-md">Odontología General</span>
+<span class="font-body-md text-body-md font-bold">8</span>
+</div>
+<div class="w-full bg-surface-container h-1 rounded-full overflow-hidden">
+<div class="bg-primary h-full w-3/4"></div>
+</div>
+<div class="flex justify-between items-center mt-3">
+<span class="font-body-md text-body-md">Ortodoncia</span>
+<span class="font-body-md text-body-md font-bold">5</span>
+</div>
+<div class="w-full bg-surface-container h-1 rounded-full overflow-hidden">
+<div class="bg-primary h-full w-1/2"></div>
+</div>
+</div>
+</div>
+<div class="col-span-12 md:col-span-4 bg-surface border border-border-base p-4 rounded flex flex-col justify-between">
+<div>
+<h3 class="font-label-xs text-label-xs font-bold text-on-surface-variant uppercase">Distribución por Sede</h3>
+<p class="font-headline-lg text-headline-lg text-primary mt-2">14 <span class="text-on-surface-variant font-body-md text-body-md font-normal">Sede Centro</span></p>
+<p class="font-headline-lg text-headline-lg text-primary">10 <span class="text-on-surface-variant font-body-md text-body-md font-normal">Sede Playa</span></p>
+</div>
+<div class="flex gap-1 h-2 rounded-full overflow-hidden mt-4">
+<div class="w-[58%] bg-primary"></div>
+<div class="w-[42%] bg-primary-fixed"></div>
+</div>
+</div>
+<div class="col-span-12 md:col-span-4 bg-primary text-white p-4 rounded relative overflow-hidden">
+<div class="relative z-10 flex flex-col h-full justify-between">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined !text-[20px]">info</span>
+<span class="font-label-xs text-label-xs uppercase tracking-widest opacity-80">Consejo Pro</span>
+</div>
+<div>
+<p class="font-body-md text-body-md font-medium leading-snug">Puedes gestionar los permisos detallados de cada miembro en la sección de Configuración &gt; Seguridad.</p>
+</div>
+<a class="font-label-xs text-label-xs underline underline-offset-2 opacity-80 hover:opacity-100 transition-opacity" href="#">Ir a Permisos</a>
+</div>
+<div class="absolute -right-4 -bottom-4 opacity-10">
+<span class="material-symbols-outlined !text-[120px]">security</span>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Contextual micro-interaction script -->
+<script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Hover effect on rows already handled by Tailwind group
+            // Potential logic for "Add User" button modal or search filter simulation
+            const searchInput = document.querySelector('input[type="text"]');
+            searchInput.addEventListener('input', (e) => {
+                const term = e.target.value.toLowerCase();
+                const rows = document.querySelectorAll('tbody tr');
+                rows.forEach(row => {
+                    const name = row.querySelector('span').textContent.toLowerCase();
+                    if (name.includes(term)) {
+                        row.style.display = '';
+                    } else {
+                        row.style.display = 'none';
+                    }
+                });
+            });
+        });
+    </script>
+</body></html>

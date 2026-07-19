@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatWeekRange, getGreeting, getWeekDays } from "@/lib/calendar";
+import { formatWeekRange, getBusinessWeekDays, getGreeting, getWeekDays } from "@/lib/calendar";
 
 describe("getWeekDays", () => {
   it("devuelve 7 dias empezando en lunes", () => {
@@ -24,6 +24,15 @@ describe("getWeekDays", () => {
     const days = getWeekDays(new Date("2026-08-01T12:00:00.000Z"));
     expect(days[0].iso).toBe("2026-07-27");
     expect(days[6].iso).toBe("2026-08-02");
+  });
+});
+
+describe("getBusinessWeekDays", () => {
+  it("devuelve solo lunes a viernes para la vista profesional de agenda", () => {
+    const days = getBusinessWeekDays(new Date("2026-07-09T12:00:00.000Z"));
+    expect(days).toHaveLength(5);
+    expect(days[0]).toEqual({ iso: "2026-07-06", label: "Lun", dayNumber: 6 });
+    expect(days[4]).toEqual({ iso: "2026-07-10", label: "Vie", dayNumber: 10 });
   });
 });
 

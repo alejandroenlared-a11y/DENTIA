@@ -23,6 +23,13 @@ enum PatientStatus {
   URGENT
 }
 
+enum PatientIntakeStatus {
+  CAPTURED
+  LINKED
+  DUPLICATE_REVIEW
+  DISCARDED
+}
+
 enum AppointmentStatus {
   REQUESTED
   PROPOSED
@@ -90,6 +97,37 @@ enum InvoiceStatus {
   CANCELLED
 }
 
+enum InvoiceReceiverType {
+  PATIENT
+  COMPANY
+  PROFESSIONAL
+  INSURER
+  PUBLIC_ADMINISTRATION
+}
+
+enum InvoiceDocumentType {
+  COMPLETE
+  SIMPLIFIED
+  RECTIFYING
+}
+
+enum ElectronicInvoiceStatus {
+  NOT_REQUIRED
+  READY
+  PENDING
+  SENT
+  ACCEPTED
+  REJECTED
+  PAID
+  FAILED
+}
+
+enum SifMode {
+  NOT_CONFIGURED
+  NO_VERIFACTU
+  VERIFACTU
+}
+
 enum ExpenseCategory {
   LABORATORIO
   SUMINISTROS
@@ -107,36 +145,42 @@ enum ExpenseStatus {
 }
 
 model Tenant {
-  id              String           @id @default(cuid())
-  name            String
-  slug            String           @unique
-  legalName       String?
-  phone           String?
-  address         String?
-  pmsProvider     String           @default("standalone")
-  assistantName   String           @default("Clara")
-  assistantEnabled Boolean         @default(true)
-  retentionDays   Int              @default(90)
-  apiKey          String?          @unique
-  plan            String           @default("PRO")
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  id                        String   @id @default(cuid())
+  name                      String
+  slug                      String   @unique
+  legalName                 String?
+  taxId                     String?
+  fiscalAddress             String?
+  phone                     String?
+  address                   String?
+  pmsProvider               String   @default("standalone")
+  assistantName             String   @default("Clara")
+  assistantEnabled          Boolean  @default(true)
+  retentionDays             Int      @default(90)
+  invoiceSeries             String   @default("F")
+  electronicInvoiceProvider String?
+  sifMode                   SifMode  @default(NOT_CONFIGURED)
+  apiKey                    String?  @unique
+  plan                      String   @default("PRO")
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
 
-  users           User[]
-  patients        Patient[]
-  providers       Provider[]
-  operatories     Operatory[]
-  treatments      Treatment[]
-  appointments    Appointment[]
-  calendarEvents  CalendarEvent[]
-  conversations   Conversation[]
-  tasks           Task[]
-  consents        Consent[]
-  auditLogs       AuditLog[]
-  agentSessions   AgentSession[]
-  invoices        Invoice[]
-  expenses        Expense[]
-  settings        TenantSetting?
+  users          User[]
+  patients       Patient[]
+  providers      Provider[]
+  operatories    Operatory[]
+  treatments     Treatment[]
+  appointments   Appointment[]
+  calendarEvents CalendarEvent[]
+  conversations  Conversation[]
+  patientIntakes PatientIntake[]
+  tasks          Task[]
+  consents       Consent[]
+  auditLogs      AuditLog[]
+  agentSessions  AgentSession[]
+  invoices       Invoice[]
+  expenses       Expense[]
+  settings       TenantSetting?
 }
 
 model TenantSetting {
@@ -155,7 +199,7 @@ model TenantSetting {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 }
 
 model User {
@@ -168,8 +212,8 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  tenant       Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  sessions     Session[]
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  sessions Session[]
 
   @@unique([tenantId, email])
   @@index([tenantId])
@@ -182,51 +226,55 @@ model Session {
   expiresAt DateTime
   createdAt DateTime @default(now())
 
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([expiresAt])
 }
 
 model Patient {
-  id             String        @id @default(cuid())
-  tenantId       String
-  name           String
-  phone          String
-  email          String?
-  status         PatientStatus @default(NEW_LEAD)
-  source         String?
+  id               String               @id @default(cuid())
+  tenantId         String
+  name             String
+  phone            String
+  email            String?
+  fiscalName       String?
+  taxId            String?
+  fiscalAddress    String?
+  status           PatientStatus        @default(NEW_LEAD)
+  source           String?
   preferredChannel ConversationChannel?
-  treatmentNeed  String?
-  estimatedValue Int           @default(0)
-  lastVisitAt    DateTime?
-  notes          String?
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  treatmentNeed    String?
+  estimatedValue   Int                  @default(0)
+  lastVisitAt      DateTime?
+  notes            String?
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
 
-  tenant         Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  appointments   Appointment[]
-  conversations  Conversation[]
-  tasks          Task[]
-  consents       Consent[]
-  agentSessions  AgentSession[]
-  invoices       Invoice[]
+  tenant        Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  appointments  Appointment[]
+  conversations Conversation[]
+  tasks         Task[]
+  consents      Consent[]
+  agentSessions AgentSession[]
+  invoices      Invoice[]
+  intakes       PatientIntake[]
 
   @@unique([tenantId, phone])
   @@index([tenantId, status])
 }
 
 model Provider {
-  id          String   @id @default(cuid())
-  tenantId    String
-  name        String
-  specialty   String
-  active      Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id        String   @id @default(cuid())
+  tenantId  String
+  name      String
+  specialty String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  appointments Appointment[]
+  tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  appointments   Appointment[]
   calendarEvents CalendarEvent[]
 
   @@index([tenantId])
@@ -241,36 +289,36 @@ model Operatory {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  appointments Appointment[]
+  tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  appointments   Appointment[]
   calendarEvents CalendarEvent[]
 
   @@index([tenantId])
 }
 
 model Treatment {
-  id              String   @id @default(cuid())
-  tenantId        String
-  name            String
-  durationMinutes Int
-  priceCents      Int?
-  requiresAssessment Boolean @default(false)
-  defaultProvider String?
-  defaultOperatory String?
-  rules           String
-  active          Boolean  @default(true)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id                 String   @id @default(cuid())
+  tenantId           String
+  name               String
+  durationMinutes    Int
+  priceCents         Int?
+  requiresAssessment Boolean  @default(false)
+  defaultProvider    String?
+  defaultOperatory   String?
+  rules              String
+  active             Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
-  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  appointments    Appointment[]
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  appointments Appointment[]
 
   @@unique([tenantId, name])
   @@index([tenantId, active])
 }
 
 model Appointment {
-  id              String            @id @default(cuid())
+  id              String               @id @default(cuid())
   tenantId        String
   patientId       String
   treatmentId     String?
@@ -278,18 +326,18 @@ model Appointment {
   operatoryId     String?
   title           String
   startsAt        DateTime
-  durationMinutes Int               @default(30)
-  status          AppointmentStatus @default(REQUESTED)
+  durationMinutes Int                  @default(30)
+  status          AppointmentStatus    @default(REQUESTED)
   channel         ConversationChannel?
-  createdByAi     Boolean           @default(false)
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
+  createdByAi     Boolean              @default(false)
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
 
-  tenant          Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  patient         Patient           @relation(fields: [patientId], references: [id], onDelete: Cascade)
-  treatment       Treatment?        @relation(fields: [treatmentId], references: [id], onDelete: SetNull)
-  provider        Provider?         @relation(fields: [providerId], references: [id], onDelete: SetNull)
-  operatory       Operatory?        @relation(fields: [operatoryId], references: [id], onDelete: SetNull)
+  tenant    Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  patient   Patient    @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  treatment Treatment? @relation(fields: [treatmentId], references: [id], onDelete: SetNull)
+  provider  Provider?  @relation(fields: [providerId], references: [id], onDelete: SetNull)
+  operatory Operatory? @relation(fields: [operatoryId], references: [id], onDelete: SetNull)
 
   @@index([tenantId, startsAt])
   @@index([tenantId, status])
@@ -316,33 +364,63 @@ model CalendarEvent {
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
 
-  tenant          Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  provider        Provider?         @relation(fields: [providerId], references: [id], onDelete: SetNull)
-  operatory       Operatory?        @relation(fields: [operatoryId], references: [id], onDelete: SetNull)
+  tenant    Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  provider  Provider?  @relation(fields: [providerId], references: [id], onDelete: SetNull)
+  operatory Operatory? @relation(fields: [operatoryId], references: [id], onDelete: SetNull)
 
   @@index([tenantId, startsAt])
   @@index([providerId, startsAt])
 }
 
 model Conversation {
-  id          String             @id @default(cuid())
-  tenantId    String
-  patientId   String?
-  channel     ConversationChannel
-  status      ConversationStatus @default(ACTIVE)
-  intent      String?
-  result      String?
-  unread      Boolean            @default(false)
-  startedAt   DateTime           @default(now())
-  updatedAt   DateTime           @updatedAt
+  id        String              @id @default(cuid())
+  tenantId  String
+  patientId String?
+  channel   ConversationChannel
+  status    ConversationStatus  @default(ACTIVE)
+  intent    String?
+  result    String?
+  unread    Boolean             @default(false)
+  startedAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
 
-  tenant      Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  patient     Patient?           @relation(fields: [patientId], references: [id], onDelete: SetNull)
-  messages    Message[]
+  tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  patient       Patient?       @relation(fields: [patientId], references: [id], onDelete: SetNull)
+  messages      Message[]
   agentSessions AgentSession[]
+  patientIntake PatientIntake?
 
   @@index([tenantId, status])
   @@index([tenantId, channel])
+}
+
+model PatientIntake {
+  id                  String               @id @default(cuid())
+  tenantId            String
+  patientId           String?
+  conversationId      String?              @unique
+  accessCode          String               @unique
+  status              PatientIntakeStatus  @default(CAPTURED)
+  name                String?
+  email               String?
+  phone               String?
+  location            String?
+  treatmentNeed       String?
+  channel             ConversationChannel?
+  source              String               @default("chat")
+  consent             Boolean              @default(false)
+  duplicatePatientIds Json?
+  stateSnapshot       Json?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  patient      Patient?      @relation(fields: [patientId], references: [id], onDelete: SetNull)
+  conversation Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, status])
+  @@index([tenantId, phone])
+  @@index([tenantId, email])
 }
 
 model Message {
@@ -354,44 +432,44 @@ model Message {
   metadata       Json?
   createdAt      DateTime         @default(now())
 
-  conversation   Conversation     @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
   @@index([conversationId, createdAt])
 }
 
 model Task {
-  id          String       @id @default(cuid())
-  tenantId    String
-  patientId   String?
-  title       String
-  type        String
-  status      TaskStatus   @default(PENDING)
-  priority    TaskPriority @default(MEDIUM)
-  dueAt       DateTime?
-  linkedType  String?
-  linkedId    String?
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  id         String       @id @default(cuid())
+  tenantId   String
+  patientId  String?
+  title      String
+  type       String
+  status     TaskStatus   @default(PENDING)
+  priority   TaskPriority @default(MEDIUM)
+  dueAt      DateTime?
+  linkedType String?
+  linkedId   String?
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
 
-  tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  patient     Patient?     @relation(fields: [patientId], references: [id], onDelete: SetNull)
+  tenant  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  patient Patient? @relation(fields: [patientId], references: [id], onDelete: SetNull)
 
   @@index([tenantId, status])
   @@index([tenantId, dueAt])
 }
 
 model Consent {
-  id          String      @id @default(cuid())
-  tenantId    String
-  patientId   String
-  kind        ConsentKind
-  granted     Boolean     @default(false)
-  grantedAt   DateTime?
-  source      String?
-  createdAt   DateTime    @default(now())
+  id        String      @id @default(cuid())
+  tenantId  String
+  patientId String
+  kind      ConsentKind
+  granted   Boolean     @default(false)
+  grantedAt DateTime?
+  source    String?
+  createdAt DateTime    @default(now())
 
-  tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  patient     Patient     @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
 
   @@unique([tenantId, patientId, kind])
   @@index([tenantId, kind])
@@ -407,7 +485,7 @@ model AuditLog {
   metadata    Json?
   createdAt   DateTime @default(now())
 
-  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, createdAt])
   @@index([tenantId, entityType, entityId])
@@ -425,33 +503,64 @@ model AgentSession {
   latencyMs      Int?
   createdAt      DateTime            @default(now())
 
-  tenant         Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  patient        Patient?            @relation(fields: [patientId], references: [id], onDelete: SetNull)
-  conversation   Conversation?       @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  patient      Patient?      @relation(fields: [patientId], references: [id], onDelete: SetNull)
+  conversation Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
 
   @@index([tenantId, createdAt])
   @@index([tenantId, outcome])
 }
 
 model Invoice {
-  id            String        @id @default(cuid())
-  tenantId      String
-  patientId     String
-  number        String
-  treatmentName String
-  amountCents   Int
-  status        InvoiceStatus @default(SENT)
-  issuedAt      DateTime      @default(now())
-  dueAt         DateTime
-  paidAt        DateTime?
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  id                     String                  @id @default(cuid())
+  tenantId               String
+  patientId              String
+  number                 String
+  series                 String                  @default("F")
+  sequence               Int?
+  documentType           InvoiceDocumentType     @default(COMPLETE)
+  receiverType           InvoiceReceiverType     @default(PATIENT)
+  receiverName           String?
+  receiverTaxId          String?
+  receiverAddress        String?
+  receiverEmail          String?
+  issuerLegalName        String?
+  issuerTaxId            String?
+  issuerAddress          String?
+  treatmentName          String
+  amountCents            Int
+  taxBaseCents           Int                     @default(0)
+  taxCents               Int                     @default(0)
+  taxRateBasisPoints     Int                     @default(0)
+  taxExemptionReason     String?
+  status                 InvoiceStatus           @default(SENT)
+  electronicStatus       ElectronicInvoiceStatus @default(NOT_REQUIRED)
+  electronicFormat       String                  @default("FacturaE")
+  electronicProvider     String?
+  electronicReference    String?
+  electronicPayload      String?
+  electronicSubmittedAt  DateTime?
+  electronicAcceptedAt   DateTime?
+  electronicRejectedAt   DateTime?
+  electronicRejectReason String?
+  sifMode                SifMode                 @default(NOT_CONFIGURED)
+  fiscalHash             String?
+  previousFiscalHash     String?
+  qrPayload              String?
+  immutableIssued        Boolean                 @default(false)
+  notes                  String?
+  issuedAt               DateTime                @default(now())
+  dueAt                  DateTime
+  paidAt                 DateTime?
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
 
-  tenant        Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  patient       Patient       @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
 
   @@unique([tenantId, number])
   @@index([tenantId, status])
+  @@index([tenantId, electronicStatus])
   @@index([tenantId, issuedAt])
 }
 
@@ -468,7 +577,7 @@ model Expense {
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
 
-  tenant      Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, status])
   @@index([tenantId, incurredAt])

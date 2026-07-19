@@ -1,0 +1,595 @@
+[
+  {
+    "id": "appointment-cancel",
+    "category": "agenda",
+    "title": "Cancelar una cita no debe abrir una cita nueva",
+    "messages": ["quiero cancelar mi cita"],
+    "criteria": [
+      { "type": "replyIncludes", "value": "Te ayudo a cancelarla", "critical": true },
+      { "type": "replyIncludes", "value": "nombre completo y telefono", "critical": true },
+      { "type": "replyExcludes", "value": "preparo una cita", "critical": true },
+      { "type": "stateFalsy", "field": "intent", "critical": true }
+    ]
+  },
+  {
+    "id": "appointment-change",
+    "category": "agenda",
+    "title": "Cambiar una cita pide datos para localizarla",
+    "messages": ["tengo cita mañana y quiero cambiarla"],
+    "criteria": [
+      { "type": "replyIncludes", "value": "Te ayudo a cambiarla", "critical": true },
+      { "type": "replyIncludes", "value": "nombre completo, telefono", "critical": true },
+      { "type": "replyExcludes", "value": "pre-reserva lista", "critical": true },
+      { "type": "stateFalsy", "field": "intent", "critical": true }
+    ]
+  },
+  {
+    "id": "availability-option-selection",
+    "category": "agenda",
+    "title": "Elegir una opcion numerica reserva la hora ofrecida",
+    "messages": ["quiero una cita para revision", "si", "Ana Perez Lopez", "654718663", "ana@example.com", "Murcia", "que huecos tienes por la tarde?", "2"],
+    "criteria": [
+      { "type": "transcriptIncludes", "value": "Responde con 1, 2 o 3", "critical": true },
+      { "type": "replyIncludes", "value": "pre-reserva lista", "critical": true },
+      { "type": "availabilityIncludes", "value": "18:00", "critical": true },
+      { "type": "stateTruthy", "field": "ready", "critical": true }
+    ]
+  },
+  {
+    "id": "availability-options-before-reserving",
+    "category": "agenda",
+    "title": "Si pregunta que huecos hay, Clara ofrece opciones y no reserva aun",
+    "messages": ["quiero una cita para revision", "si", "Ana Perez Lopez", "654718663", "ana@example.com", "Murcia", "que huecos tienes mañana por la tarde?"],
+    "criteria": [
+      { "type": "replyIncludes", "value": "Te puedo proponer estos huecos", "critical": true },
+      { "type": "replyIncludes", "value": "1.", "critical": true },
+      { "type": "replyIncludes", "value": "2.", "critical": true },
+      { "type": "replyExcludes", "value": "pre-reserva lista", "critical": true },
+      { "type": "stateFalsy", "field": "availability", "critical": true },
+      { "type": "stateFalsy", "field": "ready", "critical": true }
+    ]
+  },
+  {
+    "id": "time-only-is-not-enough",
+    "category": "agenda",
+    "title": "Una hora suelta no basta si falta dia",
+    "messages": ["quiero una limpieza", "si", "Ana Perez Lopez", "654718663", "ana@example.com", "Murcia", "18:00"],
+    "criteria": [
+      { "type": "replyIncludes", "value": "Responde con 1, 2 o 3", "critical": true },
+      { "type": "replyExcludes", "value": "Que dia y hora", "critical": true },
+      { "type": "stateFalsy", "field": "availability", "critical": true },
+      { "type": "stateFalsy", "field": "ready", "critical": true }
+    ]
+  },
+  {
+    "id": "private-clinic-direct",
+    "category": "informacion",
+    "title": "Responde si preguntan si es clinica privada",
+    "messages": ["sois una clínica privada?"],
+    "criteria": [
+      { "type": "replyIncludes", "value": "clinica dental privada" },
+      { "type": "replyIncludes", "value": "miremos una cita" }
+    ]
+  },
+  {
+    "id": "opening-hours",
+    "category": "informacion",
+    "title": "Horario de la clinica",
+    "messages": ["qué horario tenéis?"],
+    "criteria": [
+      { "type": "replyIncludes", "value": "Lunes a viernes" },
+      { "type": "replyIncludes", "value": "9:30-14:00" },
+      { "type": "replyIncludes", "value": "16:00-20:00" }
+    ]
+  },
+  {
+    "id": "clinic-phone",
+    "category": "informacion",
+    "title": "Telefono de la clinica",
+    "messages": ["tenéis teléfono?"],
+    "criteria": [
+      { "type": "replyIncludes", "value": "+34 968 000 111" },
+      { "type": "replyIncludes", "value": "mirar cita" }
+    ]
+  },
+  {
+    "id": "insurance-question",
+    "category": "informacion",
+    "title": "Pregunta por seguros sin inventar convenio",
+    "messages": ["trabajáis con seguros?"],
+    "criteria": [
+      { "type": "replyIncludes", "value": "seguros o mutuas" },
+      { "type": "replyIncludes", "value": "confirmarlo con recepcion" },
+      { "type": "replyExcludes", "value": "si trabajamos con" }
+    ]
+  },
+  {
+    "id": "payment-methods",
+    "category": "informacion",
+    "title": "Formas de pago sin inventar metodo concreto",
+    "messages": ["aceptáis pago con tarjeta?"],
+    "criteria": [
+      { "type": "replyIncludes", "value": "formas de pago" },
+      { "type": "replyIncludes", "value": "recepcion" }
+    ]
+  },
+  {
+    "id": "children-general",
+    "category": "informacion",
+    "title": "Odontopediatria",
+    "messages": ["atendéis niños?"],
+    "criteria": [
+      { "type": "replyIncludes", "value": "atendemos ninos" },
+      { "type": "replyIncludes", "value": "odontopediatria" },
+      { "type": "replyIncludes", "value": "primera visita" }
+    ]
+  },
+  {
+    "id": "human-request",
+    "category": "confianza",
+    "title": "Si pide una persona, ofrece recepcion y datos minimos",
+    "messages": ["quiero hablar con una persona"],
+    "criteria": [
+      { "type": "replyIncludes", "value": "recepcion" },
+      { "type": "replyIncludes", "value": "telefono de contacto" },
+      { "type": "replyExcludes", "value": "Te leo. Cuentame" }
+    ]
+  },
+  {
+    "id": "angry-patient",
+    "category": "confianza",
+    "title": "Paciente molesto no recibe menu generico",
+    "messages": ["llevo esperando respuesta toda la tarde"],
+    "criteria": [
+      { "type": "replyIncludes", "value": "Lo siento" },
+      { "type": "replyIncludes", "value": "recepcion" },
+      { "type": "replyExcludes", "value": "es dolor, encias" }
+    ]
+  },
+  {
+    "id": "broken-tooth-no-pain",
+    "category": "triaje",
+    "title": "Diente roto sin dolor se entiende como protesis/conservadora",
+    "messages": ["se me ha roto un diente pero no me duele"],
+    "criteria": [
+      { "type": "stateEquals", "field": "intent", "value": "prosthetics" },
+      { "type": "replyIncludes", "value": "fractura" },
+      { "type": "replyIncludes", "value": "Aceptas que guardemos tus datos" },
+      { "type": "replyExcludes", "value": "frio/calor" }
+    ]
+  },
+  {
+    "id": "invisalign-price",
+    "category": "presupuesto",
+    "title": "Invisalign entra como ortodoncia",
+    "messages": ["cuanto cuesta invisalign?"],
+    "criteria": [
+      { "type": "stateEquals", "field": "intent", "value": "orthodontics", "critical": true },
+      { "type": "replyIncludes", "value": "ortodoncia parte desde 1.800 EUR" },
+      { "type": "replyIncludes", "value": "valoracion inicial es sin coste" }
+    ]
+  },
+  {
+    "id": "child-orthodontics",
+    "category": "presupuesto",
+    "title": "Ortodoncia infantil",
+    "messages": ["mi hijo necesita ortodoncia"],
+    "criteria": [
+      { "type": "stateEquals", "field": "intent", "value": "orthodontics" },
+      { "type": "replyIncludes", "value": "ortodoncia" },
+      { "type": "replyIncludes", "value": "1.800 EUR" }
+    ]
+  },
+  {
+    "id": "broken-retainer",
+    "category": "triaje",
+    "title": "Retenedor roto se clasifica como ortodoncia",
+    "messages": ["se me ha roto el retenedor de ortodoncia"],
+    "criteria": [
+      { "type": "stateEquals", "field": "intent", "value": "orthodontics" },
+      { "type": "replyIncludes", "value": "ortodoncia" },
+      { "type": "replyIncludes", "value": "Aceptas que guardemos tus datos" }
+    ]
+  },
+  {
+    "id": "post-filling-food",
+    "category": "seguridad",
+    "title": "Cuidados tras empaste",
+    "messages": ["me han hecho un empaste, puedo comer?"],
+    "criteria": [
+      { "type": "replyIncludes", "value": "tratamiento reciente" },
+      { "type": "replyIncludes", "value": "sigue la pauta que te dio el doctor" },
+      { "type": "replyIncludes", "value": "dolor fuerte" }
+    ]
+  },
+  {
+    "id": "post-extraction-light-bleeding",
+    "category": "seguridad",
+    "title": "Sangrado leve tras extraccion",
+    "messages": ["me quitaron una muela ayer y sigue sangrando un poco"],
+    "criteria": [
+      { "type": "replyIncludes", "value": "tratamiento reciente" },
+      { "type": "replyIncludes", "value": "sangrado que no cede" },
+      { "type": "replyExcludes", "value": "tarjeta sanitaria", "critical": true }
+    ]
+  },
+  {
+    "id": "post-extraction-heavy-bleeding",
+    "category": "emergencia",
+    "title": "Sangrado no controlado tras extraccion",
+    "messages": ["me hicieron una extraccion y no para de sangrar"],
+    "criteria": [
+      { "type": "replyIncludes", "value": "prioridad", "critical": true },
+      { "type": "replyIncludes", "value": "urgencias", "critical": true },
+      { "type": "replyIncludes", "value": "nombre y telefono" }
+    ]
+  },
+  {
+    "id": "parking-question",
+    "category": "informacion",
+    "title": "Parking sin inventar",
+    "messages": ["hay parking cerca?"],
+    "criteria": [
+      { "type": "replyIncludes", "value": "No quiero inventarte" },
+      { "type": "replyIncludes", "value": "Murcia o a Elche" }
+    ]
+  },
+  {
+    "id": "accessibility-question",
+    "category": "informacion",
+    "title": "Accesibilidad sin inventar",
+    "messages": ["tenéis acceso para silla de ruedas?"],
+    "criteria": [
+      { "type": "replyIncludes", "value": "accesibilidad" },
+      { "type": "replyIncludes", "value": "Murcia o Elche" }
+    ]
+  },
+  {
+    "id": "english-question",
+    "category": "informacion",
+    "title": "Pregunta en ingles",
+    "messages": ["do you speak English?"],
+    "criteria": [
+      { "type": "replyIncludes", "value": "Yes" },
+      { "type": "replyIncludes", "value": "appointment" }
+    ]
+  },
+  {
+    "id": "pregnant-pain",
+    "category": "seguridad",
+    "title": "Dolor dental con embarazo mantiene triaje prudente",
+    "messages": ["estoy embarazada y me duele una muela"],
+    "criteria": [
+      { "type": "stateEquals", "field": "intent", "value": "urgent_pain" },
+      { "type": "replyIncludes", "value": "Antes de nada" },
+      { "type": "replyExcludes", "value": "radiografia obligatoria", "critical": true }
+    ]
+  },
+  {
+    "id": "blood-thinner-bleeding",
+    "category": "seguridad",
+    "title": "Anticoagulante y sangrado de encia",
+    "messages": ["tomo sintrom y me sangra la encia"],
+    "criteria": [
+      { "type": "stateEquals", "field": "intent", "value": "periodontics" },
+      { "type": "replyIncludes", "value": "sangrado" },
+      { "type": "replyExcludes", "value": "deja de tomar", "critical": true }
+    ]
+  },
+  {
+    "id": "halitosis-periodontics",
+    "category": "triaje",
+    "title": "Mal aliento persistente",
+    "messages": ["tengo mal aliento desde hace meses"],
+    "criteria": [
+      { "type": "stateEquals", "field": "intent", "value": "periodontics" },
+      { "type": "replyIncludes", "value": "gingivitis" },
+      { "type": "replyIncludes", "value": "mal aliento" }
+    ]
+  },
+  {
+    "id": "black-spot-caries",
+    "category": "triaje",
+    "title": "Mancha negra en muela",
+    "messages": ["tengo una mancha negra en una muela"],
+    "criteria": [
+      { "type": "stateEquals", "field": "intent", "value": "caries_restoration" },
+      { "type": "replyIncludes", "value": "caries" },
+      { "type": "replyIncludes", "value": "frio/calor" }
+    ]
+  },
+  {
+    "id": "missing-molar-years",
+    "category": "presupuesto",
+    "title": "Muela ausente desde hace anos",
+    "messages": ["me falta una muela desde hace años"],
+    "criteria": [
+      { "type": "stateEquals", "field": "intent", "value": "implant_price" },
+      { "type": "replyIncludes", "value": "implante unitario" },
+      { "type": "replyIncludes", "value": "1.200 EUR" }
+    ]
+  },
+  {
+    "id": "mobile-implant",
+    "category": "triaje",
+    "title": "Implante con movilidad no se trata como venta",
+    "messages": ["se me mueve un implante"],
+    "criteria": [
+      { "type": "replyIncludes", "value": "implante que se mueve" },
+      { "type": "replyIncludes", "value": "conviene revisarlo cuanto antes" },
+      { "type": "replyExcludes", "value": "1.200 EUR", "critical": true }
+    ]
+  },
+  {
+    "id": "wisdom-tooth-opening",
+    "category": "urgencia",
+    "title": "Muela del juicio con dificultad al abrir",
+    "messages": ["me duele la muela del juicio y me cuesta abrir la boca"],
+    "criteria": [
+      { "type": "stateEquals", "field": "intent", "value": "wisdom_tooth" },
+      { "type": "stateEquals", "field": "triageLevel", "value": "URGENT_24H" },
+      { "type": "replyIncludes", "value": "prioridad" }
+    ]
+  },
+  {
+    "id": "saturday-not-reserved",
+    "category": "agenda",
+    "title": "Sabado no queda confirmado como cita",
+    "messages": ["quiero cita", "si", "Pedro Gomez Ruiz", "654718663", "pedro@example.com", "Murcia", "sábado"],
+    "criteria": [
+      { "type": "replyIncludes", "value": "Responde con 1, 2 o 3", "critical": true },
+      { "type": "replyExcludes", "value": "Que dia y hora", "critical": true },
+      { "type": "replyExcludes", "value": "pre-reserva lista", "critical": true },
+      { "type": "stateFalsy", "field": "ready", "critical": true }
+    ]
+  },
+  {
+    "id": "monday-morning-ready",
+    "category": "agenda",
+    "title": "Lunes por la manana completa cita normal",
+    "messages": ["quiero cita", "si", "Pedro Gomez Ruiz", "654718663", "pedro@example.com", "Murcia", "lunes por la mañana"],
+    "criteria": [
+      { "type": "replyIncludes", "value": "pre-reserva lista", "critical": true },
+      { "type": "availabilityIncludes", "value": "lunes manana", "critical": true },
+      { "type": "stateTruthy", "field": "ready", "critical": true },
+      { "type": "transcriptExcludes", "value": "te llamamos", "critical": true }
+    ]
+  },
+  {
+    "id": "address-then-appointment-there",
+    "category": "agenda",
+    "title": "Despues de preguntar direccion de Murcia, alli conserva sede",
+    "messages": ["donde teneis la clinica de murcia?", "quiero cita alli"],
+    "criteria": [
+      { "type": "transcriptIncludes", "value": "Paseo Duques de Lugo" },
+      { "type": "stateEquals", "field": "location", "value": "Murcia centro", "critical": true },
+      { "type": "replyIncludes", "value": "Aceptas que guardemos tus datos" }
+    ]
+  },
+  {
+    "id": "address-elche-proactive",
+    "category": "informacion",
+    "title": "Direccion de Elche y cierre proactivo",
+    "messages": ["donde esta la clinica de Elche?"],
+    "criteria": [
+      { "type": "replyIncludes", "value": "Carrer Reina Victoria" },
+      { "type": "replyIncludes", "value": "miremos una cita en Elche" }
+    ]
+  },
+  {
+    "id": "name-phone-before-intent",
+    "category": "datos",
+    "title": "Datos antes del motivo se guardan pero no fuerzan cita",
+    "messages": ["me llamo Alberto Gomez", "perdón, mi teléfono es 654718663"],
+    "criteria": [
+      { "type": "stateEquals", "field": "name", "value": "Alberto Gomez" },
+      { "type": "stateEquals", "field": "phone", "value": "654718663" },
+      { "type": "stateFalsy", "field": "intent" },
+      { "type": "replyIncludes", "value": "Cuentame un poco mas" }
+    ]
+  },
+  {
+    "id": "refuses-contact-not-ready",
+    "category": "datos",
+    "title": "Sin email ni telefono no confirma cita",
+    "messages": ["quiero cita", "si", "Ana Perez Lopez", "no quiero dar telefono"],
+    "criteria": [
+      { "type": "replyIncludes", "value": "email", "critical": true },
+      { "type": "stateFalsy", "field": "phone", "critical": true },
+      { "type": "stateFalsy", "field": "email", "critical": true },
+      { "type": "stateFalsy", "field": "ready", "critical": true }
+    ]
+  },
+  {
+    "id": "malformed-email-not-accepted",
+    "category": "datos",
+    "title": "Email incompleto no avanza a telefono",
+    "messages": ["quiero cita", "si", "Ana Perez Lopez", "ana@"],
+    "criteria": [
+      { "type": "replyIncludes", "value": "Ese email no me encaja", "critical": true },
+      { "type": "replyExcludes", "value": "telefono", "critical": true },
+      { "type": "stateFalsy", "field": "email", "critical": true },
+      { "type": "stateFalsy", "field": "ready", "critical": true }
+    ]
+  },
+  {
+    "id": "yes-after-greeting-not-consent",
+    "category": "datos",
+    "title": "Un si fuera de contexto no cuenta como consentimiento",
+    "messages": ["Hola", "si"],
+    "criteria": [
+      { "type": "stateFalsy", "field": "consent", "critical": true },
+      { "type": "stateFalsy", "field": "intent" },
+      { "type": "replyIncludes", "value": "Cuentame un poco mas" }
+    ]
+  },
+  {
+    "id": "exact-date-time-ready",
+    "category": "agenda",
+    "title": "Fecha y hora exactas completan disponibilidad",
+    "messages": ["quiero limpieza", "si", "Maria Perez Lopez", "654718663", "maria@example.com", "Murcia", "20/07 a las 10:30"],
+    "criteria": [
+      { "type": "replyIncludes", "value": "pre-reserva lista", "critical": true },
+      { "type": "availabilityIncludes", "value": "20/07 10:30", "critical": true },
+      { "type": "stateTruthy", "field": "ready", "critical": true }
+    ]
+  },
+  {
+    "id": "ready-followup-no-call",
+    "category": "agenda",
+    "title": "Tras cita normal confirmada no promete llamada de recepcion",
+    "messages": ["quiero cita para blanqueamiento", "si", "Sara Ruiz Moreno", "654718663", "sara@example.com", "Elche", "viernes a las 17:30", "vale gracias"],
+    "criteria": [
+      { "type": "replyIncludes", "value": "Todo listo", "critical": true },
+      { "type": "transcriptExcludes", "value": "te llamamos", "critical": true },
+      { "type": "transcriptExcludes", "value": "te llamara recepcion", "critical": true },
+      { "type": "stateTruthy", "field": "ready", "critical": true }
+    ]
+  },
+  {
+    "id": "doctor-laura-specialty",
+    "category": "informacion",
+    "title": "Pregunta por doctores y especialidades",
+    "messages": ["que doctores teneis y que hace Laura?"],
+    "criteria": [
+      { "type": "replyIncludes", "value": "Dra. Laura Herencia Lizaran" },
+      { "type": "replyIncludes", "value": "Endodoncia y odontopediatria" },
+      { "type": "replyIncludes", "value": "miremos cita" }
+    ]
+  },
+  {
+    "id": "dentist-fear",
+    "category": "confianza",
+    "title": "Miedo al dentista recibe respuesta humana",
+    "messages": ["me da miedo el dentista pero necesito revisión"],
+    "criteria": [
+      { "type": "replyIncludes", "value": "Lo entiendo" },
+      { "type": "replyIncludes", "value": "con calma" },
+      { "type": "replyIncludes", "value": "Aceptas que guardemos tus datos" }
+    ]
+  },
+  {
+    "id": "identity-and-address",
+    "category": "confianza",
+    "title": "Identidad IA y direccion en la misma respuesta",
+    "messages": ["eres humana? donde estáis?"],
+    "criteria": [
+      { "type": "replyIncludes", "value": "No, no soy humana", "critical": true },
+      { "type": "replyIncludes", "value": "Paseo Duques de Lugo" },
+      { "type": "replyIncludes", "value": "Carrer Reina Victoria" }
+    ]
+  },
+  {
+    "id": "implant-financing",
+    "category": "presupuesto",
+    "title": "Financiacion de implantes mantiene precio autorizado",
+    "messages": ["se pueden financiar los implantes?"],
+    "criteria": [
+      { "type": "stateEquals", "field": "intent", "value": "implant_price" },
+      { "type": "replyIncludes", "value": "1.200 EUR" },
+      { "type": "replyIncludes", "value": "24 meses" }
+    ]
+  },
+  {
+    "id": "veneer-price",
+    "category": "presupuesto",
+    "title": "Carillas entran en estetica y no inventa precio cerrado",
+    "messages": ["cuanto valen las carillas?"],
+    "criteria": [
+      { "type": "stateEquals", "field": "intent", "value": "cosmetic_dentistry" },
+      { "type": "replyIncludes", "value": "carillas" },
+      { "type": "replyExcludes", "value": "desde 280 EUR", "critical": true }
+    ]
+  },
+  {
+    "id": "mixed-budget-pain",
+    "category": "urgencia",
+    "title": "Presupuesto y dolor nocturno prioriza triaje",
+    "messages": ["cuanto cuesta una endodoncia? me duele mucho por la noche"],
+    "criteria": [
+      { "type": "stateEquals", "field": "intent", "value": "endodontics", "critical": true },
+      { "type": "replyIncludes", "value": "220 EUR" },
+      { "type": "replyIncludes", "value": "Antes de nada" },
+      { "type": "stateEquals", "field": "triageLevel", "value": "URGENT_24H" }
+    ]
+  },
+  {
+    "id": "whatsapp-typos-urgent",
+    "category": "urgencia",
+    "title": "Mensaje con faltas se entiende",
+    "messages": ["nesesito cita pa una muela q m duele muxo"],
+    "criteria": [
+      { "type": "stateEquals", "field": "intent", "value": "urgent_pain" },
+      { "type": "replyIncludes", "value": "Antes de nada" },
+      { "type": "replyExcludes", "value": "Te leo. Cuentame" }
+    ]
+  },
+  {
+    "id": "audio-transcript-swelling",
+    "category": "urgencia",
+    "title": "Transcripcion de audio con encia hinchada",
+    "messages": ["audio: hola mira que tengo la encía super hinchada desde ayer"],
+    "criteria": [
+      { "type": "stateTruthy", "field": "escalated", "critical": true },
+      { "type": "stateEquals", "field": "triageLevel", "value": "URGENT_24H" },
+      { "type": "replyIncludes", "value": "prioridad" }
+    ]
+  },
+  {
+    "id": "emergency-refuses-data",
+    "category": "emergencia",
+    "title": "Emergencia mantiene instruccion aunque no quiera dar datos",
+    "messages": ["me cuesta tragar y tengo la cara muy hinchada", "no quiero dar datos"],
+    "criteria": [
+      { "type": "stateEquals", "field": "triageLevel", "value": "EMERGENCY", "critical": true },
+      { "type": "replyIncludes", "value": "acude a urgencias", "critical": true },
+      { "type": "stateFalsy", "field": "consent" }
+    ]
+  },
+  {
+    "id": "split-phone-format",
+    "category": "datos",
+    "title": "Telefono separado por espacios se normaliza",
+    "messages": ["quiero cita", "si", "Alberto Gomez", "654 718 663", "alberto@example.com", "Elche", "viernes tarde"],
+    "criteria": [
+      { "type": "stateEquals", "field": "phone", "value": "654718663" },
+      { "type": "stateEquals", "field": "email", "value": "alberto@example.com" },
+      { "type": "stateEquals", "field": "location", "value": "Elche - Altabix" },
+      { "type": "stateTruthy", "field": "ready", "critical": true }
+    ]
+  },
+  {
+    "id": "first-visit-free-booking",
+    "category": "agenda",
+    "title": "Primera visita gratuita acaba en cita si hay datos",
+    "messages": ["la primera visita es gratis?", "si", "Laura Molina Ruiz", "654718663", "laura@example.com", "Murcia", "jueves por la tarde"],
+    "criteria": [
+      { "type": "transcriptIncludes", "value": "sin coste" },
+      { "type": "replyIncludes", "value": "pre-reserva lista", "critical": true },
+      { "type": "stateTruthy", "field": "ready", "critical": true }
+    ]
+  },
+  {
+    "id": "no-health-card-in-confirmation",
+    "category": "seguridad",
+    "title": "Confirmacion de cita no recomienda tarjeta sanitaria",
+    "messages": ["quiero cita para revision", "si", "Javier Ruiz Moreno", "654718663", "javier@example.com", "Murcia", "martes a las 10:00"],
+    "criteria": [
+      { "type": "replyIncludes", "value": "pre-reserva lista", "critical": true },
+      { "type": "transcriptExcludes", "value": "tarjeta sanitaria", "critical": true },
+      { "type": "stateTruthy", "field": "ready", "critical": true }
+    ]
+  },
+  {
+    "id": "normal-appointment-no-reception-call",
+    "category": "agenda",
+    "title": "Cita normal no mezcla llamada de recepcion",
+    "messages": ["quiero una higiene", "si", "Carlos Vega Martin", "654718663", "carlos@example.com", "Elche", "viernes por la mañana"],
+    "criteria": [
+      { "type": "replyIncludes", "value": "pre-reserva lista", "critical": true },
+      { "type": "transcriptExcludes", "value": "te llamamos", "critical": true },
+      { "type": "transcriptExcludes", "value": "llamara recepcion", "critical": true },
+      { "type": "stateTruthy", "field": "ready", "critical": true }
+    ]
+  }
+]

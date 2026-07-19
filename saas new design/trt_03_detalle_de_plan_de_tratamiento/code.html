@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+
+<html class="light" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>TRT-03 — Detalle de Plan de Tratamiento | DENTIA</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
+            font-size: 18px;
+        }
+        body { font-family: 'Inter', sans-serif; }
+        .sidebar-active { border-right: 2px solid #004268; background-color: #F0F2F4; color: #004268; font-weight: 600; }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #D9DEE3; border-radius: 10px; }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                "success": "#278561",
+                "on-tertiary-fixed": "#2e1500",
+                "tertiary-fixed-dim": "#ffb779",
+                "tertiary-container": "#824701",
+                "on-secondary-fixed": "#111d26",
+                "text-primary": "#17212B",
+                "tertiary": "#613300",
+                "on-tertiary-container": "#ffbe87",
+                "on-primary-fixed": "#001d32",
+                "on-secondary-fixed-variant": "#3c4852",
+                "surface-container-highest": "#e1e2e7",
+                "secondary-fixed-dim": "#bcc8d4",
+                "on-secondary-container": "#58646f",
+                "background": "#F5F6F7",
+                "surface-container-high": "#e7e8ed",
+                "surface-variant": "#e1e2e7",
+                "surface-container-lowest": "#ffffff",
+                "surface-bright": "#f8f9fe",
+                "tertiary-fixed": "#ffdcc1",
+                "primary-fixed": "#cde5ff",
+                "error": "#C53030",
+                "on-error": "#ffffff",
+                "outline": "#717880",
+                "secondary-container": "#d5e1ee",
+                "surface": "#FFFFFF",
+                "on-secondary": "#ffffff",
+                "inverse-on-surface": "#eff1f5",
+                "surface-container-low": "#f2f3f8",
+                "surface-container": "#eceef2",
+                "primary": "#004268",
+                "secondary": "#54606b",
+                "on-background": "#191c1f",
+                "secondary-fixed": "#d8e4f1",
+                "surface-alt": "#F0F2F4",
+                "warning": "#B37D00",
+                "on-primary-fixed-variant": "#004a75",
+                "border-subtle": "#E8EBEE",
+                "on-surface": "#191c1f",
+                "on-primary-container": "#9fd0ff",
+                "primary-container": "#005a8c",
+                "primary-fixed-dim": "#95ccff",
+                "inverse-surface": "#2e3134",
+                "error-container": "#ffdad6",
+                "surface-dim": "#d8dadf",
+                "on-tertiary-fixed-variant": "#6c3a00",
+                "border-base": "#D9DEE3",
+                "on-error-container": "#93000a",
+                "on-surface-variant": "#41474f",
+                "outline-variant": "#c1c7d0",
+                "inverse-primary": "#95ccff",
+                "on-primary": "#ffffff",
+                "surface-tint": "#166395",
+                "on-tertiary": "#ffffff"
+              },
+              "borderRadius": {
+                "DEFAULT": "0.125rem",
+                "lg": "0.25rem",
+                "xl": "0.5rem",
+                "full": "0.75rem"
+              },
+              "spacing": {
+                "sidebar-width": "224px",
+                "padding-base": "1rem",
+                "header-height": "52px",
+                "gutter": "1rem",
+                "sidebar-collapsed": "64px",
+                "padding-compact": "0.75rem"
+              },
+              "fontFamily": {
+                "label-xs": ["Inter"],
+                "headline-lg": ["Inter"],
+                "body-sm": ["Inter"],
+                "headline-md": ["Inter"],
+                "body-md": ["Inter"]
+              },
+              "fontSize": {
+                "label-xs": ["10px", {"lineHeight": "14px", "letterSpacing": "0.02em", "fontWeight": "500"}],
+                "headline-lg": ["22px", {"lineHeight": "32px", "fontWeight": "600"}],
+                "body-sm": ["11px", {"lineHeight": "16px", "fontWeight": "400"}],
+                "headline-md": ["16px", {"lineHeight": "24px", "fontWeight": "600"}],
+                "body-md": ["12px", {"lineHeight": "18px", "fontWeight": "400"}]
+              }
+            },
+          },
+        }
+    </script>
+</head>
+<body class="bg-background text-on-surface">
+<!-- SideNavBar Shell -->
+<aside class="w-sidebar-width h-screen fixed left-0 top-0 border-r border-border-base bg-surface flex flex-col py-4 overflow-y-auto">
+<div class="px-6 mb-8 flex flex-col">
+<span class="font-headline-md text-headline-md font-bold text-primary">DENTIA</span>
+<span class="text-[10px] uppercase tracking-widest text-secondary opacity-70">Dental Software</span>
+</div>
+<nav class="flex-1 space-y-1">
+<a class="flex items-center px-6 py-2 gap-3 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors duration-150 ease-in-out font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined">home</span> Inicio
+            </a>
+<a class="flex items-center px-6 py-2 gap-3 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors duration-150 ease-in-out font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined">calendar_month</span> Agenda
+            </a>
+<a class="flex items-center px-6 py-2 gap-3 sidebar-active transition-colors duration-150 ease-in-out font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined">group</span> Pacientes
+            </a>
+<a class="flex items-center px-6 py-2 gap-3 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors duration-150 ease-in-out font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined">medical_services</span> Clínica
+            </a>
+<a class="flex items-center px-6 py-2 gap-3 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors duration-150 ease-in-out font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined">dentistry</span> Tratamientos
+            </a>
+<a class="flex items-center px-6 py-2 gap-3 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors duration-150 ease-in-out font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined">payments</span> Finanzas
+            </a>
+<a class="flex items-center px-6 py-2 gap-3 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors duration-150 ease-in-out font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined">account_tree</span> CRM
+            </a>
+<a class="flex items-center px-6 py-2 gap-3 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors duration-150 ease-in-out font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined">folder_open</span> Documentos
+            </a>
+<a class="flex items-center px-6 py-2 gap-3 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors duration-150 ease-in-out font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined">inventory_2</span> Inventario
+            </a>
+<a class="flex items-center px-6 py-2 gap-3 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors duration-150 ease-in-out font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined">badge</span> Equipo
+            </a>
+<a class="flex items-center px-6 py-2 gap-3 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors duration-150 ease-in-out font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined">query_stats</span> Analítica
+            </a>
+<a class="flex items-center px-6 py-2 gap-3 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors duration-150 ease-in-out font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined">auto_mode</span> Automatizaciones
+            </a>
+<a class="flex items-center px-6 py-2 gap-3 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors duration-150 ease-in-out font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined">settings</span> Configuración
+            </a>
+</nav>
+</aside>
+<!-- Main Content Area -->
+<main class="ml-sidebar-width min-h-screen flex flex-col">
+<!-- TopNavBar Shell -->
+<header class="h-header-height bg-surface border-b border-border-base flex items-center justify-between px-gutter sticky top-0 z-50">
+<div class="flex items-center gap-6">
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline">search</span>
+<input class="pl-10 pr-4 py-1.5 bg-surface-container-low border border-border-base rounded text-body-md w-64 focus:ring-0 focus:border-primary transition-all" placeholder="Buscar paciente o cita..." type="text"/>
+</div>
+<div class="flex items-center gap-4 border-l border-border-subtle pl-6 h-6">
+<a class="font-body-md text-body-md text-primary font-bold border-b-2 border-primary pb-1" href="#">Sede Centro</a>
+<a class="font-body-md text-body-md text-on-surface-variant hover:text-primary transition-colors" href="#">Sede Playa</a>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="bg-primary text-on-primary px-4 py-1.5 rounded font-body-md text-body-md font-semibold hover:opacity-90 active:scale-95 transition-all">+ Crear</button>
+<div class="flex items-center gap-3 border-l border-border-subtle pl-4">
+<span class="material-symbols-outlined text-secondary cursor-pointer hover:text-primary transition-colors">notifications</span>
+<span class="material-symbols-outlined text-secondary cursor-pointer hover:text-primary transition-colors">account_circle</span>
+</div>
+</div>
+</header>
+<!-- TopAppBar (Patient Context) -->
+<div class="w-full h-10 bg-surface-container-low border-b border-border-subtle flex items-center px-4 sticky top-header-height z-40 gap-4">
+<div class="flex items-center gap-2 text-on-surface">
+<span class="material-symbols-outlined text-primary">person</span>
+<span class="font-label-xs text-label-xs font-semibold">Paciente: Juan Pérez</span>
+</div>
+<div class="h-4 w-px bg-border-base"></div>
+<div class="flex items-center gap-4 ml-auto">
+<span class="material-symbols-outlined text-warning cursor-pointer" title="Alerta médica">warning</span>
+<span class="material-symbols-outlined text-secondary cursor-pointer" title="Balance">account_balance_wallet</span>
+<span class="material-symbols-outlined text-secondary cursor-pointer" title="Historial">quick_reference_all</span>
+</div>
+</div>
+<!-- Canvas Content -->
+<div class="p-6 grid grid-cols-12 gap-6 max-w-[1600px] w-full mx-auto">
+<!-- Left Column: Treatment Detail (8 cols) -->
+<div class="col-span-12 lg:col-span-8 flex flex-col gap-6">
+<!-- Plan Header Card -->
+<div class="bg-surface border border-border-base rounded p-5">
+<div class="flex justify-between items-start mb-6">
+<div>
+<div class="flex items-center gap-3 mb-1">
+<h1 class="font-headline-lg text-headline-lg text-text-primary">Plan de Rehabilitación Integral - Fase 1</h1>
+<span class="bg-warning/10 text-warning px-2 py-0.5 rounded text-[10px] font-bold border border-warning/20">PENDIENTE DE ACEPTAR</span>
+</div>
+<p class="text-body-md text-secondary">Código: PR-2023-0892 • Creado el 14 Oct 2023 por Dra. Elena Martínez</p>
+</div>
+<div class="text-right">
+<span class="text-label-xs text-secondary block">PRESUPUESTO TOTAL</span>
+<span class="text-2xl font-black text-primary">2.450,00 €</span>
+</div>
+</div>
+<div class="grid grid-cols-3 gap-4 py-4 border-t border-border-subtle">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 bg-surface-container rounded flex items-center justify-center text-primary">
+<span class="material-symbols-outlined">health_and_safety</span>
+</div>
+<div>
+<span class="text-label-xs text-secondary uppercase block">Especialidad</span>
+<span class="text-body-md font-semibold">Implantología &amp; Estética</span>
+</div>
+</div>
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 bg-surface-container rounded flex items-center justify-center text-primary">
+<span class="material-symbols-outlined">calendar_today</span>
+</div>
+<div>
+<span class="text-label-xs text-secondary uppercase block">Validez</span>
+<span class="text-body-md font-semibold">30 días (Hasta 13 Nov)</span>
+</div>
+</div>
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 bg-surface-container rounded flex items-center justify-center text-primary">
+<span class="material-symbols-outlined">payments</span>
+</div>
+<div>
+<span class="text-label-xs text-secondary uppercase block">Financiación</span>
+<span class="text-body-md font-semibold">Disponible 12 meses</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Procedures List Grouped by Phases -->
+<div class="bg-surface border border-border-base rounded overflow-hidden">
+<div class="bg-surface-container-low px-4 py-2 border-b border-border-base flex justify-between items-center">
+<span class="text-label-xs font-bold text-secondary uppercase tracking-wider">Desglose de Procedimientos</span>
+<div class="flex gap-4">
+<div class="flex items-center gap-1.5">
+<div class="w-2 h-2 rounded-full bg-outline-variant"></div>
+<span class="text-[10px] text-secondary">Pendiente</span>
+</div>
+<div class="flex items-center gap-1.5">
+<div class="w-2 h-2 rounded-full bg-primary"></div>
+<span class="text-[10px] text-secondary">Programado</span>
+</div>
+<div class="flex items-center gap-1.5">
+<div class="w-2 h-2 rounded-full bg-success"></div>
+<span class="text-[10px] text-secondary">Realizado</span>
+</div>
+</div>
+</div>
+<!-- Fase 1 -->
+<div class="border-b border-border-subtle last:border-0">
+<div class="px-4 py-2 bg-surface-alt flex items-center gap-2">
+<span class="material-symbols-outlined text-[16px] text-primary">subdirectory_arrow_right</span>
+<span class="font-body-md font-bold text-primary">FASE 1: Higiene y Saneamiento</span>
+</div>
+<table class="w-full text-left">
+<thead class="bg-surface-container-lowest border-b border-border-subtle">
+<tr>
+<th class="px-4 py-2 text-label-xs text-secondary font-bold uppercase w-12 text-center">Utd.</th>
+<th class="px-4 py-2 text-label-xs text-secondary font-bold uppercase">Código y Descripción</th>
+<th class="px-4 py-2 text-label-xs text-secondary font-bold uppercase w-24 text-center">Estado</th>
+<th class="px-4 py-2 text-label-xs text-secondary font-bold uppercase w-32 text-right">Precio</th>
+</tr>
+</thead>
+<tbody>
+<tr class="hover:bg-surface-container-low border-b border-border-subtle transition-colors">
+<td class="px-4 py-3 text-body-sm font-semibold text-center">--</td>
+<td class="px-4 py-3">
+<div class="flex flex-col">
+<span class="text-body-md font-semibold">1.1 Limpieza Bucodental Completa</span>
+<span class="text-[10px] text-secondary">Ultrasonidos + Pulido de manchas</span>
+</div>
+</td>
+<td class="px-4 py-3 text-center">
+<span class="bg-success/10 text-success px-2 py-0.5 rounded text-[10px] font-bold border border-success/20">REALIZADO</span>
+</td>
+<td class="px-4 py-3 text-right text-body-md font-semibold">65,00 €</td>
+</tr>
+<tr class="hover:bg-surface-container-low border-b border-border-subtle transition-colors">
+<td class="px-4 py-3 text-body-sm font-semibold text-center">14</td>
+<td class="px-4 py-3">
+<div class="flex flex-col">
+<span class="text-body-md font-semibold">1.2 Obturación Composite (Cara Ocl.)</span>
+<span class="text-[10px] text-secondary">Tratamiento de caries simple</span>
+</div>
+</td>
+<td class="px-4 py-3 text-center">
+<span class="bg-primary/10 text-primary px-2 py-0.5 rounded text-[10px] font-bold border border-primary/20">PROGRAMADO</span>
+</td>
+<td class="px-4 py-3 text-right text-body-md font-semibold">85,00 €</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Fase 2 -->
+<div class="border-b border-border-subtle last:border-0">
+<div class="px-4 py-2 bg-surface-alt flex items-center gap-2">
+<span class="material-symbols-outlined text-[16px] text-primary">subdirectory_arrow_right</span>
+<span class="font-body-md font-bold text-primary">FASE 2: Implantología Quirúrgica</span>
+</div>
+<table class="w-full text-left">
+<tbody>
+<tr class="hover:bg-surface-container-low border-b border-border-subtle transition-colors">
+<td class="px-4 py-3 text-body-sm font-semibold text-center w-12">46</td>
+<td class="px-4 py-3">
+<div class="flex flex-col">
+<span class="text-body-md font-semibold">2.1 Implante Dental Titanio (Straumann)</span>
+<span class="text-[10px] text-secondary">Fase quirúrgica + Tapón cicatrización</span>
+</div>
+</td>
+<td class="px-4 py-3 text-center w-24">
+<span class="bg-outline-variant/10 text-outline-variant px-2 py-0.5 rounded text-[10px] font-bold border border-outline-variant/20">PENDIENTE</span>
+</td>
+<td class="px-4 py-3 text-right text-body-md font-semibold w-32">1.250,00 €</td>
+</tr>
+<tr class="hover:bg-surface-container-low border-b border-border-subtle transition-colors">
+<td class="px-4 py-3 text-body-sm font-semibold text-center w-12">46</td>
+<td class="px-4 py-3">
+<div class="flex flex-col">
+<span class="text-body-md font-semibold">2.2 Regeneración Ósea con Bio-Oss</span>
+<span class="text-[10px] text-secondary">0.5g Membrana reabsorbible</span>
+</div>
+</td>
+<td class="px-4 py-3 text-center w-24">
+<span class="bg-outline-variant/10 text-outline-variant px-2 py-0.5 rounded text-[10px] font-bold border border-outline-variant/20">PENDIENTE</span>
+</td>
+<td class="px-4 py-3 text-right text-body-md font-semibold w-32">450,00 €</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Fase 3 -->
+<div class="border-b border-border-subtle last:border-0">
+<div class="px-4 py-2 bg-surface-alt flex items-center gap-2">
+<span class="material-symbols-outlined text-[16px] text-primary">subdirectory_arrow_right</span>
+<span class="font-body-md font-bold text-primary">FASE 3: Prótesis y Estética</span>
+</div>
+<table class="w-full text-left">
+<tbody>
+<tr class="hover:bg-surface-container-low border-b border-border-subtle transition-colors">
+<td class="px-4 py-3 text-body-sm font-semibold text-center w-12">46</td>
+<td class="px-4 py-3">
+<div class="flex flex-col">
+<span class="text-body-md font-semibold">3.1 Corona sobre Implante (Zirconio)</span>
+<span class="text-[10px] text-secondary">Atornillada, alta estética</span>
+</div>
+</td>
+<td class="px-4 py-3 text-center w-24">
+<span class="bg-outline-variant/10 text-outline-variant px-2 py-0.5 rounded text-[10px] font-bold border border-outline-variant/20">PENDIENTE</span>
+</td>
+<td class="px-4 py-3 text-right text-body-md font-semibold w-32">600,00 €</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<!-- Observations Card -->
+<div class="bg-surface border border-border-base rounded p-4">
+<span class="text-label-xs font-bold text-secondary uppercase block mb-2">Observaciones Clínicas</span>
+<p class="text-body-md leading-relaxed text-on-surface-variant">
+                        Paciente presenta periodontitis leve controlada en fase 1. El implante en 46 requiere regeneración ósea simultánea por déficit de anchura vestibular. Se ha informado al paciente sobre la importancia de evitar tabaco durante la osteointegración.
+                    </p>
+</div>
+</div>
+<!-- Right Column: Timeline & Actions (4 cols) -->
+<div class="col-span-12 lg:col-span-4 flex flex-col gap-6">
+<!-- Quick Actions Panel -->
+<div class="bg-surface border border-border-base rounded p-5">
+<h3 class="text-body-md font-bold text-primary mb-4 flex items-center gap-2">
+<span class="material-symbols-outlined">bolt</span>
+                        Acciones Rápidas
+                    </h3>
+<div class="flex flex-col gap-3">
+<button class="w-full bg-primary text-on-primary py-2.5 rounded font-semibold text-body-md flex items-center justify-center gap-2 hover:opacity-90 transition-all active:scale-95 shadow-sm">
+<span class="material-symbols-outlined">draw</span>
+                            Aceptar y Firmar
+                        </button>
+<div class="grid grid-cols-2 gap-2">
+<button class="bg-surface-container-low border border-border-base text-on-surface py-2 rounded text-body-md font-medium flex items-center justify-center gap-2 hover:bg-surface-container transition-all">
+<span class="material-symbols-outlined text-[18px]">print</span>
+                                Imprimir
+                            </button>
+<button class="bg-surface-container-low border border-border-base text-on-surface py-2 rounded text-body-md font-medium flex items-center justify-center gap-2 hover:bg-surface-container transition-all">
+<span class="material-symbols-outlined text-[18px]">mail</span>
+                                Enviar
+                            </button>
+</div>
+<button class="w-full bg-surface-container-low border border-border-base text-error py-2 rounded font-medium text-body-md flex items-center justify-center gap-2 hover:bg-error/5 transition-all">
+<span class="material-symbols-outlined text-[18px]">cancel</span>
+                            Marcar como Rechazado
+                        </button>
+</div>
+</div>
+<!-- Timeline / Seguimiento -->
+<div class="bg-surface border border-border-base rounded flex-1 flex flex-col">
+<div class="p-4 border-b border-border-base flex justify-between items-center bg-surface-container-low">
+<h3 class="text-body-md font-bold text-primary flex items-center gap-2">
+<span class="material-symbols-outlined">history</span>
+                            Seguimiento
+                        </h3>
+<button class="text-[10px] font-bold text-primary hover:underline uppercase">Nueva Nota</button>
+</div>
+<div class="p-5 flex-1 custom-scrollbar overflow-y-auto max-h-[500px]">
+<div class="relative pl-6 space-y-8 before:content-[''] before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-[1px] before:bg-border-base">
+<!-- Timeline Item -->
+<div class="relative">
+<span class="absolute -left-7 top-1 w-3 h-3 rounded-full bg-success ring-4 ring-white ring-offset-0"></span>
+<div class="flex flex-col">
+<span class="text-label-xs font-bold text-primary">Presupuesto Creado</span>
+<span class="text-body-sm text-on-surface-variant">Dra. Elena Martínez generó el plan inicial.</span>
+<span class="text-[10px] text-secondary mt-1 italic">14 Oct 2023, 10:15</span>
+</div>
+</div>
+<!-- Timeline Item -->
+<div class="relative">
+<span class="absolute -left-7 top-1 w-3 h-3 rounded-full bg-primary ring-4 ring-white ring-offset-0"></span>
+<div class="flex flex-col">
+<span class="text-label-xs font-bold text-primary">Enviado por Email</span>
+<span class="text-body-sm text-on-surface-variant">Presupuesto enviado a juan.perez@email.com</span>
+<span class="text-[10px] text-secondary mt-1 italic">14 Oct 2023, 11:30</span>
+</div>
+</div>
+<!-- Timeline Item -->
+<div class="relative">
+<span class="absolute -left-7 top-1 w-3 h-3 rounded-full bg-warning ring-4 ring-white ring-offset-0"></span>
+<div class="flex flex-col">
+<span class="text-label-xs font-bold text-primary">Recordatorio Enviado</span>
+<span class="text-body-sm text-on-surface-variant">Sistema envió recordatorio automático vía WhatsApp.</span>
+<span class="text-[10px] text-secondary mt-1 italic">17 Oct 2023, 09:00</span>
+</div>
+</div>
+<!-- Timeline Item (Current State) -->
+<div class="relative">
+<span class="absolute -left-7 top-1 w-3 h-3 rounded-full bg-outline-variant ring-4 ring-white ring-offset-0"></span>
+<div class="flex flex-col">
+<span class="text-label-xs font-bold text-on-surface">Lectura Confirmada</span>
+<span class="text-body-sm text-on-surface-variant">El paciente ha visualizado el presupuesto desde el portal.</span>
+<span class="text-[10px] text-secondary mt-1 italic">Hoy, 14:22</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Payment Status Mini Card -->
+<div class="bg-surface-container-high border border-border-base rounded p-4">
+<div class="flex justify-between items-center mb-3">
+<span class="text-label-xs font-bold text-secondary uppercase">Estado de Cobro</span>
+<span class="text-body-sm font-bold text-error">Pendiente</span>
+</div>
+<div class="w-full bg-surface-container rounded-full h-1.5 mb-2">
+<div class="bg-success h-1.5 rounded-full" style="width: 2.6%"></div>
+</div>
+<div class="flex justify-between items-center">
+<span class="text-label-xs text-secondary">Cobrado: 65,00 €</span>
+<span class="text-label-xs text-secondary">Restante: 2.385,00 €</span>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Micro-interaction for sidebar tabs -->
+<script>
+        document.querySelectorAll('nav a').forEach(link => {
+            link.addEventListener('click', function(e) {
+                if(!this.classList.contains('sidebar-active')) {
+                    document.querySelectorAll('nav a').forEach(l => {
+                        l.classList.remove('sidebar-active');
+                        l.classList.add('text-on-surface-variant');
+                    });
+                    this.classList.add('sidebar-active');
+                    this.classList.remove('text-on-surface-variant');
+                }
+            });
+        });
+    </script>
+</body></html>

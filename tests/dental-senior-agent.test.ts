@@ -6,6 +6,46 @@ import {
 } from "@/lib/agent/dental-senior-agent";
 
 describe("runDentalSeniorTurn", () => {
+  it("answers clinic address questions directly without opening triage", () => {
+    const general = runDentalSeniorTurn(initialDentalAgentState, "donde estais?");
+    expect(general.reply).toContain("Paseo Duques de Lugo, 16");
+    expect(general.reply).toContain("Carrer Reina Victoria, 49");
+    expect(general.reply).toContain("servicios");
+    expect(general.reply).toContain("cita");
+    expect(general.reply.toLowerCase()).not.toContain("dolor, encias");
+    expect(general.reply.toLowerCase()).not.toContain("pieza rota");
+    expect(general.state.intent).toBeUndefined();
+
+    const elche = runDentalSeniorTurn(initialDentalAgentState, "donde teneis vuestra clinica de Elche??");
+    expect(elche.reply).toContain("Carrer Reina Victoria, 49");
+    expect(elche.reply).toContain("Elche");
+    expect(elche.reply).toContain("miremos una cita en Elche");
+    expect(elche.reply.toLowerCase()).not.toContain("dolor, encias");
+    expect(elche.reply.toLowerCase()).not.toContain("pieza rota");
+    expect(elche.state.intent).toBeUndefined();
+
+    const murcia = runDentalSeniorTurn(initialDentalAgentState, "cual es la direccion de Murcia?");
+    expect(murcia.reply).toContain("Paseo Duques de Lugo, 16");
+    expect(murcia.reply).toContain("miremos una cita en Murcia");
+    expect(murcia.reply.toLowerCase()).not.toContain("cuentame");
+  });
+
+  it("answers doctor and specialty questions before guiding the next step", () => {
+    const turn = runDentalSeniorTurn(initialDentalAgentState, "que doctores y especialidades teneis?");
+
+    expect(turn.reply).toContain("Dr. Ernesto Ruiz Chumilla");
+    expect(turn.reply).toContain("Periodoncia, implantes y cirugia oral");
+    expect(turn.reply).toContain("Dra. Esther Estrada Mallada");
+    expect(turn.reply).toContain("Ortodoncia");
+    expect(turn.reply).toContain("Dra. Laura Herencia Lizaran");
+    expect(turn.reply).toContain("Endodoncia y odontopediatria");
+    expect(turn.reply).toContain("cita con algun doctor en concreto");
+    expect(turn.reply.toLowerCase()).toContain("urgencia");
+    expect(turn.reply.toLowerCase()).not.toContain("dolor, encias");
+    expect(turn.reply.toLowerCase()).not.toContain("pieza rota");
+    expect(turn.state.intent).toBeUndefined();
+  });
+
   it("detects emergency red flags without waiting for a normal booking flow", () => {
     const turn = runDentalSeniorTurn(
       initialDentalAgentState,
@@ -14,7 +54,7 @@ describe("runDentalSeniorTurn", () => {
 
     expect(turn.state.triageLevel).toBe("EMERGENCY");
     expect(turn.state.escalated).toBe(true);
-    expect(turn.state.ready).toBe(true);
+    expect(turn.state.ready).toBe(false);
     expect(turn.state.name).toBe("Urgencia Senior");
     expect(turn.reply).toContain("urgencias");
     expect(buildDentalSummary(turn.state)).toContain("Senales de alarma");
@@ -32,6 +72,78 @@ describe("runDentalSeniorTurn", () => {
     expect(turn.state.detectedSignals).toContain("sensibilidad al frio/calor");
     expect(turn.state.detectedSignals).toContain("dolor al morder");
     expect(turn.reply).toContain("empaste");
+  });
+
+  it("does not mark an urgent inflamed moving tooth as ready without clinic, day and time", () => {
+    const first = runDentalSeniorTurn(initialDentalAgentState, "se me mueve un diente");
+    const second = runDentalSeniorTurn(first.state, "noto inflamacion");
+    const third = runDentalSeniorTurn(second.state, "si");
+    const fourth = runDentalSeniorTurn(third.state, "Alejandro Marti 654718663");
+
+    expect(fourth.state.intent).toBe("periodontics");
+    expect(fourth.state.consent).toBe(true);
+    expect(fourth.state.name).toBe("Alejandro Marti");
+    expect(fourth.state.phone).toBe("654718663");
+    expect(fourth.state.ready).toBe(false);
+    expect(fourth.reply).not.toContain("reservado");
+    expect(fourth.reply).not.toContain("confirmado");
+  });
+
+  it("asks a safety question before consent when a tooth is moving", () => {
+    const turn = runDentalSeniorTurn(initialDentalAgentState, "se me mueve una muela");
+
+    expect(turn.state.intent).toBe("periodontics");
+    expect(turn.state.detectedSignals).toContain("movilidad dental");
+    expect(turn.state.ready).toBe(false);
+    expect(turn.reply.toLowerCase()).toContain("conviene revisarlo pronto");
+    expect(turn.reply).toContain("Te duele, notas inflamacion, sangrado o ha sido por un golpe?");
+    expect(turn.reply.toLowerCase()).not.toContain("gingivitis");
+    expect(turn.reply.toLowerCase()).not.toContain("periodontitis");
+    expect(turn.reply.toLowerCase()).not.toContain("aceptas que guardemos");
+  });
+
+  it("keeps context when the patient answers a symptom with one word", () => {
+    const first = runDentalSeniorTurn(initialDentalAgentState, "se me mueve una muela");
+    const second = runDentalSeniorTurn(first.state, "sangrado");
+
+    expect(second.state.intent).toBe("periodontics");
+    expect(second.state.detectedSignals).toContain("movilidad dental");
+    expect(second.state.detectedSignals).toContain("sangrado de encias");
+    expect(second.reply.toLowerCase()).not.toContain("pieza rota");
+    expect(second.reply.toLowerCase()).not.toContain("implante, ortodoncia");
+    expect(second.reply).toContain("El sangrado es leve o abundante");
+
+    const third = runDentalSeniorTurn(second.state, "leve, sin golpe");
+    expect(third.state.safetyScreened).toBe(true);
+    expect(third.reply).toContain("Aceptas que guardemos tus datos");
+  });
+
+  it("uses natural wording when asking about a dental trauma", () => {
+    const turn = runDentalSeniorTurn(initialDentalAgentState, "Me he dado un golpe en una muela y se mueve");
+
+    expect(turn.state.intent).toBe("trauma");
+    expect(turn.reply).toContain("Cuando te diste el golpe");
+    expect(turn.reply).toContain("cuanto te duele del 0 al 10");
+    expect(turn.reply).toContain("Puedes abrir la boca y tragar bien");
+    expect(turn.reply.toLowerCase()).not.toContain("desde cuando ocurrio el golpe");
+  });
+
+  it("keeps trauma context after pain intensity follow-up", () => {
+    const first = runDentalSeniorTurn(initialDentalAgentState, "Me he dado un golpe en una muela y se mueve");
+    const second = runDentalSeniorTurn(first.state, "ayer y me duele un 7. si puedo tragar");
+
+    expect(second.state.intent).toBe("trauma");
+    expect(second.state.safetyScreened).toBe(false);
+    expect(second.reply).toContain("Y puedes abrir la boca bien?");
+    expect(second.reply.toLowerCase()).not.toContain("pulpitis");
+    expect(second.reply.toLowerCase()).not.toContain("absceso");
+    expect(second.reply.toLowerCase()).not.toContain("frio/calor");
+
+    const third = runDentalSeniorTurn(first.state, "ayer y me duele un 7. puedo tragar y abrir la boca bien");
+    expect(third.state.intent).toBe("trauma");
+    expect(third.state.safetyScreened).toBe(true);
+    expect(third.reply).toContain("Aceptas que guardemos tus datos");
+    expect(third.reply.toLowerCase()).not.toContain("frio/calor");
   });
 
   it("recognizes periodontal symptoms and only gives the price band when asked", () => {
@@ -57,7 +169,7 @@ describe("runDentalSeniorTurn", () => {
   it("can complete a high-value implant pre-booking when the patient gives consent and contact data", () => {
     const turn = runDentalSeniorTurn(
       initialDentalAgentState,
-      "Me falta una muela y quiero valorar implante. Acepto que guarde mis datos. Soy Ana Molina, telefono 612999111. Prefiero Murcia por la tarde."
+      "Me falta una muela y quiero valorar implante. Acepto que guarde mis datos. Soy Ana Molina, telefono 612999111, email ana@example.com. Prefiero Murcia el viernes por la tarde."
     );
 
     expect(turn.state.intent).toBe("implant_price");
@@ -67,6 +179,124 @@ describe("runDentalSeniorTurn", () => {
     expect(turn.state.availability).toContain("tarde");
     expect(turn.state.budget).toBe("desde 1.200 EUR");
     expect(turn.reply).toContain("pre-reserva lista");
+  });
+
+  it("understands plural morning and afternoon replies after asking for availability", () => {
+    const waitingForAvailability = {
+      ...initialDentalAgentState,
+      intent: "implant_price" as const,
+      intentCode: "IMPLANTE_PROTESIS_VALORACION",
+      treatmentNeed: "Implante unitario",
+      budget: "desde 1.200 EUR",
+      estimatedValue: 120000,
+      consent: true,
+      name: "Alex Demo",
+      phone: "612345678",
+      email: "alex@example.com",
+      location: "Murcia centro",
+      clinicalReading: "Pendiente de valoracion para implante.",
+      likelyCauses: ["ausencia de pieza"],
+      safetyScreened: true
+    };
+
+    const mornings = runDentalSeniorTurn(waitingForAvailability, "viernes por las mañanas");
+    const afternoons = runDentalSeniorTurn(waitingForAvailability, "viernes por las tardes");
+
+    expect(mornings.state.availability).toBe("viernes manana");
+    expect(mornings.state.ready).toBe(true);
+    expect(mornings.reply).not.toContain("Que dia y hora");
+
+    expect(afternoons.state.availability).toBe("viernes tarde");
+    expect(afternoons.state.ready).toBe(true);
+    expect(afternoons.reply).not.toContain("Que dia y hora");
+  });
+
+  it("understands short day and hour replies after asking for availability", () => {
+    const waitingForAvailability = {
+      ...initialDentalAgentState,
+      intent: "implant_price" as const,
+      intentCode: "IMPLANTE_PROTESIS_VALORACION",
+      treatmentNeed: "Implante unitario",
+      budget: "desde 1.200 EUR",
+      estimatedValue: 120000,
+      consent: true,
+      name: "Alex Demo",
+      phone: "612345678",
+      email: "alex@example.com",
+      location: "Murcia centro",
+      clinicalReading: "Pendiente de valoracion para implante.",
+      likelyCauses: ["ausencia de pieza"],
+      safetyScreened: true
+    };
+
+    const turn = runDentalSeniorTurn(waitingForAvailability, "lunes 10");
+
+    expect(turn.state.availability).toBe("lunes 10:00");
+    expect(turn.state.ready).toBe(true);
+    expect(turn.reply).not.toContain("Que dia y hora");
+  });
+
+  it("understands tomorrow afternoon as a concrete availability", () => {
+    const waitingForAvailability = {
+      ...initialDentalAgentState,
+      intent: "trauma" as const,
+      intentCode: "TRAUMA_DENTAL",
+      treatmentNeed: "Urgencia dental",
+      budget: "desde 70 EUR",
+      estimatedValue: 30000,
+      escalated: true,
+      consent: true,
+      name: "Paquito Demo",
+      phone: "654718663",
+      email: "paquito@example.com",
+      location: "Murcia centro",
+      triageLevel: "URGENT_24H" as const,
+      triageLabel: "Urgencia 24h",
+      clinicalReading: "Golpe dental con movilidad a valorar.",
+      likelyCauses: ["luxacion", "fractura dental"],
+      detectedSignals: ["movilidad dental"],
+      confidence: "Media" as const,
+      safetyScreened: true
+    };
+
+    const turn = runDentalSeniorTurn(waitingForAvailability, "manana por la tarde");
+
+    expect(turn.state.availability).toBe("manana tarde");
+    expect(turn.state.ready).toBe(true);
+    expect(turn.reply).not.toContain("Que dia y hora");
+  });
+
+  it("offers afternoon slot options when the patient asks what days are available", () => {
+    const waitingForAvailability = {
+      ...initialDentalAgentState,
+      intent: "trauma" as const,
+      intentCode: "TRAUMA_DENTAL",
+      treatmentNeed: "Urgencia dental",
+      budget: "desde 70 EUR",
+      estimatedValue: 30000,
+      escalated: true,
+      consent: true,
+      name: "Alejandro Marti",
+      phone: "654718663",
+      email: "alejandro@example.com",
+      location: "Murcia centro",
+      triageLevel: "URGENT_24H" as const,
+      triageLabel: "Urgencia 24h",
+      clinicalReading: "Golpe dental con movilidad a valorar.",
+      likelyCauses: ["luxacion", "fractura dental"],
+      detectedSignals: ["movilidad dental"],
+      confidence: "Media" as const,
+      safetyScreened: true
+    };
+
+    const turn = runDentalSeniorTurn(waitingForAvailability, "que dias tienes por la tarde??");
+
+    expect(turn.state.availability).toBe("");
+    expect(turn.reply).toContain("Te puedo proponer estos huecos de tarde en Murcia centro");
+    expect(turn.reply).toContain("1.");
+    expect(turn.reply).toContain("2.");
+    expect(turn.reply).toContain("Responde con 1, 2 o 3");
+    expect(turn.reply).not.toContain("Que dia y hora o franja te encaja");
   });
 
   it("does not repeat the price note when asking for consent", () => {
@@ -107,6 +337,60 @@ describe("runDentalSeniorTurn", () => {
     expect(second.reply).not.toContain("podria ser");
   });
 
+  it("treats aesthetic options as a category, not only whitening", () => {
+    const first = runDentalSeniorTurn(initialDentalAgentState, "Quiero un presupuesto");
+    const second = runDentalSeniorTurn(first.state, "Estetica, que opciones tienes?");
+
+    expect(second.state.intent).toBe("cosmetic_dentistry");
+    expect(second.state.treatmentNeed).toBe("Estetica dental");
+    expect(second.reply.toLowerCase()).toContain("blanqueamiento");
+    expect(second.reply.toLowerCase()).toContain("carillas");
+    expect(second.reply.toLowerCase()).toContain("digital smile design");
+    expect(second.reply.toLowerCase()).toContain("cual te interesa mas");
+    expect(second.reply.toLowerCase()).not.toContain("no es solo");
+    expect(second.reply.toLowerCase()).not.toContain("aceptas que guardemos");
+    expect(second.state.budget).toBe("valoracion sin coste");
+  });
+
+  it("keeps whitening as its own treatment when the patient asks specifically for it", () => {
+    const turn = runDentalSeniorTurn(initialDentalAgentState, "Quiero presupuesto para blanqueamiento");
+
+    expect(turn.state.intent).toBe("whitening");
+    expect(turn.state.treatmentNeed).toBe("Blanqueamiento");
+    expect(turn.reply).toContain("280 EUR");
+  });
+
+  it("answers cleaning price as hygiene, not as a generic first visit", () => {
+    const turn = runDentalSeniorTurn(initialDentalAgentState, "Cuanto vale una limpieza de boca?");
+
+    expect(turn.state.intent).toBe("reactivation");
+    expect(turn.state.treatmentNeed).toBe("Higiene dental");
+    expect(turn.reply).toContain("55 EUR");
+    expect(turn.reply.toLowerCase()).toContain("encia inflamada");
+    expect(turn.reply.toLowerCase()).not.toContain("primera visita");
+  });
+
+  it("keeps gum symptoms in periodontics even if the patient mentions cleaning", () => {
+    const turn = runDentalSeniorTurn(
+      initialDentalAgentState,
+      "Creo que necesito limpieza, me sangran las encias y tengo mal aliento"
+    );
+
+    expect(turn.state.intent).toBe("periodontics");
+    expect(turn.state.treatmentNeed).toBe("Periodoncia");
+    expect(turn.reply.toLowerCase()).toContain("gingivitis");
+  });
+
+  it("does not reduce orthodontics to invisible aligners when the patient asks for brackets", () => {
+    const turn = runDentalSeniorTurn(initialDentalAgentState, "Cuanto cuestan los brackets o el aparato?");
+
+    expect(turn.state.intent).toBe("orthodontics");
+    expect(turn.state.treatmentNeed).toBe("Ortodoncia");
+    expect(turn.reply).toContain("brackets");
+    expect(turn.reply).toContain("1.800 EUR");
+    expect(turn.reply.toLowerCase()).toContain("estudio digital");
+  });
+
   it("uses the commercial copy when quote and treatment arrive in one message", () => {
     const turn = runDentalSeniorTurn(initialDentalAgentState, "Quiero presupuesto para un implante");
     expect(turn.state.intent).toBe("implant_price");
@@ -119,7 +403,7 @@ describe("runDentalSeniorTurn", () => {
     const first = runDentalSeniorTurn(initialDentalAgentState, "Quiero un presupuesto");
     const second = runDentalSeniorTurn(
       first.state,
-      "Para un implante. Acepto que guardeis mis datos. Soy Rosa Gil, telefono 622333444. Murcia por la tarde."
+      "Para un implante. Acepto que guardeis mis datos. Soy Rosa Gil, telefono 622333444, email rosa@example.com. Murcia el viernes por la tarde."
     );
     expect(second.state.ready).toBe(true);
     expect(second.reply).toContain("pre-reserva lista");
@@ -136,6 +420,7 @@ describe("runDentalSeniorTurn", () => {
     const consented = runDentalSeniorTurn(emergency.state, "me vale");
     expect(consented.state.consent).toBe(true);
     expect(consented.reply.toLowerCase()).toContain("nombre");
+    expect(consented.reply.toLowerCase()).not.toContain("telefono");
 
     const named = runDentalSeniorTurn(consented.state, "Alejandro Marti");
     expect(named.state.name).toBe("Alejandro Marti");
@@ -151,6 +436,76 @@ describe("runDentalSeniorTurn", () => {
     const second = runDentalSeniorTurn(first.state, "Alejandro Marti, 655444333");
     expect(second.state.name).toBe("Alejandro Marti");
     expect(second.state.phone).toBe("655444333");
+  });
+
+  it("asks booking data one field at a time after consent", () => {
+    const first = runDentalSeniorTurn(initialDentalAgentState, "Me falta una muela y quiero implante");
+    const consented = runDentalSeniorTurn(first.state, "acepto");
+    expect(consented.reply).toContain("Y tu nombre y apellidos?");
+    expect(consented.reply.toLowerCase()).not.toContain("telefono");
+    expect(consented.reply.toLowerCase()).not.toContain("murcia");
+    expect(consented.reply.toLowerCase()).not.toContain("disponibilidad");
+
+    const named = runDentalSeniorTurn(consented.state, "Alejandro Marti");
+    expect(named.reply).toContain("Y tu email");
+    expect(named.reply.toLowerCase()).not.toContain("telefono");
+    expect(named.reply.toLowerCase()).not.toContain("murcia");
+    expect(named.reply.toLowerCase()).not.toContain("disponibilidad");
+
+    const emailed = runDentalSeniorTurn(named.state, "alejandro@example.com");
+    expect(emailed.state.email).toBe("alejandro@example.com");
+    expect(emailed.reply).toContain("Y un telefono de contacto");
+    expect(emailed.reply.toLowerCase()).not.toContain("murcia");
+    expect(emailed.reply.toLowerCase()).not.toContain("disponibilidad");
+
+    const phoned = runDentalSeniorTurn(emailed.state, "654718663");
+    expect(phoned.state.phone).toBe("654718663");
+    expect(phoned.reply).toContain("Te viene mejor");
+    expect(phoned.reply).toContain("Murcia centro");
+    expect(phoned.reply.toLowerCase()).not.toContain("disponibilidad");
+
+    const located = runDentalSeniorTurn(phoned.state, "Murcia");
+    expect(located.reply).toContain("Te puedo proponer estos huecos");
+    expect(located.reply).toContain("1.");
+    expect(located.reply).toContain("2.");
+    expect(located.reply).toContain("Responde con 1, 2 o 3");
+    expect(located.reply).not.toContain("Que dia y hora");
+    expect(located.state.offeredAvailabilityOptions).toHaveLength(3);
+    expect(located.state.ready).toBe(false);
+  });
+
+  it("does not advance to phone when the email is malformed", () => {
+    const first = runDentalSeniorTurn(initialDentalAgentState, "Me falta una muela y quiero implante");
+    const consented = runDentalSeniorTurn(first.state, "acepto");
+    const named = runDentalSeniorTurn(consented.state, "Alejandro Marti");
+    const invalidEmail = runDentalSeniorTurn(named.state, "alejandro@");
+
+    expect(invalidEmail.state.email).toBe("");
+    expect(invalidEmail.reply).toContain("Ese email no me encaja");
+    expect(invalidEmail.reply.toLowerCase()).not.toContain("telefono");
+    expect(invalidEmail.state.ready).toBe(false);
+  });
+
+  it("captures uppercase name separated from phone with a dash", () => {
+    const waitingForContact = {
+      ...initialDentalAgentState,
+      intent: "orthodontics" as const,
+      intentCode: "ORTODONCIA_ESTUDIO",
+      treatmentNeed: "Ortodoncia",
+      budget: "desde 1.800 EUR",
+      estimatedValue: 180000,
+      consent: true,
+      missingClinicalData: ["Es para ti o para un nino?"],
+      clinicalReading: "Pendiente de estudio digital.",
+      likelyCauses: ["apinamiento"]
+    };
+
+    const turn = runDentalSeniorTurn(waitingForContact, "ALEX JANDER - 654718663");
+
+    expect(turn.state.name).toBe("ALEX JANDER");
+    expect(turn.state.phone).toBe("654718663");
+    expect(turn.reply.toLowerCase()).not.toContain("nombre");
+    expect(turn.reply.toLowerCase()).not.toContain("apellidos");
   });
 
   it("does not store a clinical answer as the name when the pending question is clinical", () => {
@@ -180,7 +535,7 @@ describe("runDentalSeniorTurn", () => {
   it("does not repeat the booking confirmation once the pre-booking is done", () => {
     const ready = runDentalSeniorTurn(
       initialDentalAgentState,
-      "Me falta una muela y quiero implante. Acepto que guarde mis datos. Soy Ana Molina, telefono 612999111. Prefiero Murcia por la tarde."
+      "Me falta una muela y quiero implante. Acepto que guarde mis datos. Soy Ana Molina, telefono 612999111, email ana@example.com. Prefiero Murcia el viernes por la tarde."
     );
     expect(ready.state.ready).toBe(true);
     expect(ready.reply).toContain("pre-reserva lista");

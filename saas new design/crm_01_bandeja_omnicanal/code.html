@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+
+<html class="light" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>DENTIA - CRM Bandeja Omnicanal</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "outline": "#717880",
+                        "border-subtle": "#E8EBEE",
+                        "surface-bright": "#f8f9fe",
+                        "tertiary-container": "#824701",
+                        "secondary": "#54606b",
+                        "secondary-fixed": "#d8e4f1",
+                        "on-tertiary-fixed-variant": "#6c3a00",
+                        "on-secondary-container": "#58646f",
+                        "primary": "#004268",
+                        "inverse-on-surface": "#eff1f5",
+                        "surface-container-high": "#e7e8ed",
+                        "success": "#278561",
+                        "tertiary": "#613300",
+                        "surface-container-low": "#f2f3f8",
+                        "on-primary-fixed-variant": "#004a75",
+                        "on-background": "#191c1f",
+                        "text-primary": "#17212B",
+                        "error": "#C53030",
+                        "on-secondary": "#ffffff",
+                        "background": "#F5F6F7",
+                        "secondary-fixed-dim": "#bcc8d4",
+                        "surface-variant": "#e1e2e7",
+                        "tertiary-fixed-dim": "#ffb779",
+                        "primary-fixed": "#cde5ff",
+                        "on-secondary-fixed": "#111d26",
+                        "primary-container": "#005a8c",
+                        "border-base": "#D9DEE3",
+                        "surface-alt": "#F0F2F4",
+                        "surface-tint": "#166395",
+                        "on-surface-variant": "#41474f",
+                        "on-primary-fixed": "#001d32",
+                        "inverse-primary": "#95ccff",
+                        "on-error-container": "#93000a",
+                        "surface-dim": "#d8dadf",
+                        "on-tertiary": "#ffffff",
+                        "tertiary-fixed": "#ffdcc1",
+                        "on-primary-container": "#9fd0ff",
+                        "secondary-container": "#d5e1ee",
+                        "inverse-surface": "#2e3134",
+                        "outline-variant": "#c1c7d0",
+                        "warning": "#B37D00",
+                        "error-container": "#ffdad6",
+                        "surface": "#FFFFFF",
+                        "on-secondary-fixed-variant": "#3c4852",
+                        "primary-fixed-dim": "#95ccff",
+                        "on-surface": "#191c1f",
+                        "on-primary": "#ffffff",
+                        "surface-container": "#eceef2",
+                        "on-tertiary-container": "#ffbe87",
+                        "surface-container-lowest": "#ffffff",
+                        "on-tertiary-fixed": "#2e1500",
+                        "on-error": "#ffffff",
+                        "surface-container-highest": "#e1e2e7"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "header-height": "52px",
+                        "padding-compact": "0.75rem",
+                        "sidebar-collapsed": "64px",
+                        "sidebar-width": "224px",
+                        "padding-base": "1rem",
+                        "gutter": "1rem"
+                    },
+                    "fontFamily": {
+                        "label-xs": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "body-sm": ["Inter"],
+                        "headline-lg": ["Inter"],
+                        "body-md": ["Inter"]
+                    },
+                    "fontSize": {
+                        "label-xs": ["10px", {"lineHeight": "14px", "letterSpacing": "0.02em", "fontWeight": "500"}],
+                        "headline-md": ["16px", {"lineHeight": "24px", "fontWeight": "600"}],
+                        "body-sm": ["11px", {"lineHeight": "16px", "fontWeight": "400"}],
+                        "headline-lg": ["22px", {"lineHeight": "32px", "fontWeight": "600"}],
+                        "body-md": ["12px", {"lineHeight": "18px", "fontWeight": "400"}]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; background-color: #F5F6F7; color: #191c1f; }
+        .material-symbols-outlined { font-size: 18px; vertical-align: middle; }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #D9DEE3; border-radius: 10px; }
+        .chat-bubble-patient { position: relative; background: #FFFFFF; border: 1px solid #D9DEE3; border-radius: 4px 12px 12px 12px; }
+        .chat-bubble-doctor { position: relative; background: #004268; color: #FFFFFF; border-radius: 12px 12px 4px 12px; }
+    </style>
+</head>
+<body class="flex h-screen overflow-hidden">
+<!-- SideNavBar (Shared Component) -->
+<aside class="w-sidebar-width h-screen fixed left-0 top-0 border-r border-border-base bg-surface flex flex-col py-4 overflow-y-auto z-50">
+<div class="px-6 mb-8">
+<h1 class="font-headline-md text-headline-md font-bold text-primary">DENTIA</h1>
+<p class="font-body-sm text-body-sm text-secondary opacity-70">Dental Software</p>
+</div>
+<nav class="flex-1 space-y-1">
+<a class="flex items-center px-6 py-2 gap-3 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined">home</span>
+<span class="font-body-md text-body-md">Inicio</span>
+</a>
+<a class="flex items-center px-6 py-2 gap-3 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined">calendar_month</span>
+<span class="font-body-md text-body-md">Agenda</span>
+</a>
+<a class="flex items-center px-6 py-2 gap-3 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined">group</span>
+<span class="font-body-md text-body-md">Pacientes</span>
+</a>
+<a class="flex items-center px-6 py-2 gap-3 text-primary font-semibold border-r-2 border-primary bg-surface-alt" href="#">
+<span class="material-symbols-outlined">account_tree</span>
+<span class="font-body-md text-body-md">CRM</span>
+</a>
+<a class="flex items-center px-6 py-2 gap-3 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined">payments</span>
+<span class="font-body-md text-body-md">Finanzas</span>
+</a>
+<a class="flex items-center px-6 py-2 gap-3 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined">inventory_2</span>
+<span class="font-body-md text-body-md">Inventario</span>
+</a>
+<a class="flex items-center px-6 py-2 gap-3 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors mt-auto pt-4 border-t border-border-subtle" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-body-md text-body-md">Configuración</span>
+</a>
+</nav>
+</aside>
+<!-- Main Content Area -->
+<main class="ml-sidebar-width flex-1 flex flex-col h-full bg-background relative">
+<!-- TopNavBar (Shared Component) -->
+<header class="h-header-height w-full bg-surface border-b border-border-base flex items-center justify-between px-gutter z-40">
+<div class="flex items-center gap-6">
+<div class="flex items-center gap-2 text-primary font-bold border-b-2 border-primary pb-1 cursor-pointer">
+<span class="font-body-md text-body-md">Sede Centro</span>
+</div>
+<div class="flex items-center gap-2 text-on-surface-variant hover:text-primary transition-colors cursor-pointer">
+<span class="font-body-md text-body-md">Sede Playa</span>
+</div>
+<div class="relative ml-4">
+<span class="material-symbols-outlined absolute left-2 top-1/2 -translate-y-1/2 text-outline">search</span>
+<input class="h-8 pl-8 pr-4 bg-surface-container-low border border-border-base rounded-lg text-body-md focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all w-64" placeholder="Buscar paciente o mensaje..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="h-8 px-4 bg-primary text-on-primary font-body-md text-body-md rounded-lg active:scale-95 transition-transform flex items-center gap-2">
+<span class="material-symbols-outlined !text-[16px]">add</span>
+                    Crear
+                </button>
+<div class="flex items-center gap-3 border-l border-border-subtle pl-4 text-on-surface-variant">
+<span class="material-symbols-outlined cursor-pointer hover:text-primary">notifications</span>
+<div class="w-8 h-8 rounded-full bg-primary-container flex items-center justify-center text-on-primary-container cursor-pointer overflow-hidden">
+<span class="material-symbols-outlined">account_circle</span>
+</div>
+</div>
+</div>
+</header>
+<!-- CRM Workspace Container -->
+<div class="flex-1 flex overflow-hidden">
+<!-- Column 1: Filters & Folders -->
+<div class="w-56 bg-surface border-r border-border-base flex flex-col py-4">
+<div class="px-4 mb-6">
+<h2 class="font-label-xs text-label-xs text-outline uppercase tracking-wider mb-3">CANALES</h2>
+<ul class="space-y-1">
+<li class="flex items-center justify-between px-2 py-1.5 rounded bg-primary-fixed text-on-primary-fixed font-semibold cursor-pointer">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined !text-[18px]">chat</span>
+<span class="font-body-md text-body-md">WhatsApp</span>
+</div>
+<span class="text-label-xs bg-primary text-white px-1.5 rounded-full">12</span>
+</li>
+<li class="flex items-center justify-between px-2 py-1.5 rounded hover:bg-surface-alt text-on-surface-variant cursor-pointer transition-colors">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined !text-[18px]">mail</span>
+<span class="font-body-md text-body-md">Email</span>
+</div>
+<span class="text-label-xs text-outline">4</span>
+</li>
+<li class="flex items-center justify-between px-2 py-1.5 rounded hover:bg-surface-alt text-on-surface-variant cursor-pointer transition-colors">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined !text-[18px]">sms</span>
+<span class="font-body-md text-body-md">SMS</span>
+</div>
+</li>
+<li class="flex items-center justify-between px-2 py-1.5 rounded hover:bg-surface-alt text-on-surface-variant cursor-pointer transition-colors">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined !text-[18px]">call</span>
+<span class="font-body-md text-body-md">Llamadas</span>
+</div>
+</li>
+<li class="flex items-center justify-between px-2 py-1.5 rounded hover:bg-surface-alt text-on-surface-variant cursor-pointer transition-colors">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined !text-[18px]">language</span>
+<span class="font-body-md text-body-md">Portal</span>
+</div>
+</li>
+</ul>
+</div>
+<div class="px-4">
+<h2 class="font-label-xs text-label-xs text-outline uppercase tracking-wider mb-3">ESTADOS</h2>
+<ul class="space-y-1">
+<li class="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-surface-alt text-on-surface-variant cursor-pointer transition-colors">
+<div class="w-2 h-2 rounded-full bg-error"></div>
+<span class="font-body-md text-body-md">Nuevo</span>
+</li>
+<li class="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-surface-alt text-on-surface-variant cursor-pointer transition-colors">
+<div class="w-2 h-2 rounded-full bg-primary"></div>
+<span class="font-body-md text-body-md">Abierto</span>
+</li>
+<li class="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-surface-alt text-on-surface-variant cursor-pointer transition-colors">
+<div class="w-2 h-2 rounded-full bg-warning"></div>
+<span class="font-body-md text-body-md">Pendiente</span>
+</li>
+<li class="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-surface-alt text-on-surface-variant cursor-pointer transition-colors">
+<div class="w-2 h-2 rounded-full bg-success"></div>
+<span class="font-body-md text-body-md">Resuelto</span>
+</li>
+</ul>
+</div>
+</div>
+<!-- Column 2: Conversation List -->
+<div class="w-80 bg-white border-r border-border-base flex flex-col h-full">
+<div class="p-4 border-b border-border-subtle flex items-center justify-between">
+<h2 class="font-headline-md text-headline-md">Mensajes</h2>
+<span class="material-symbols-outlined text-outline cursor-pointer">filter_list</span>
+</div>
+<div class="flex-1 overflow-y-auto custom-scrollbar">
+<!-- Conversation Item Active -->
+<div class="p-4 border-b border-border-subtle bg-surface-container-low border-l-4 border-l-primary cursor-pointer">
+<div class="flex justify-between items-start mb-1">
+<h3 class="font-headline-md text-[13px] text-primary">Juan Pérez</h3>
+<span class="text-label-xs text-outline">10:45 AM</span>
+</div>
+<p class="text-body-sm text-secondary truncate mb-2">Hola, ¿podrían confirmarme la cita de mañana a las 16:00? Gracias.</p>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined !text-[14px] text-success">chat</span>
+<span class="text-label-xs bg-error-container text-on-error-container px-1.5 py-0.5 rounded uppercase">Urgente</span>
+</div>
+</div>
+<!-- Conversation Item -->
+<div class="p-4 border-b border-border-subtle hover:bg-surface-alt cursor-pointer transition-colors">
+<div class="flex justify-between items-start mb-1">
+<h3 class="font-headline-md text-[13px] text-text-primary">Marta Sánchez</h3>
+<span class="text-label-xs text-outline">09:12 AM</span>
+</div>
+<p class="text-body-sm text-secondary truncate mb-2">Gracias por la atención de hoy, me siento mucho mejor.</p>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined !text-[14px] text-primary">mail</span>
+<span class="text-label-xs bg-surface-variant text-on-surface-variant px-1.5 py-0.5 rounded uppercase">Resuelto</span>
+</div>
+</div>
+<!-- Conversation Item -->
+<div class="p-4 border-b border-border-subtle hover:bg-surface-alt cursor-pointer transition-colors">
+<div class="flex justify-between items-start mb-1">
+<h3 class="font-headline-md text-[13px] text-text-primary">Carlos Ruiz</h3>
+<span class="text-label-xs text-outline">Ayer</span>
+</div>
+<p class="text-body-sm text-secondary truncate mb-2">¿Cuál es el presupuesto para la ortodoncia invisible?</p>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined !text-[14px] text-success">chat</span>
+<span class="text-label-xs bg-warning-container text-on-warning-container px-1.5 py-0.5 rounded uppercase">Seguimiento</span>
+</div>
+</div>
+<!-- Repeat for depth -->
+<div class="p-4 border-b border-border-subtle hover:bg-surface-alt cursor-pointer transition-colors">
+<div class="flex justify-between items-start mb-1">
+<h3 class="font-headline-md text-[13px] text-text-primary">Elena Torres</h3>
+<span class="text-label-xs text-outline">Ayer</span>
+</div>
+<p class="text-body-sm text-secondary truncate mb-2">He perdido mi retenedor, ¿puedo pasarme hoy mismo?</p>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined !text-[14px] text-success">chat</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Column 3: Active Conversation Chat -->
+<div class="flex-1 bg-surface-bright flex flex-col">
+<!-- Chat Header -->
+<div class="h-14 px-6 border-b border-border-base flex items-center justify-between bg-surface">
+<div class="flex items-center gap-3">
+<div class="w-8 h-8 rounded-full bg-secondary-fixed flex items-center justify-center text-primary font-bold text-label-xs">JP</div>
+<div>
+<h2 class="font-headline-md text-headline-md text-primary">Juan Pérez</h2>
+<p class="text-label-xs text-success flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-success"></span> En línea (WhatsApp)</p>
+</div>
+</div>
+<div class="flex items-center gap-4 text-outline">
+<span class="material-symbols-outlined cursor-pointer hover:text-primary">videocam</span>
+<span class="material-symbols-outlined cursor-pointer hover:text-primary">call</span>
+<span class="material-symbols-outlined cursor-pointer hover:text-primary">more_vert</span>
+</div>
+</div>
+<!-- Chat Messages Area -->
+<div class="flex-1 p-6 overflow-y-auto custom-scrollbar flex flex-col gap-4">
+<div class="flex justify-center my-2">
+<span class="text-label-xs bg-surface-variant px-3 py-1 rounded-full text-on-surface-variant">HOY</span>
+</div>
+<!-- Patient Message -->
+<div class="flex flex-col items-start max-w-[80%]">
+<div class="chat-bubble-patient p-3 shadow-sm">
+<p class="font-body-md text-body-md">Hola, ¿podrían confirmarme la cita de mañana a las 16:00? Gracias.</p>
+</div>
+<span class="text-label-xs text-outline mt-1 ml-1">10:45 AM</span>
+</div>
+<!-- Doctor Message -->
+<div class="flex flex-col items-end max-w-[80%] self-end">
+<div class="chat-bubble-doctor p-3">
+<p class="font-body-md text-body-md">Hola Juan, un momento por favor. Voy a verificarlo en la agenda.</p>
+</div>
+<div class="flex items-center gap-1 mt-1 mr-1">
+<span class="text-label-xs text-outline">10:46 AM</span>
+<span class="material-symbols-outlined !text-[14px] text-primary" style="font-variation-settings: 'FILL' 1;">done_all</span>
+</div>
+</div>
+<!-- Patient Message -->
+<div class="flex flex-col items-start max-w-[80%]">
+<div class="chat-bubble-patient p-3 shadow-sm">
+<p class="font-body-md text-body-md">De acuerdo, espero. También quería preguntar si debo traer la radiografía que me hice en el hospital.</p>
+</div>
+<span class="text-label-xs text-outline mt-1 ml-1">10:47 AM</span>
+</div>
+</div>
+<!-- Chat Input Area -->
+<div class="p-4 bg-surface border-t border-border-base">
+<!-- Quick Templates -->
+<div class="flex gap-2 mb-3 overflow-x-auto pb-1 no-scrollbar">
+<button class="whitespace-nowrap px-3 py-1 rounded border border-border-subtle bg-surface-container-low text-label-xs text-secondary hover:border-primary hover:text-primary transition-colors">Confirmación Cita</button>
+<button class="whitespace-nowrap px-3 py-1 rounded border border-border-subtle bg-surface-container-low text-label-xs text-secondary hover:border-primary hover:text-primary transition-colors">Recordatorio Pago</button>
+<button class="whitespace-nowrap px-3 py-1 rounded border border-border-subtle bg-surface-container-low text-label-xs text-secondary hover:border-primary hover:text-primary transition-colors">Post-Tratamiento</button>
+<button class="whitespace-nowrap px-3 py-1 rounded border border-border-subtle bg-surface-container-low text-label-xs text-secondary hover:border-primary hover:text-primary transition-colors">Bienvenida</button>
+</div>
+<!-- Text Box -->
+<div class="relative bg-surface-container border border-border-base rounded-xl p-2 focus-within:border-primary transition-all">
+<textarea class="w-full h-20 bg-transparent border-none focus:ring-0 resize-none text-body-md font-body-md px-2" placeholder="Escribe un mensaje..."></textarea>
+<div class="flex items-center justify-between px-2 mt-1">
+<div class="flex gap-3 text-outline">
+<span class="material-symbols-outlined cursor-pointer hover:text-primary">sentiment_satisfied</span>
+<span class="material-symbols-outlined cursor-pointer hover:text-primary">attach_file</span>
+<span class="material-symbols-outlined cursor-pointer hover:text-primary">mic</span>
+</div>
+<button class="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center hover:bg-primary-container transition-colors shadow-sm active:scale-95">
+<span class="material-symbols-outlined">send</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Column 4: Patient Context Panel -->
+<div class="w-72 bg-white border-l border-border-base flex flex-col h-full">
+<!-- Patient Profile Summary -->
+<div class="p-6 flex flex-col items-center text-center border-b border-border-subtle">
+<div class="w-20 h-20 rounded-full mb-4 ring-2 ring-offset-2 ring-primary-fixed overflow-hidden relative">
+<img class="w-full h-full object-cover" data-alt="A clean, professional close-up portrait of a male patient in his early 40s for a dental software profile. The lighting is soft and natural, typical of a bright clinical office. He is smiling warmly, looking directly into the camera. The background is a blurred dental office with subtle teal and white tones, matching a professional and sanitary healthcare environment." src="https://lh3.googleusercontent.com/aida-public/AB6AXuATZbU1qAw2zkDEpy-Qs7eiTpWAluQL2Sus-BiUGGWjwrMCGE-TXx1p7lYPEyVMhNJOjxkXSgWow_2DXZzik_ETegS-dBI2Ook6mDop5LA735qZB41CqzrRUrYJQcVEkohC37u49B1nw6CugSyShx7hSusSXlptvRJjLKn5YCwFp3nGsymmysEVAe_dM7H5GkX-HgiTmTDSw_BscJXg1k_tB0kfMo1bulG644P7kskSocYnz7Ku1NjJ"/>
+</div>
+<h3 class="font-headline-lg text-headline-lg text-primary">Juan Pérez</h3>
+<p class="text-body-sm text-secondary">ID: 48.291.002-K</p>
+<div class="flex gap-2 mt-3">
+<span class="text-label-xs bg-success/10 text-success px-2 py-0.5 rounded border border-success/20">Asegurado</span>
+<span class="text-label-xs bg-primary/10 text-primary px-2 py-0.5 rounded border border-primary/20">Frecuente</span>
+</div>
+</div>
+<!-- Patient Info Sections -->
+<div class="flex-1 overflow-y-auto custom-scrollbar p-5 space-y-6">
+<!-- Section: Next Appointment -->
+<div class="p-4 bg-surface-container-low rounded border border-border-subtle">
+<h4 class="font-label-xs text-label-xs text-outline uppercase mb-3">PRÓXIMA CITA</h4>
+<div class="flex items-start gap-3">
+<span class="material-symbols-outlined text-primary">event</span>
+<div>
+<p class="font-headline-md text-[13px]">Mañana, 16:00</p>
+<p class="text-body-sm text-secondary">Limpieza y Revisión</p>
+<p class="text-body-sm text-outline">Dr. Martínez - Box 2</p>
+</div>
+</div>
+</div>
+<!-- Section: History -->
+<div>
+<h4 class="font-label-xs text-label-xs text-outline uppercase mb-3">HISTORIAL RECIENTE</h4>
+<div class="space-y-3">
+<div class="flex gap-3">
+<div class="mt-1 w-1.5 h-1.5 rounded-full bg-border-base"></div>
+<div>
+<p class="text-body-sm font-semibold">Endodoncia pieza 14</p>
+<p class="text-label-xs text-outline">15 Oct, 2023</p>
+</div>
+</div>
+<div class="flex gap-3">
+<div class="mt-1 w-1.5 h-1.5 rounded-full bg-border-base"></div>
+<div>
+<p class="text-body-sm font-semibold">Extracción cordal</p>
+<p class="text-label-xs text-outline">22 Sep, 2023</p>
+</div>
+</div>
+</div>
+<button class="mt-4 text-primary font-body-md text-body-md flex items-center gap-1 hover:underline">
+                            Ver historia completa <span class="material-symbols-outlined !text-[14px]">arrow_forward</span>
+</button>
+</div>
+<!-- Section: Clinical Alerts -->
+<div>
+<h4 class="font-label-xs text-label-xs text-outline uppercase mb-3">ALERTAS CLÍNICAS</h4>
+<div class="flex flex-wrap gap-2">
+<span class="px-2 py-1 bg-error-container text-on-error-container text-label-xs rounded flex items-center gap-1">
+<span class="material-symbols-outlined !text-[12px]" style="font-variation-settings: 'FILL' 1;">warning</span> Alergia Penicilina
+                            </span>
+<span class="px-2 py-1 bg-warning-container text-on-warning-container text-label-xs rounded flex items-center gap-1">
+<span class="material-symbols-outlined !text-[12px]">info</span> Hipertensión
+                            </span>
+</div>
+</div>
+</div>
+<!-- Footer Action -->
+<div class="p-4 border-t border-border-subtle bg-surface">
+<button class="w-full py-2 border border-primary text-primary font-headline-md text-[13px] rounded hover:bg-primary hover:text-white transition-all flex items-center justify-center gap-2">
+<span class="material-symbols-outlined !text-[18px]">open_in_new</span> Ir a Ficha Clínica
+                    </button>
+</div>
+</div>
+</div>
+</main>
+<script>
+        // Simple micro-interaction for conversation selection
+        const conversationItems = document.querySelectorAll('.w-80 .flex-1 > div');
+        conversationItems.forEach(item => {
+            item.addEventListener('click', () => {
+                conversationItems.forEach(i => {
+                    i.classList.remove('bg-surface-container-low', 'border-l-4', 'border-l-primary');
+                    i.querySelector('h3').classList.replace('text-primary', 'text-text-primary');
+                });
+                item.classList.add('bg-surface-container-low', 'border-l-4', 'border-l-primary');
+                item.querySelector('h3').classList.replace('text-text-primary', 'text-primary');
+            });
+        });
+    </script>
+</body></html>

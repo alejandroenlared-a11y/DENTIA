@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+
+<html class="light" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>DENTIA - Detalle de Cita</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "surface": "#FFFFFF",
+                    "warning": "#B37D00",
+                    "error-container": "#ffdad6",
+                    "on-primary": "#ffffff",
+                    "surface-container": "#eceef2",
+                    "on-tertiary-container": "#ffbe87",
+                    "on-secondary-fixed-variant": "#3c4852",
+                    "on-surface": "#191c1f",
+                    "primary-fixed-dim": "#95ccff",
+                    "surface-container-highest": "#e1e2e7",
+                    "on-tertiary-fixed": "#2e1500",
+                    "surface-container-lowest": "#ffffff",
+                    "on-error": "#ffffff",
+                    "primary-container": "#005a8c",
+                    "tertiary-fixed-dim": "#ffb779",
+                    "primary-fixed": "#cde5ff",
+                    "on-secondary-fixed": "#111d26",
+                    "on-primary-fixed": "#001d32",
+                    "on-surface-variant": "#41474f",
+                    "inverse-primary": "#95ccff",
+                    "border-base": "#D9DEE3",
+                    "surface-alt": "#F0F2F4",
+                    "surface-tint": "#166395",
+                    "on-tertiary": "#ffffff",
+                    "on-primary-container": "#9fd0ff",
+                    "tertiary-fixed": "#ffdcc1",
+                    "on-error-container": "#93000a",
+                    "surface-dim": "#d8dadf",
+                    "inverse-surface": "#2e3134",
+                    "outline-variant": "#c1c7d0",
+                    "secondary-container": "#d5e1ee",
+                    "success": "#278561",
+                    "tertiary": "#613300",
+                    "surface-container-low": "#f2f3f8",
+                    "primary": "#004268",
+                    "inverse-on-surface": "#eff1f5",
+                    "surface-container-high": "#e7e8ed",
+                    "on-primary-fixed-variant": "#004a75",
+                    "on-background": "#191c1f",
+                    "text-primary": "#17212B",
+                    "error": "#C53030",
+                    "on-secondary": "#ffffff",
+                    "background": "#F5F6F7",
+                    "surface-variant": "#e1e2e7",
+                    "secondary-fixed-dim": "#bcc8d4",
+                    "border-subtle": "#E8EBEE",
+                    "outline": "#717880",
+                    "tertiary-container": "#824701",
+                    "secondary": "#54606b",
+                    "on-tertiary-fixed-variant": "#6c3a00",
+                    "secondary-fixed": "#d8e4f1",
+                    "surface-bright": "#f8f9fe",
+                    "on-secondary-container": "#58646f"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "sidebar-collapsed": "64px",
+                    "padding-compact": "0.75rem",
+                    "header-height": "52px",
+                    "gutter": "1rem",
+                    "padding-base": "1rem",
+                    "sidebar-width": "224px"
+            },
+            "fontFamily": {
+                    "body-sm": ["Inter"],
+                    "label-xs": ["Inter"],
+                    "headline-md": ["Inter"],
+                    "body-md": ["Inter"],
+                    "headline-lg": ["Inter"]
+            },
+            "fontSize": {
+                    "body-sm": ["11px", {"lineHeight": "16px", "fontWeight": "400"}],
+                    "label-xs": ["10px", {"lineHeight": "14px", "letterSpacing": "0.02em", "fontWeight": "500"}],
+                    "headline-md": ["16px", {"lineHeight": "24px", "fontWeight": "600"}],
+                    "body-md": ["12px", {"lineHeight": "18px", "fontWeight": "400"}],
+                    "headline-lg": ["22px", {"lineHeight": "32px", "fontWeight": "600"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
+            font-size: 18px;
+        }
+        .sidebar-item-active { border-right-width: 2px; }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #D9DEE3; border-radius: 2px; }
+    </style>
+</head>
+<body class="bg-background text-on-surface overflow-hidden">
+<!-- SideNavBar -->
+<aside class="w-sidebar-width h-screen fixed left-0 top-0 border-r border-border-base bg-surface flex flex-col py-4 z-50">
+<div class="px-6 mb-8 flex items-center gap-3">
+<div class="w-8 h-8 bg-primary rounded flex items-center justify-center text-white shrink-0">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">dentistry</span>
+</div>
+<div>
+<h1 class="font-headline-md text-headline-md font-bold text-primary leading-none">DENTIA</h1>
+<p class="text-[9px] uppercase tracking-wider text-outline font-semibold">Dental Software</p>
+</div>
+</div>
+<nav class="flex-1 overflow-y-auto custom-scrollbar">
+<ul class="space-y-0.5">
+<li>
+<a class="flex items-center px-6 py-2.5 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined mr-3">home</span> Inicio
+                    </a>
+</li>
+<li>
+<a class="flex items-center px-6 py-2.5 text-primary font-semibold border-r-2 border-primary bg-surface-alt font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined mr-3" style="font-variation-settings: 'FILL' 1;">calendar_month</span> Agenda
+                    </a>
+</li>
+<li>
+<a class="flex items-center px-6 py-2.5 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined mr-3">group</span> Pacientes
+                    </a>
+</li>
+<li>
+<a class="flex items-center px-6 py-2.5 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined mr-3">medical_services</span> Clínica
+                    </a>
+</li>
+<li>
+<a class="flex items-center px-6 py-2.5 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined mr-3">dentistry</span> Tratamientos
+                    </a>
+</li>
+<li>
+<a class="flex items-center px-6 py-2.5 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined mr-3">payments</span> Finanzas
+                    </a>
+</li>
+<li>
+<a class="flex items-center px-6 py-2.5 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined mr-3">account_tree</span> CRM
+                    </a>
+</li>
+<li>
+<a class="flex items-center px-6 py-2.5 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined mr-3">inventory_2</span> Inventario
+                    </a>
+</li>
+<li class="pt-4 mt-4 border-t border-border-subtle">
+<a class="flex items-center px-6 py-2.5 text-on-surface-variant hover:bg-surface-alt hover:text-primary transition-colors font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined mr-3">settings</span> Configuración
+                    </a>
+</li>
+</ul>
+</nav>
+</aside>
+<!-- Main Content Area -->
+<main class="ml-sidebar-width h-screen flex flex-col relative">
+<!-- TopNavBar -->
+<header class="h-header-height bg-surface border-b border-border-base flex items-center justify-between px-gutter sticky top-0 z-40">
+<div class="flex items-center gap-6">
+<div class="relative flex items-center">
+<span class="material-symbols-outlined absolute left-3 text-outline">search</span>
+<input class="pl-10 pr-4 py-1.5 bg-surface-alt border-none rounded text-body-md w-80 focus:ring-1 focus:ring-primary" placeholder="Buscar paciente, cita o documento..." type="text"/>
+</div>
+<div class="flex gap-4">
+<span class="text-primary font-bold border-b-2 border-primary pb-1 font-body-md text-body-md cursor-pointer">Sede Centro</span>
+<span class="text-on-surface-variant hover:text-primary transition-colors font-body-md text-body-md cursor-pointer">Sede Playa</span>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="bg-primary text-white px-4 py-1.5 rounded font-body-md text-body-md hover:opacity-90 active:scale-95 transition-all">+ Crear</button>
+<div class="flex items-center gap-3 ml-2 border-l border-border-subtle pl-4">
+<span class="material-symbols-outlined text-on-surface-variant cursor-pointer hover:text-primary">notifications</span>
+<div class="w-8 h-8 rounded-full overflow-hidden border border-border-base cursor-pointer hover:border-primary transition-colors">
+<img class="w-full h-full object-cover" data-alt="A professional male dentist in his 40s wearing a white clinical coat, smiling confidently in a modern, brightly lit dental office environment with a clean, high-end medical aesthetic. The lighting is soft and neutral, reflecting a trustworthy and sanitary atmosphere." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDM1ujckC9bhqmNcj26T-bRpt3PoYUjiGP3m2TcUixBS5F0OLYDzs6TOmyuBuQl_U0rHVWS8706ckK21Exq_TCi-HHV23hT9bJKZi86Dx-h_zRyis57Ab1SM516x2S-Sub5TI-6lyz1a_gdO2hlBDfCtfdLM2_iMMPAOTaTZRUcEWaLrgtxeocdvJD8cpxGfAzfcvCDuOdvYLmq32-IC9CDSum9RqUO7hMwlMcdK-kz0hl-nUaLO8Hr"/>
+</div>
+</div>
+</div>
+</header>
+<!-- TopAppBar (Contextual Header) -->
+<div class="w-full h-10 bg-surface-container-low border-b border-border-subtle flex items-center px-4 sticky top-header-height z-30">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary" style="font-size: 16px;">calendar_month</span>
+<span class="font-label-xs text-label-xs text-on-surface uppercase tracking-wider font-bold">Agenda Diaria — Martes 24 de Octubre, 2023</span>
+</div>
+<div class="flex-1"></div>
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-1.5 text-label-xs font-label-xs text-secondary px-2 py-0.5 border border-border-base rounded bg-surface">
+<span class="w-2 h-2 rounded-full bg-success"></span> Confirmadas: 12
+                </div>
+<div class="flex items-center gap-1.5 text-label-xs font-label-xs text-secondary px-2 py-0.5 border border-border-base rounded bg-surface">
+<span class="w-2 h-2 rounded-full bg-warning"></span> Pendientes: 4
+                </div>
+</div>
+</div>
+<!-- Agenda Background (CAL-01 simulation) -->
+<div class="flex-1 bg-background p-4 overflow-hidden relative">
+<!-- Simulated Grid -->
+<div class="w-full h-full bg-surface border border-border-base rounded flex">
+<!-- Time column -->
+<div class="w-16 border-r border-border-subtle bg-surface-alt flex flex-col text-[10px] text-outline pt-12">
+<div class="h-16 flex justify-center border-b border-border-subtle">09:00</div>
+<div class="h-16 flex justify-center border-b border-border-subtle">10:00</div>
+<div class="h-16 flex justify-center border-b border-border-subtle">11:00</div>
+<div class="h-16 flex justify-center border-b border-border-subtle">12:00</div>
+<div class="h-16 flex justify-center border-b border-border-subtle">13:00</div>
+<div class="h-16 flex justify-center border-b border-border-subtle">14:00</div>
+</div>
+<!-- Content column -->
+<div class="flex-1 relative bg-[linear-gradient(to_bottom,#E8EBEE_1px,transparent_1px)] bg-[size:100%_64px]">
+<!-- Sample Appointments -->
+<div class="absolute top-12 left-2 right-2 h-24 bg-primary/10 border-l-4 border-primary p-2 flex flex-col gap-0.5">
+<span class="text-[10px] font-bold text-primary">09:00 - 10:30 | Limpieza Dental</span>
+<span class="text-[9px] text-on-surface-variant">Lucía Fernández</span>
+</div>
+<div class="absolute top-44 left-2 right-2 h-32 bg-primary/20 border-l-4 border-primary p-2 flex flex-col gap-0.5 shadow-sm ring-1 ring-primary/30 z-10 cursor-pointer">
+<div class="flex justify-between items-start">
+<span class="text-[10px] font-bold text-primary">11:00 - 12:30 | Endodoncia</span>
+<span class="bg-success text-white px-1.5 py-0.5 rounded-[2px] text-[8px] font-bold uppercase">Confirmado</span>
+</div>
+<span class="text-[11px] font-semibold text-on-surface">Juan Pérez</span>
+<span class="text-[10px] text-on-surface-variant">Dr. Navarro</span>
+</div>
+</div>
+</div>
+<!-- OVERLAY / DRAWER (CAL-04) -->
+<div class="absolute inset-0 bg-on-surface/20 z-50 flex justify-end transition-opacity duration-300">
+<!-- Click away area -->
+<div class="flex-1" onclick="window.history.back()"></div>
+<!-- Drawer Content -->
+<div class="w-[400px] h-full bg-surface shadow-2xl flex flex-col border-l border-border-base transform transition-transform duration-300 translate-x-0">
+<!-- Header -->
+<div class="px-6 py-4 border-b border-border-base flex items-center justify-between">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full bg-surface-container-highest flex items-center justify-center text-primary border border-border-base">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">person</span>
+</div>
+<div>
+<h2 class="font-headline-md text-headline-md font-bold text-primary">Juan Pérez</h2>
+<p class="font-label-xs text-label-xs text-outline uppercase tracking-wider">Historia #102</p>
+</div>
+</div>
+<button class="p-1 hover:bg-surface-alt rounded-full transition-colors">
+<span class="material-symbols-outlined text-outline">close</span>
+</button>
+</div>
+<!-- Scrollable Content -->
+<div class="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-6">
+<!-- Status & Quick Actions -->
+<div class="space-y-4">
+<div class="flex items-center justify-between p-3 bg-surface-alt rounded border border-border-subtle">
+<div class="flex flex-col">
+<span class="text-[9px] uppercase font-bold text-outline tracking-widest mb-1">Estado de Cita</span>
+<div class="flex items-center gap-2">
+<span class="w-2.5 h-2.5 rounded-full bg-success"></span>
+<span class="font-body-md text-body-md font-semibold text-on-surface">Confirmado</span>
+</div>
+</div>
+<button class="text-primary font-body-sm text-body-sm hover:underline flex items-center gap-1">
+                                    Cambiar <span class="material-symbols-outlined" style="font-size: 14px;">expand_more</span>
+</button>
+</div>
+<div class="grid grid-cols-2 gap-3">
+<button class="flex items-center justify-center gap-2 bg-primary text-white py-2 px-3 rounded font-body-md text-body-md font-medium hover:bg-primary-container transition-colors">
+<span class="material-symbols-outlined" style="font-size: 16px;">how_to_reg</span> Registrar llegada
+                                </button>
+<button class="flex items-center justify-center gap-2 border border-primary text-primary py-2 px-3 rounded font-body-md text-body-md font-medium hover:bg-surface-alt transition-colors">
+<span class="material-symbols-outlined" style="font-size: 16px;">clinical_notes</span> Abrir encuentro
+                                </button>
+</div>
+</div>
+<!-- Appointment Details -->
+<section class="space-y-4">
+<h3 class="text-[11px] font-bold text-outline uppercase tracking-widest border-b border-border-subtle pb-2">Información de la Cita</h3>
+<div class="grid grid-cols-1 gap-4">
+<div class="flex items-start gap-4">
+<div class="w-8 flex justify-center pt-1 text-outline">
+<span class="material-symbols-outlined">schedule</span>
+</div>
+<div>
+<p class="text-[10px] text-outline mb-0.5">Fecha y Hora</p>
+<p class="font-body-md text-body-md font-medium">Martes 24 Oct, 11:00 — 12:30</p>
+</div>
+</div>
+<div class="flex items-start gap-4">
+<div class="w-8 flex justify-center pt-1 text-outline">
+<span class="material-symbols-outlined">medical_information</span>
+</div>
+<div>
+<p class="text-[10px] text-outline mb-0.5">Motivo</p>
+<p class="font-body-md text-body-md font-medium text-primary bg-primary/5 inline-block px-2 py-0.5 rounded border border-primary/10">Endodoncia Multirradicular</p>
+</div>
+</div>
+<div class="flex items-start gap-4">
+<div class="w-8 flex justify-center pt-1 text-outline">
+<span class="material-symbols-outlined">badge</span>
+</div>
+<div>
+<p class="text-[10px] text-outline mb-0.5">Profesional</p>
+<p class="font-body-md text-body-md font-medium">Dr. Carlos Navarro</p>
+<p class="text-[10px] text-on-surface-variant">Especialista en Endodoncia</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Linked Procedures -->
+<section class="space-y-3">
+<h3 class="text-[11px] font-bold text-outline uppercase tracking-widest border-b border-border-subtle pb-2">Procedimientos vinculados</h3>
+<div class="space-y-2">
+<div class="p-3 bg-white border border-border-subtle rounded flex items-center justify-between">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-outline" style="font-size: 20px;">meet</span>
+<div class="flex flex-col">
+<span class="text-body-md font-medium">Endodoncia Molar Superior (Pieza 16)</span>
+<span class="text-[10px] text-on-surface-variant">Tratamiento #TR-2204</span>
+</div>
+</div>
+<span class="text-body-md font-bold text-primary">$185.00</span>
+</div>
+<button class="w-full py-2 border-2 border-dashed border-border-base text-outline text-body-sm font-medium rounded hover:border-primary hover:text-primary transition-all">
+                                    + Vincular otro procedimiento
+                                </button>
+</div>
+</section>
+<!-- Notes Section -->
+<section class="space-y-3">
+<h3 class="text-[11px] font-bold text-outline uppercase tracking-widest border-b border-border-subtle pb-2">Notas Administrativas</h3>
+<div class="relative">
+<textarea class="w-full bg-surface-alt border border-border-subtle rounded p-3 font-body-md text-body-md min-h-[80px] focus:ring-1 focus:ring-primary focus:bg-white transition-all" placeholder="Escribir nota interna...">Paciente requiere factura a nombre de empresa. Confirmó por WhatsApp hace 2 horas.</textarea>
+<div class="flex justify-between mt-1 px-1">
+<span class="text-[9px] text-outline">Última edición: Hoy 09:12</span>
+<button class="text-primary font-bold text-[9px] uppercase tracking-wider hover:underline">Guardar nota</button>
+</div>
+</div>
+</section>
+</div>
+<!-- Footer / Actions -->
+<div class="p-6 border-t border-border-base bg-surface-container-low flex flex-col gap-3">
+<div class="flex items-center justify-between text-body-md mb-2">
+<span class="text-on-surface-variant">Valor Total Estimado:</span>
+<span class="text-headline-md font-bold text-primary">$185.00</span>
+</div>
+<div class="grid grid-cols-3 gap-2">
+<button class="flex flex-col items-center justify-center gap-1 p-2 border border-border-base rounded bg-white hover:bg-surface-alt transition-colors group">
+<span class="material-symbols-outlined text-outline group-hover:text-primary">edit</span>
+<span class="text-[9px] uppercase font-bold text-outline group-hover:text-primary">Editar</span>
+</button>
+<button class="flex flex-col items-center justify-center gap-1 p-2 border border-border-base rounded bg-white hover:bg-surface-alt transition-colors group">
+<span class="material-symbols-outlined text-outline group-hover:text-primary">print</span>
+<span class="text-[9px] uppercase font-bold text-outline group-hover:text-primary">Imprimir</span>
+</button>
+<button class="flex flex-col items-center justify-center gap-1 p-2 border border-error/20 rounded bg-white hover:bg-error-container/30 transition-colors group">
+<span class="material-symbols-outlined text-error opacity-60 group-hover:opacity-100">cancel</span>
+<span class="text-[9px] uppercase font-bold text-error opacity-60 group-hover:opacity-100">Anular</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Floating Tooltip / Microinteraction simulation -->
+<script>
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('DENTIA UI Initialized');
+            // Mock drawer toggle logic if needed, currently statically rendered open as per prompt
+        });
+    </script>
+</body></html>

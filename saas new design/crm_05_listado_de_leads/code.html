@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+
+<html class="light" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>DENTIA - CRM de Leads</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        body { font-family: 'Inter', sans-serif; background-color: #F5F6F7; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20; font-size: 18px; }
+        /* Custom scrollbar for clinical density */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #F5F6F7; }
+        ::-webkit-scrollbar-thumb { background: #D9DEE3; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #717880; }
+        .table-fixed-header thead th { position: sticky; top: 0; z-index: 10; }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "outline": "#717880",
+                        "border-subtle": "#E8EBEE",
+                        "surface-bright": "#f8f9fe",
+                        "tertiary-container": "#824701",
+                        "secondary": "#54606b",
+                        "secondary-fixed": "#d8e4f1",
+                        "on-tertiary-fixed-variant": "#6c3a00",
+                        "on-secondary-container": "#58646f",
+                        "primary": "#004268",
+                        "inverse-on-surface": "#eff1f5",
+                        "surface-container-high": "#e7e8ed",
+                        "success": "#278561",
+                        "tertiary": "#613300",
+                        "surface-container-low": "#f2f3f8",
+                        "on-primary-fixed-variant": "#004a75",
+                        "on-background": "#191c1f",
+                        "text-primary": "#17212B",
+                        "error": "#C53030",
+                        "on-secondary": "#ffffff",
+                        "background": "#F5F6F7",
+                        "secondary-fixed-dim": "#bcc8d4",
+                        "surface-variant": "#e1e2e7",
+                        "tertiary-fixed-dim": "#ffb779",
+                        "primary-fixed": "#cde5ff",
+                        "on-secondary-fixed": "#111d26",
+                        "primary-container": "#005a8c",
+                        "border-base": "#D9DEE3",
+                        "surface-alt": "#F0F2F4",
+                        "surface-tint": "#166395",
+                        "on-surface-variant": "#41474f",
+                        "on-primary-fixed": "#001d32",
+                        "inverse-primary": "#95ccff",
+                        "on-error-container": "#93000a",
+                        "surface-dim": "#d8dadf",
+                        "on-tertiary": "#ffffff",
+                        "tertiary-fixed": "#ffdcc1",
+                        "on-primary-container": "#9fd0ff",
+                        "secondary-container": "#d5e1ee",
+                        "inverse-surface": "#2e3134",
+                        "outline-variant": "#c1c7d0",
+                        "warning": "#B37D00",
+                        "error-container": "#ffdad6",
+                        "surface": "#FFFFFF",
+                        "on-secondary-fixed-variant": "#3c4852",
+                        "primary-fixed-dim": "#95ccff",
+                        "on-surface": "#191c1f",
+                        "on-primary": "#ffffff",
+                        "surface-container": "#eceef2",
+                        "on-tertiary-container": "#ffbe87",
+                        "surface-container-lowest": "#ffffff",
+                        "on-tertiary-fixed": "#2e1500",
+                        "on-error": "#ffffff",
+                        "surface-container-highest": "#e1e2e7"
+                    },
+                    "borderRadius": { "DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem" },
+                    "spacing": { "header-height": "52px", "padding-compact": "0.75rem", "sidebar-collapsed": "64px", "sidebar-width": "224px", "padding-base": "1rem", "gutter": "1rem" },
+                    "fontFamily": { "label-xs": ["Inter"], "headline-md": ["Inter"], "body-sm": ["Inter"], "headline-lg": ["Inter"], "body-md": ["Inter"] },
+                    "fontSize": {
+                        "label-xs": ["10px", { "lineHeight": "14px", "letterSpacing": "0.02em", "fontWeight": "500" }],
+                        "headline-md": ["16px", { "lineHeight": "24px", "fontWeight": "600" }],
+                        "body-sm": ["11px", { "lineHeight": "16px", "fontWeight": "400" }],
+                        "headline-lg": ["22px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "body-md": ["12px", { "lineHeight": "18px", "fontWeight": "400" }]
+                    }
+                },
+            },
+        }
+    </script>
+</head>
+<body class="bg-background text-on-surface">
+<!-- SideNavBar -->
+<aside class="w-sidebar-width h-screen fixed left-0 top-0 border-r border-border-base bg-surface flex flex-col py-4 overflow-y-auto z-50">
+<div class="px-6 mb-8 flex items-center gap-3">
+<div class="w-8 h-8 bg-primary rounded flex items-center justify-center">
+<span class="material-symbols-outlined text-white" style="font-variation-settings: 'FILL' 1;">dentistry</span>
+</div>
+<div>
+<h1 class="font-headline-md text-headline-md font-bold text-primary">DENTIA</h1>
+<p class="font-label-xs text-label-xs text-secondary leading-tight">Dental Software</p>
+</div>
+</div>
+<nav class="flex-1 px-2 space-y-0.5">
+<a class="flex items-center gap-3 px-4 py-2.5 rounded-sm transition-colors font-body-md text-body-md text-on-surface-variant hover:bg-surface-alt hover:text-primary" href="#">
+<span class="material-symbols-outlined">home</span> Inicio
+            </a>
+<a class="flex items-center gap-3 px-4 py-2.5 rounded-sm transition-colors font-body-md text-body-md text-on-surface-variant hover:bg-surface-alt hover:text-primary" href="#">
+<span class="material-symbols-outlined">calendar_month</span> Agenda
+            </a>
+<a class="flex items-center gap-3 px-4 py-2.5 rounded-sm transition-colors font-body-md text-body-md text-on-surface-variant hover:bg-surface-alt hover:text-primary" href="#">
+<span class="material-symbols-outlined">group</span> Pacientes
+            </a>
+<a class="flex items-center gap-3 px-4 py-2.5 rounded-sm transition-colors font-body-md text-body-md text-on-surface-variant hover:bg-surface-alt hover:text-primary" href="#">
+<span class="material-symbols-outlined">medical_services</span> Clínica
+            </a>
+<a class="flex items-center gap-3 px-4 py-2.5 rounded-sm transition-colors font-body-md text-body-md text-on-surface-variant hover:bg-surface-alt hover:text-primary" href="#">
+<span class="material-symbols-outlined">dentistry</span> Tratamientos
+            </a>
+<a class="flex items-center gap-3 px-4 py-2.5 rounded-sm transition-colors font-body-md text-body-md text-on-surface-variant hover:bg-surface-alt hover:text-primary" href="#">
+<span class="material-symbols-outlined">payments</span> Finanzas
+            </a>
+<a class="flex items-center gap-3 px-4 py-2.5 rounded-sm transition-colors font-body-md text-body-md text-primary font-semibold border-r-2 border-primary bg-surface-alt" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">account_tree</span> CRM
+            </a>
+<a class="flex items-center gap-3 px-4 py-2.5 rounded-sm transition-colors font-body-md text-body-md text-on-surface-variant hover:bg-surface-alt hover:text-primary" href="#">
+<span class="material-symbols-outlined">folder_open</span> Documentos
+            </a>
+<a class="flex items-center gap-3 px-4 py-2.5 rounded-sm transition-colors font-body-md text-body-md text-on-surface-variant hover:bg-surface-alt hover:text-primary" href="#">
+<span class="material-symbols-outlined">inventory_2</span> Inventario
+            </a>
+<a class="flex items-center gap-3 px-4 py-2.5 rounded-sm transition-colors font-body-md text-body-md text-on-surface-variant hover:bg-surface-alt hover:text-primary" href="#">
+<span class="material-symbols-outlined">badge</span> Equipo
+            </a>
+<a class="flex items-center gap-3 px-4 py-2.5 rounded-sm transition-colors font-body-md text-body-md text-on-surface-variant hover:bg-surface-alt hover:text-primary" href="#">
+<span class="material-symbols-outlined">query_stats</span> Analítica
+            </a>
+<a class="flex items-center gap-3 px-4 py-2.5 rounded-sm transition-colors font-body-md text-body-md text-on-surface-variant hover:bg-surface-alt hover:text-primary" href="#">
+<span class="material-symbols-outlined">auto_mode</span> Automatizaciones
+            </a>
+<a class="flex items-center gap-3 px-4 py-2.5 rounded-sm transition-colors font-body-md text-body-md text-on-surface-variant hover:bg-surface-alt hover:text-primary mt-auto" href="#">
+<span class="material-symbols-outlined">settings</span> Configuración
+            </a>
+</nav>
+</aside>
+<!-- TopNavBar -->
+<header class="h-header-height fixed top-0 right-0 left-sidebar-width z-40 bg-surface border-b border-border-base flex items-center justify-between px-gutter">
+<div class="flex items-center gap-6">
+<div class="relative group">
+<span class="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-outline">search</span>
+<input class="pl-10 pr-4 py-1.5 bg-surface-container-low border border-border-subtle rounded-sm text-body-md font-body-md w-80 focus:outline-none focus:border-primary transition-all" placeholder="Buscar leads o pacientes..." type="text"/>
+</div>
+<nav class="hidden lg:flex items-center gap-4">
+<a class="text-body-md font-body-md text-primary font-bold border-b-2 border-primary pb-1" href="#">Sede Centro</a>
+<a class="text-body-md font-body-md text-on-surface-variant hover:text-primary transition-colors" href="#">Sede Playa</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<button class="bg-primary text-white px-4 py-1.5 rounded-sm font-body-md text-body-md font-semibold hover:bg-primary-container transition-all active:scale-95 flex items-center gap-2">
+<span class="material-symbols-outlined !text-[16px]">add</span>
+                Crear Lead
+            </button>
+<div class="flex items-center gap-2">
+<button class="w-8 h-8 flex items-center justify-center text-secondary hover:bg-surface-variant rounded-full transition-colors relative">
+<span class="material-symbols-outlined">notifications</span>
+<span class="absolute top-1 right-1 w-2 h-2 bg-error rounded-full"></span>
+</button>
+<div class="w-8 h-8 rounded-full bg-secondary-container flex items-center justify-center cursor-pointer overflow-hidden border border-border-base">
+<img class="w-full h-full object-cover" data-alt="Professional headshot of a female dental clinic manager with a confident and warm expression, wearing clinical attire, in a bright and high-end dental office environment with soft focus. The aesthetic is clean, sanitary, and authoritative." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCvlL25bRRqbUbIFVYB7lEKY1MTdAL8ZvK0Ggi5c23WrgSbCaQ7YjHryEkoYESlqOKmNq2u9wjpQVsjpTXr7lLa9s9w8UlIV-Z1FSNSUBjtphVO_T-QoEzhgZsNSVkr413KR-SYroolZA8L9p2VUp4vvAV0sBYXvn83ngvyZN6pkyq_zdYl2MwoEP0UiclLjrifj2AZcyluI6k6TFtFV4LT0RGXtTcbyMA3dBRY339Is3CoX6WWbJjK"/>
+</div>
+</div>
+</div>
+</header>
+<!-- Main Content -->
+<main class="ml-sidebar-width pt-header-height min-h-screen">
+<!-- Page Title Bar (TopAppBar type small) -->
+<div class="w-full h-10 bg-surface-container-low border-b border-border-subtle flex items-center justify-between px-4 sticky top-header-height z-30">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1;">account_tree</span>
+<span class="font-headline-md text-headline-md text-on-surface">Gestión de Leads (CRM)</span>
+</div>
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-1 text-label-xs font-label-xs text-secondary">
+<span class="material-symbols-outlined !text-[14px]">update</span> Actualizado: hace 2 min
+                </div>
+<div class="h-4 w-px bg-border-base mx-1"></div>
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-on-surface-variant cursor-pointer hover:text-primary" title="Exportar CSV">download</span>
+<span class="material-symbols-outlined text-on-surface-variant cursor-pointer hover:text-primary" title="Configurar Columnas">view_column</span>
+<span class="material-symbols-outlined text-on-surface-variant cursor-pointer hover:text-primary" title="Ayuda">help</span>
+</div>
+</div>
+</div>
+<div class="p-4 space-y-4">
+<!-- Filter Section -->
+<div class="bg-surface border border-border-base p-3 flex flex-wrap items-end gap-4 rounded-sm">
+<div class="flex flex-col gap-1.5">
+<label class="font-label-xs text-label-xs text-secondary uppercase tracking-wider">Canal de Entrada</label>
+<select class="text-body-md font-body-md bg-white border border-border-base px-3 py-1.5 rounded-sm focus:ring-0 focus:border-primary min-w-[160px]">
+<option>Todos los canales</option>
+<option>Web Oficial</option>
+<option>Instagram</option>
+<option>WhatsApp</option>
+<option>Referido</option>
+<option>Llamada Directa</option>
+</select>
+</div>
+<div class="flex flex-col gap-1.5">
+<label class="font-label-xs text-label-xs text-secondary uppercase tracking-wider">Probabilidad</label>
+<select class="text-body-md font-body-md bg-white border border-border-base px-3 py-1.5 rounded-sm focus:ring-0 focus:border-primary min-w-[140px]">
+<option>Cualquiera</option>
+<option>Alta (&gt;75%)</option>
+<option>Media (25-75%)</option>
+<option>Baja (&lt;25%)</option>
+</select>
+</div>
+<div class="flex flex-col gap-1.5">
+<label class="font-label-xs text-label-xs text-secondary uppercase tracking-wider">Estado</label>
+<select class="text-body-md font-body-md bg-white border border-border-base px-3 py-1.5 rounded-sm focus:ring-0 focus:border-primary min-w-[140px]">
+<option>Todos los estados</option>
+<option>Nuevo</option>
+<option>Contactado</option>
+<option>Cita reservada</option>
+<option>Perdido</option>
+</select>
+</div>
+<div class="flex flex-col gap-1.5">
+<label class="font-label-xs text-label-xs text-secondary uppercase tracking-wider">Responsable</label>
+<select class="text-body-md font-body-md bg-white border border-border-base px-3 py-1.5 rounded-sm focus:ring-0 focus:border-primary min-w-[140px]">
+<option>Cualquier asesor</option>
+<option>Marta García</option>
+<option>Luis Posada</option>
+<option>Elena Sanchis</option>
+</select>
+</div>
+<button class="h-[34px] px-4 border border-border-base hover:bg-surface-alt transition-colors font-body-md text-body-md flex items-center gap-2">
+<span class="material-symbols-outlined !text-[16px]">filter_alt</span>
+                    Más filtros
+                </button>
+<button class="h-[34px] px-4 text-primary font-semibold hover:underline font-body-md text-body-md ml-auto">
+                    Limpiar filtros
+                </button>
+</div>
+<!-- Dashboard Summary Widgets (Clinical Precision Style) -->
+<div class="grid grid-cols-4 gap-4">
+<div class="bg-surface border border-border-base p-4 rounded-sm">
+<p class="font-label-xs text-label-xs text-secondary uppercase">Total Leads Activos</p>
+<div class="flex items-baseline gap-2 mt-1">
+<span class="text-2xl font-bold text-primary">124</span>
+<span class="text-success text-body-sm font-body-sm flex items-center">+12% vs mes ant.</span>
+</div>
+</div>
+<div class="bg-surface border border-border-base p-4 rounded-sm">
+<p class="font-label-xs text-label-xs text-secondary uppercase">Tasa de Conversión</p>
+<div class="flex items-baseline gap-2 mt-1">
+<span class="text-2xl font-bold text-primary">18.4%</span>
+<span class="text-warning text-body-sm font-body-sm flex items-center">-2% estacional</span>
+</div>
+</div>
+<div class="bg-surface border border-border-base p-4 rounded-sm">
+<p class="font-label-xs text-label-xs text-secondary uppercase">Tiempo de Respuesta</p>
+<div class="flex items-baseline gap-2 mt-1">
+<span class="text-2xl font-bold text-primary">14 min</span>
+<span class="text-success text-body-sm font-body-sm flex items-center">Bajo la meta</span>
+</div>
+</div>
+<div class="bg-surface border border-border-base p-4 rounded-sm">
+<p class="font-label-xs text-label-xs text-secondary uppercase">Origen Principal</p>
+<div class="flex items-baseline gap-2 mt-1">
+<span class="text-2xl font-bold text-primary">Instagram</span>
+<span class="text-secondary text-body-sm font-body-sm">42 leads</span>
+</div>
+</div>
+</div>
+<!-- Operational Table -->
+<div class="bg-surface border border-border-base rounded-sm overflow-hidden flex flex-col">
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse table-fixed-header">
+<thead>
+<tr class="bg-surface-container-low border-b border-border-base">
+<th class="px-4 py-2.5 font-label-xs text-label-xs text-secondary uppercase w-12 text-center">
+<input class="rounded-sm border-border-base text-primary focus:ring-0" type="checkbox"/>
+</th>
+<th class="px-4 py-2.5 font-label-xs text-label-xs text-secondary uppercase w-48">Nombre</th>
+<th class="px-4 py-2.5 font-label-xs text-label-xs text-secondary uppercase w-40">Contacto</th>
+<th class="px-4 py-2.5 font-label-xs text-label-xs text-secondary uppercase w-40">Interés</th>
+<th class="px-4 py-2.5 font-label-xs text-label-xs text-secondary uppercase w-32">Origen</th>
+<th class="px-4 py-2.5 font-label-xs text-label-xs text-secondary uppercase w-40">Estado</th>
+<th class="px-4 py-2.5 font-label-xs text-label-xs text-secondary uppercase w-36">Responsable</th>
+<th class="px-4 py-2.5 font-label-xs text-label-xs text-secondary uppercase w-32">Último Contacto</th>
+<th class="px-4 py-2.5 font-label-xs text-label-xs text-secondary uppercase w-40">Próxima Acción</th>
+<th class="px-4 py-2.5 font-label-xs text-label-xs text-secondary uppercase w-12"></th>
+</tr>
+</thead>
+<tbody class="divide-y divide-border-subtle">
+<!-- Row 1 -->
+<tr class="hover:bg-surface-alt transition-colors group">
+<td class="px-4 py-3 text-center">
+<input class="rounded-sm border-border-base text-primary focus:ring-0" type="checkbox"/>
+</td>
+<td class="px-4 py-3">
+<div class="flex flex-col">
+<span class="font-body-md text-body-md font-semibold text-text-primary">Carlos Méndez</span>
+<span class="font-body-sm text-body-sm text-secondary">Lead ID: #4592</span>
+</div>
+</td>
+<td class="px-4 py-3">
+<div class="flex flex-col gap-0.5">
+<div class="flex items-center gap-1.5 text-body-sm text-on-surface-variant">
+<span class="material-symbols-outlined !text-[14px]">phone</span> +34 612 345 678
+                                        </div>
+<div class="flex items-center gap-1.5 text-body-sm text-on-surface-variant">
+<span class="material-symbols-outlined !text-[14px]">mail</span> c.mendez@email.com
+                                        </div>
+</div>
+</td>
+<td class="px-4 py-3">
+<span class="inline-flex items-center px-2 py-0.5 rounded-sm bg-primary-fixed text-on-primary-fixed font-body-sm text-body-sm font-medium">Implantes</span>
+</td>
+<td class="px-4 py-3">
+<div class="flex items-center gap-1.5 font-body-sm text-body-sm text-on-surface-variant">
+<span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span> Instagram
+                                    </div>
+</td>
+<td class="px-4 py-3">
+<span class="inline-flex items-center px-2 py-0.5 rounded-sm bg-success/10 text-success border border-success/20 font-body-sm text-body-sm font-semibold">Cita reservada</span>
+</td>
+<td class="px-4 py-3">
+<div class="flex items-center gap-2">
+<div class="w-5 h-5 rounded-full bg-surface-dim flex items-center justify-center text-[10px] text-on-surface font-bold">MG</div>
+<span class="font-body-sm text-body-sm">Marta García</span>
+</div>
+</td>
+<td class="px-4 py-3">
+<span class="font-body-sm text-body-sm text-on-surface-variant">Hoy, 09:15</span>
+</td>
+<td class="px-4 py-3">
+<div class="flex items-center gap-2 text-primary font-semibold font-body-sm text-body-sm">
+<span class="material-symbols-outlined !text-[16px]">event</span> Confirmar cita
+                                    </div>
+</td>
+<td class="px-4 py-3 text-right">
+<button class="opacity-0 group-hover:opacity-100 p-1 hover:bg-border-subtle rounded-sm transition-all">
+<span class="material-symbols-outlined text-secondary">more_vert</span>
+</button>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="hover:bg-surface-alt transition-colors group">
+<td class="px-4 py-3 text-center">
+<input class="rounded-sm border-border-base text-primary focus:ring-0" type="checkbox"/>
+</td>
+<td class="px-4 py-3">
+<div class="flex flex-col">
+<span class="font-body-md text-body-md font-semibold text-text-primary">Lucía Fernández</span>
+<span class="font-body-sm text-body-sm text-secondary">Lead ID: #4601</span>
+</div>
+</td>
+<td class="px-4 py-3">
+<div class="flex flex-col gap-0.5">
+<div class="flex items-center gap-1.5 text-body-sm text-on-surface-variant">
+<span class="material-symbols-outlined !text-[14px]">phone</span> +34 655 890 122
+                                        </div>
+</div>
+</td>
+<td class="px-4 py-3">
+<span class="inline-flex items-center px-2 py-0.5 rounded-sm bg-tertiary-fixed text-on-tertiary-fixed-variant font-body-sm text-body-sm font-medium">Ortodoncia</span>
+</td>
+<td class="px-4 py-3">
+<div class="flex items-center gap-1.5 font-body-sm text-body-sm text-on-surface-variant">
+<span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Web Oficial
+                                    </div>
+</td>
+<td class="px-4 py-3">
+<span class="inline-flex items-center px-2 py-0.5 rounded-sm bg-primary/10 text-primary border border-primary/20 font-body-sm text-body-sm font-semibold">Nuevo</span>
+</td>
+<td class="px-4 py-3">
+<div class="flex items-center gap-2">
+<div class="w-5 h-5 rounded-full bg-surface-dim flex items-center justify-center text-[10px] text-on-surface font-bold">LP</div>
+<span class="font-body-sm text-body-sm">Luis Posada</span>
+</div>
+</td>
+<td class="px-4 py-3">
+<span class="font-body-sm text-body-sm text-secondary italic">Sin contacto</span>
+</td>
+<td class="px-4 py-3">
+<div class="flex items-center gap-2 text-warning font-semibold font-body-sm text-body-sm">
+<span class="material-symbols-outlined !text-[16px]">call</span> Primer contacto
+                                    </div>
+</td>
+<td class="px-4 py-3 text-right">
+<button class="opacity-0 group-hover:opacity-100 p-1 hover:bg-border-subtle rounded-sm transition-all">
+<span class="material-symbols-outlined text-secondary">more_vert</span>
+</button>
+</td>
+</tr>
+<!-- Row 3 -->
+<tr class="hover:bg-surface-alt transition-colors group">
+<td class="px-4 py-3 text-center">
+<input class="rounded-sm border-border-base text-primary focus:ring-0" type="checkbox"/>
+</td>
+<td class="px-4 py-3">
+<div class="flex flex-col">
+<span class="font-body-md text-body-md font-semibold text-text-primary">Sergio Ramos</span>
+<span class="font-body-sm text-body-sm text-secondary">Lead ID: #4588</span>
+</div>
+</td>
+<td class="px-4 py-3">
+<div class="flex flex-col gap-0.5">
+<div class="flex items-center gap-1.5 text-body-sm text-on-surface-variant">
+<span class="material-symbols-outlined !text-[14px]">phone</span> +34 699 112 233
+                                        </div>
+</div>
+</td>
+<td class="px-4 py-3">
+<span class="inline-flex items-center px-2 py-0.5 rounded-sm bg-secondary-fixed text-on-secondary-container font-body-sm text-body-sm font-medium">Blanqueamiento</span>
+</td>
+<td class="px-4 py-3">
+<div class="flex items-center gap-1.5 font-body-sm text-body-sm text-on-surface-variant">
+<span class="w-1.5 h-1.5 rounded-full bg-purple-500"></span> Referido
+                                    </div>
+</td>
+<td class="px-4 py-3">
+<span class="inline-flex items-center px-2 py-0.5 rounded-sm bg-warning/10 text-warning border border-warning/20 font-body-sm text-body-sm font-semibold">Contactado</span>
+</td>
+<td class="px-4 py-3">
+<div class="flex items-center gap-2">
+<div class="w-5 h-5 rounded-full bg-surface-dim flex items-center justify-center text-[10px] text-on-surface font-bold">ES</div>
+<span class="font-body-sm text-body-sm">Elena Sanchis</span>
+</div>
+</td>
+<td class="px-4 py-3">
+<span class="font-body-sm text-body-sm text-on-surface-variant">Ayer, 18:30</span>
+</td>
+<td class="px-4 py-3">
+<div class="flex items-center gap-2 text-secondary font-semibold font-body-sm text-body-sm">
+<span class="material-symbols-outlined !text-[16px]">chat</span> Esperando respuesta
+                                    </div>
+</td>
+<td class="px-4 py-3 text-right">
+<button class="opacity-0 group-hover:opacity-100 p-1 hover:bg-border-subtle rounded-sm transition-all">
+<span class="material-symbols-outlined text-secondary">more_vert</span>
+</button>
+</td>
+</tr>
+<!-- Row 4 -->
+<tr class="hover:bg-surface-alt transition-colors group">
+<td class="px-4 py-3 text-center">
+<input class="rounded-sm border-border-base text-primary focus:ring-0" type="checkbox"/>
+</td>
+<td class="px-4 py-3">
+<div class="flex flex-col">
+<span class="font-body-md text-body-md font-semibold text-text-primary">Beatriz Soler</span>
+<span class="font-body-sm text-body-sm text-secondary">Lead ID: #4612</span>
+</div>
+</td>
+<td class="px-4 py-3">
+<div class="flex flex-col gap-0.5">
+<div class="flex items-center gap-1.5 text-body-sm text-on-surface-variant">
+<span class="material-symbols-outlined !text-[14px]">phone</span> +34 600 555 444
+                                        </div>
+</div>
+</td>
+<td class="px-4 py-3">
+<span class="inline-flex items-center px-2 py-0.5 rounded-sm bg-primary-fixed text-on-primary-fixed font-body-sm text-body-sm font-medium">Implantes</span>
+</td>
+<td class="px-4 py-3">
+<div class="flex items-center gap-1.5 font-body-sm text-body-sm text-on-surface-variant">
+<span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span> Instagram
+                                    </div>
+</td>
+<td class="px-4 py-3">
+<span class="inline-flex items-center px-2 py-0.5 rounded-sm bg-primary/10 text-primary border border-primary/20 font-body-sm text-body-sm font-semibold">Nuevo</span>
+</td>
+<td class="px-4 py-3">
+<div class="flex items-center gap-2">
+<div class="w-5 h-5 rounded-full bg-surface-dim flex items-center justify-center text-[10px] text-on-surface font-bold">MG</div>
+<span class="font-body-sm text-body-sm">Marta García</span>
+</div>
+</td>
+<td class="px-4 py-3">
+<span class="font-body-sm text-body-sm text-secondary italic">Sin contacto</span>
+</td>
+<td class="px-4 py-3">
+<div class="flex items-center gap-2 text-warning font-semibold font-body-sm text-body-sm">
+<span class="material-symbols-outlined !text-[16px]">whatshot</span> Enviar mensaje
+                                    </div>
+</td>
+<td class="px-4 py-3 text-right">
+<button class="opacity-0 group-hover:opacity-100 p-1 hover:bg-border-subtle rounded-sm transition-all">
+<span class="material-symbols-outlined text-secondary">more_vert</span>
+</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Pagination -->
+<div class="px-4 py-3 border-t border-border-base bg-surface flex items-center justify-between">
+<span class="font-body-sm text-body-sm text-secondary">Mostrando 4 de 124 leads</span>
+<div class="flex items-center gap-1">
+<button class="w-8 h-8 flex items-center justify-center rounded-sm border border-border-base hover:bg-surface-alt disabled:opacity-50" disabled="">
+<span class="material-symbols-outlined">chevron_left</span>
+</button>
+<button class="w-8 h-8 flex items-center justify-center rounded-sm border border-primary bg-primary text-white font-body-sm text-body-sm">1</button>
+<button class="w-8 h-8 flex items-center justify-center rounded-sm border border-border-base hover:bg-surface-alt font-body-sm text-body-sm text-on-surface">2</button>
+<button class="w-8 h-8 flex items-center justify-center rounded-sm border border-border-base hover:bg-surface-alt font-body-sm text-body-sm text-on-surface">3</button>
+<button class="w-8 h-8 flex items-center justify-center rounded-sm border border-border-base hover:bg-surface-alt">
+<span class="material-symbols-outlined">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Probability & Channel Breakdown Bento -->
+<div class="grid grid-cols-12 gap-4">
+<div class="col-span-8 bg-surface border border-border-base p-4 rounded-sm">
+<h3 class="font-headline-md text-headline-md text-primary mb-4">Probabilidad de Cierre por Lead</h3>
+<div class="space-y-4">
+<div class="flex items-center gap-4">
+<span class="w-24 font-body-sm text-body-sm text-secondary">Carlos M.</span>
+<div class="flex-1 h-2 bg-surface-alt rounded-full overflow-hidden">
+<div class="h-full bg-success w-[85%]"></div>
+</div>
+<span class="w-10 font-body-sm text-body-sm font-semibold text-success">85%</span>
+</div>
+<div class="flex items-center gap-4">
+<span class="w-24 font-body-sm text-body-sm text-secondary">Lucía F.</span>
+<div class="flex-1 h-2 bg-surface-alt rounded-full overflow-hidden">
+<div class="h-full bg-primary w-[60%]"></div>
+</div>
+<span class="w-10 font-body-sm text-body-sm font-semibold text-primary">60%</span>
+</div>
+<div class="flex items-center gap-4">
+<span class="w-24 font-body-sm text-body-sm text-secondary">Sergio R.</span>
+<div class="flex-1 h-2 bg-surface-alt rounded-full overflow-hidden">
+<div class="h-full bg-warning w-[40%]"></div>
+</div>
+<span class="w-10 font-body-sm text-body-sm font-semibold text-warning">40%</span>
+</div>
+<div class="flex items-center gap-4">
+<span class="w-24 font-body-sm text-body-sm text-secondary">Beatriz S.</span>
+<div class="flex-1 h-2 bg-surface-alt rounded-full overflow-hidden">
+<div class="h-full bg-primary w-[55%]"></div>
+</div>
+<span class="w-10 font-body-sm text-body-sm font-semibold text-primary">55%</span>
+</div>
+</div>
+</div>
+<div class="col-span-4 bg-surface border border-border-base p-4 rounded-sm flex flex-col items-center justify-center text-center">
+<h3 class="font-headline-md text-headline-md text-primary mb-2 w-full text-left">Distribución Canales</h3>
+<div class="w-32 h-32 rounded-full border-[10px] border-surface-alt relative flex items-center justify-center mb-4">
+<div class="absolute inset-0 rounded-full border-[10px] border-primary border-t-transparent border-l-transparent transform -rotate-45"></div>
+<span class="font-headline-lg text-headline-lg text-primary">42%</span>
+</div>
+<div class="grid grid-cols-2 gap-x-4 gap-y-1 w-full">
+<div class="flex items-center gap-2">
+<div class="w-2 h-2 rounded-full bg-primary"></div>
+<span class="font-label-xs text-label-xs text-secondary">Instagram</span>
+</div>
+<div class="flex items-center gap-2">
+<div class="w-2 h-2 rounded-full bg-emerald-500"></div>
+<span class="font-label-xs text-label-xs text-secondary">Web</span>
+</div>
+<div class="flex items-center gap-2">
+<div class="w-2 h-2 rounded-full bg-purple-500"></div>
+<span class="font-label-xs text-label-xs text-secondary">Referido</span>
+</div>
+<div class="flex items-center gap-2">
+<div class="w-2 h-2 rounded-full bg-blue-400"></div>
+<span class="font-label-xs text-label-xs text-secondary">Otros</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Micro-interaction JS for hover effects and dynamic styling -->
+<script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Logic for checkboxes
+            const masterCheckbox = document.querySelector('thead input[type="checkbox"]');
+            const rowCheckboxes = document.querySelectorAll('tbody input[type="checkbox"]');
+
+            masterCheckbox?.addEventListener('change', (e) => {
+                rowCheckboxes.forEach(cb => {
+                    cb.checked = e.target.checked;
+                    const row = cb.closest('tr');
+                    if(e.target.checked) row.classList.add('bg-surface-alt');
+                    else row.classList.remove('bg-surface-alt');
+                });
+            });
+
+            rowCheckboxes.forEach(cb => {
+                cb.addEventListener('change', (e) => {
+                    const row = cb.closest('tr');
+                    if(e.target.checked) row.classList.add('bg-surface-alt');
+                    else row.classList.remove('bg-surface-alt');
+                });
+            });
+
+            // Simple search focus effect
+            const searchInput = document.querySelector('input[type="text"]');
+            searchInput?.addEventListener('focus', () => {
+                searchInput.parentElement.classList.add('ring-2', 'ring-primary/10');
+            });
+            searchInput?.addEventListener('blur', () => {
+                searchInput.parentElement.classList.remove('ring-2', 'ring-primary/10');
+            });
+        });
+    </script>
+</body></html>
