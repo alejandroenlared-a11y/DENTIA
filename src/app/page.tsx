@@ -898,8 +898,8 @@ function PatientsView({
           <span>Sede</span>
           <select name="site" defaultValue="all">
             <option value="all">Todas las sedes</option>
-            <option value="centro">Sede Centro</option>
-            <option value="playa">Sede Playa</option>
+            <option value="murcia">Sede Murcia</option>
+            <option value="elche">Sede Elche</option>
           </select>
         </label>
         <label>

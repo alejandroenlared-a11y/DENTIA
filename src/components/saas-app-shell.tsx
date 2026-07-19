@@ -102,8 +102,8 @@ export function SaasAppShell({ data, view, patientQuery, notices, children }: Sa
               <input name="q" defaultValue={view === "patients" ? patientQuery ?? "" : ""} placeholder={currentView.search} />
             </form>
             <nav className="site-tabs" aria-label="Sedes">
-              <span className="active">Sede Centro</span>
-              <span>Sede Playa</span>
+              <span className="active">Sede Murcia</span>
+              <span>Sede Elche</span>
             </nav>
           </div>
           <div className="top-actions">
