@@ -1,5 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { formatUrgentSlotSentence, inferPreferredStartForTest, roundUpToSlot, type UrgentBooking } from "@/lib/agent";
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 describe("roundUpToSlot", () => {
   it("redondea hacia arriba al siguiente bloque de 30 minutos", () => {
@@ -15,9 +19,9 @@ describe("roundUpToSlot", () => {
 
 describe("formatUrgentSlotSentence", () => {
   it("dice 'hoy' cuando la cita cae en el dia actual", () => {
-    const now = new Date();
-    const startsAt = new Date(now);
-    startsAt.setHours(now.getHours() + 1, 0, 0, 0);
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-19T10:00:00"));
+    const startsAt = new Date("2026-07-19T11:00:00");
     const booking: UrgentBooking = { startsAt, providerName: "Dra. Ruiz" };
 
     const sentence = formatUrgentSlotSentence(booking);

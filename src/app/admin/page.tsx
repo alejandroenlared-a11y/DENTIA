@@ -1,20 +1,18 @@
-import { notFound } from "next/navigation";
-import { UserRole } from "@prisma/client";
 import { Icon } from "@/components/icon";
-import { hasRole, requireSessionUser } from "@/lib/auth";
+import { resetDemoPatientsAction } from "@/app/admin/actions";
+import { requireAdminUser } from "@/lib/admin-auth";
 import { formatDate } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
 
-export default async function AdminPage() {
-  const user = await requireSessionUser();
-  const adminEmails = getAdminEmails();
-  const allowedByEmail = adminEmails.length > 0
-    ? adminEmails.includes(user.email.toLowerCase())
-    : process.env.NODE_ENV !== "production";
+type AdminPageProps = {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+};
 
-  if (!hasRole(user, UserRole.OWNER) || !allowedByEmail) {
-    notFound();
-  }
+export default async function AdminPage({ searchParams }: AdminPageProps) {
+  await requireAdminUser();
+  const params = await searchParams;
+  const okNotice = Array.isArray(params?.ok) ? params.ok[0] : params?.ok;
+  const errorNotice = Array.isArray(params?.error) ? params.error[0] : params?.error;
 
   const tenants = await prisma.tenant.findMany({
     orderBy: { createdAt: "asc" },
@@ -37,6 +35,33 @@ export default async function AdminPage() {
             <span>{tenants.length} clinicas activas</span>
           </div>
         </div>
+        {okNotice ? <div className="notice ok"><span>{okNotice}</span></div> : null}
+        {errorNotice ? <div className="notice error"><span>{errorNotice}</span></div> : null}
+        <section className="card pad" style={{ marginBottom: 16 }}>
+          <h2 style={{ marginTop: 0 }}>Mantenimiento de demo</h2>
+          <p style={{ color: "var(--muted)", marginTop: 0 }}>
+            Resetea los datos vinculados a pacientes del tenant seleccionado y recrea 5 fichas ficticias completas.
+          </p>
+          <form action={resetDemoPatientsAction} className="form-grid two">
+            <label className="field">
+              <span>Tenant</span>
+              <select name="tenantSlug" defaultValue="clinica-murcia-elche">
+                {tenants.map(tenant => (
+                  <option key={tenant.id} value={tenant.slug}>{tenant.name} · {tenant.slug}</option>
+                ))}
+              </select>
+            </label>
+            <label className="field">
+              <span>Confirmacion</span>
+              <input name="confirmation" placeholder="RESET PACIENTES DEMO" />
+            </label>
+            <div />
+            <button className="button danger" type="submit">
+              <Icon name="archive" />
+              Resetear pacientes demo
+            </button>
+          </form>
+        </section>
         <div style={{ overflow: "auto" }}>
           <table className="data-table">
             <thead>
@@ -72,11 +97,4 @@ export default async function AdminPage() {
       </section>
     </div>
   );
-}
-
-function getAdminEmails() {
-  return (process.env.DENTIA_ADMIN_EMAILS || "")
-    .split(",")
-    .map(email => email.trim().toLowerCase())
-    .filter(Boolean);
 }
