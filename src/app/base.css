@@ -616,6 +616,8 @@ a:hover {
   gap: 12px;
   align-items: center;
   min-height: 48px;
+  border-radius: 8px;
+  padding: 12px 14px;
   min-width: 0;
   max-width: 100%;
   overflow: hidden;
@@ -680,7 +682,7 @@ a:hover {
   min-height: 48px;
   border: 1px solid var(--line);
   border-radius: 6px;
-  padding: 8px 10px;
+  padding: 12px 14px;
   margin-top: 6px;
   display: flex;
   flex-direction: column;
@@ -1449,20 +1451,29 @@ a:hover {
 .work-card {
   border: 1px solid var(--line);
   border-radius: 9px;
-  padding: 13px;
+  padding: 16px;
   margin-bottom: 10px;
   background: var(--surface);
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .work-card strong {
   display: block;
   color: var(--ink);
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 
 .work-card p {
   margin: 5px 0 10px;
   color: var(--muted);
   font-size: 11px;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 
 .agent-demo {

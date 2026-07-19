@@ -835,7 +835,7 @@ body {
   align-items: center;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 12px;
-  padding: 9px 0;
+  padding: 12px 14px;
   border-bottom: 1px solid var(--line-soft);
   min-width: 0;
   max-width: 100%;
