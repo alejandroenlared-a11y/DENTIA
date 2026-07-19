@@ -1730,7 +1730,7 @@ Estado GitHub/Vercel:
 - Proyecto Vercel operativo:
   - `dentia-hu6t`
 - El ultimo commit verificado al actualizar esta memoria fue:
-  - `738ee32 fix: align home agenda card height`
+  - `e23f1c3 docs: rewrite dental saas roadmap and add session handoff`
 - Estado remoto de ese commit:
   - `Vercel - dentia`: `success`
   - `Vercel - dentia-hu6t`: `success`
@@ -1759,6 +1759,14 @@ Commits funcionales recientes que definen el estado visual actual:
 - `738ee32 fix: align home agenda card height`
   - Card `Agenda` alineada en altura con la card de `Bienvenida`.
   - KPIs pasan debajo ocupando todo el ancho.
+- `2d3ffee fix: adopt versioned prisma migrations and drop db push from build`
+  - Baseline `prisma/migrations/0_init/migration.sql` (629 lineas, esquema completo).
+  - Marcada como aplicada en el postgres local (docker 56321); `prisma migrate status` local: up to date.
+  - Script `build` ya NO ejecuta `db push` (era deuda 8.1: riesgo de perdida de datos en cada deploy). Ahora `prisma generate && next build`.
+  - `migrate deploy` NO esta aun en el build de Vercel: Neon produccion necesita antes `npx prisma migrate resolve --applied 0_init` (solo el usuario puede, sentinel bloquea a Claude el acceso a ficheros de entorno). Hasta entonces los deploys no tocan el esquema de produccion.
+- `e23f1c3 docs: rewrite dental saas roadmap and add session handoff`
+  - `HOJA-DE-RUTA-SAAS-DENTAL.md` reescrita entera (camino directo, deuda tecnica, fases con gates).
+  - `HANDOFF.md` con el plan de fase 2 (resolve en Neon + activar `vercel-build` con `migrate deploy`).
 
 Validaciones realizadas el 19 julio 2026:
 
@@ -1808,3 +1816,5 @@ Riesgos activos:
 - El rediseno visual ya esta desplegado, pero aun necesita revision humana completa por modulo en produccion.
 - No meter datos reales de pacientes hasta cerrar auditoria de seguridad, RGPD, roles/permisos y retencion.
 - Cualquier cambio de Prisma que afecte produccion debe coordinarse con Neon/Vercel antes del deploy.
+- Baseline de migraciones pendiente de marcar en Neon produccion (`npx prisma migrate resolve --applied 0_init` con la URL productiva; solo el usuario). Hasta hacerlo, NO anadir `migrate deploy` al build de Vercel: fallaria el deploy y dejaria una migracion "failed" registrada en Neon.
+- Cambios futuros de esquema: usar `npm run db:migrate` (crea migracion versionada), nunca `db:push` contra produccion.
