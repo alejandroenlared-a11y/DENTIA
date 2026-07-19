@@ -29,6 +29,7 @@ export function getDashboardDataRequirements(view: AppView) {
   const needsPatients = view === "patients";
   const needsTasks = view === "tasks";
   const needsAgent = view === "agent" || view === "aiReview";
+  const needsAiReview = view === "aiReview";
   const needsTreatments = view === "treatments";
   const needsBilling = view === "billing";
   const needsSettings = view === "settings";
@@ -45,15 +46,17 @@ export function getDashboardDataRequirements(view: AppView) {
     needsAgent,
     needsSettings,
     needsTeam,
-    needsPatientRows: needsHome || needsCalendar || needsInbox || needsPatients || needsTasks || needsBilling || needsClinical || needsCrm || needsDocuments || needsAnalytics || needsTeam || needsAgent,
-    needsAppointmentRows: needsHome || needsCalendar || needsInbox || needsPatients || needsClinical || needsCrm || needsInventory || needsTeam || needsAnalytics || needsAgent,
-    needsConversationRows: needsHome || needsInbox || needsCrm || needsAnalytics || needsAgent,
-    needsTaskRows: needsHome || needsTasks || needsClinical || needsCrm || needsDocuments || needsAnalytics || needsTeam || needsAgent,
-    needsTreatmentRows: needsCalendar || needsTreatments || needsClinical || needsCrm || needsAnalytics || needsAgent,
+    needsOverviewMetricCounts: needsHome,
+    needsPatientRows: needsHome || needsCalendar || needsInbox || needsPatients || needsTasks || needsBilling || needsClinical || needsCrm || needsDocuments || needsAnalytics || needsTeam,
+    needsAppointmentRows: needsHome || needsCalendar || needsInbox || needsPatients || needsClinical || needsCrm || needsInventory || needsTeam || needsAnalytics,
+    needsConversationRows: needsHome || needsInbox || needsCrm || needsAnalytics,
+    needsTaskRows: needsHome || needsTasks || needsClinical || needsCrm || needsDocuments || needsAnalytics || needsTeam,
+    needsTreatmentRows: needsCalendar || needsTreatments || needsClinical || needsCrm || needsAnalytics,
     needsProviderRows: needsCalendar || needsClinical || needsTeam,
     needsOperatoryRows: needsCalendar || needsClinical || needsTeam,
-    needsBillingRows: needsHome || needsPatients || needsBilling || needsCrm || needsAnalytics || needsDocuments,
-    needsPatientIntakeRows: needsInbox || needsCrm || needsAgent,
+    needsInvoiceRows: needsHome || needsPatients || needsBilling || needsAnalytics || needsDocuments,
+    needsExpenseRows: needsHome || needsBilling || needsAnalytics,
+    needsPatientIntakeRows: needsInbox || needsCrm || needsAiReview,
     needsRecoveredAppointmentRows: needsHome || needsAnalytics
   };
 }
@@ -68,9 +71,11 @@ export async function getDashboardData(view: AppView = "home") {
     needsTreatmentRows,
     needsProviderRows,
     needsOperatoryRows,
-    needsBillingRows,
+    needsInvoiceRows,
+    needsExpenseRows,
     needsPatientIntakeRows,
     needsRecoveredAppointmentRows,
+    needsOverviewMetricCounts,
     needsCalendar,
     needsAgent,
     needsSettings,
@@ -100,9 +105,13 @@ export async function getDashboardData(view: AppView = "home") {
     expenses
   ] = await Promise.all([
     prisma.conversation.count({ where: { tenantId: tenant.id, unread: true } }),
-    prisma.appointment.count({ where: { tenantId: tenant.id } }),
+    needsOverviewMetricCounts
+      ? prisma.appointment.count({ where: { tenantId: tenant.id } })
+      : Promise.resolve(0),
     prisma.task.count({ where: { tenantId: tenant.id, status: { not: "COMPLETED" } } }),
-    prisma.patient.count({ where: { tenantId: tenant.id, status: { not: "INACTIVE" } } }),
+    needsOverviewMetricCounts
+      ? prisma.patient.count({ where: { tenantId: tenant.id, status: { not: "INACTIVE" } } })
+      : Promise.resolve(0),
     needsRecoveredAppointmentRows
       ? prisma.appointment.findMany({
           where: { tenantId: tenant.id, createdByAi: true },
@@ -203,14 +212,14 @@ export async function getDashboardData(view: AppView = "home") {
           return [];
         })
       : Promise.resolve([]),
-    needsBillingRows
+    needsInvoiceRows
       ? prisma.invoice.findMany({
           where: { tenantId: tenant.id },
           orderBy: { issuedAt: "desc" },
           include: { patient: true }
         })
       : Promise.resolve([]),
-    needsBillingRows
+    needsExpenseRows
       ? prisma.expense.findMany({
           where: { tenantId: tenant.id },
           orderBy: { incurredAt: "desc" }
