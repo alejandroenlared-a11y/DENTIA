@@ -791,11 +791,26 @@ body {
 }
 
 .home-agenda {
-  grid-row: span 2;
+  grid-area: agenda;
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: start;
+  min-width: 0;
 }
 
 .home-kpis,
 .widget-board {
+  min-width: 0;
+}
+
+.home-kpis {
+  grid-area: kpis;
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.widget-board {
+  grid-area: main;
   grid-column: 1 / -1;
 }
 

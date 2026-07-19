@@ -561,7 +561,7 @@ a:hover {
   grid-template-columns: minmax(0, 1fr) 380px;
   grid-template-areas:
     "intro agenda"
-    "kpis kpis"
+    "kpis agenda"
     "main main";
   column-gap: 16px;
   row-gap: 16px;
@@ -595,7 +595,10 @@ a:hover {
 
 .home-agenda {
   grid-area: agenda;
+  grid-column: 2;
+  grid-row: 1 / span 2;
   align-self: start;
+  min-width: 0;
 }
 
 .home-agenda .card {
@@ -613,18 +616,33 @@ a:hover {
   gap: 12px;
   align-items: center;
   min-height: 48px;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .home-agenda-item strong {
   display: block;
   color: var(--ink);
   font-size: 12px;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
+  white-space: nowrap;
 }
 
 .home-agenda-item span {
   display: block;
   color: var(--muted);
   font-size: 11px;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
+  white-space: nowrap;
 }
 
 .home-kpis {
