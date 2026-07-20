@@ -886,7 +886,7 @@ function PatientsView({
       ) : (
         <section className="patient-registry-layout">
           <div className="card table-card patient-master-list">
-            <div style={{ overflow: "auto" }}>
+            <div className="patient-table-wrap">
               <table className="data-table patient-table">
                 <thead>
                   <tr><th>Paciente</th><th>Contacto</th><th>Estado</th><th>Proxima cita</th><th>Tratamiento</th><th>Valor</th><th>Acciones</th></tr>
