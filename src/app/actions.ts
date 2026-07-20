@@ -27,6 +27,7 @@ import { hashPassword } from "@/lib/password";
 import { notifyAppointmentEvent } from "@/lib/notifications/appointment-notifications";
 import { prisma } from "@/lib/prisma";
 import { getCurrentContext } from "@/lib/tenant";
+import { parseLocation, providerScopesForLocation } from "@/lib/locations";
 import {
   cancelAppointment,
   cancelCalendarEvent,
@@ -87,6 +88,7 @@ export async function createPatientAction(formData: FormData) {
     const patient = await prisma.patient.create({
       data: {
         tenantId: tenant.id,
+        primaryLocation: parsed.data.primaryLocation,
         name: parsed.data.name,
         phone: parsed.data.phone,
         email: parsed.data.email || null,
@@ -226,6 +228,7 @@ export async function createAppointmentAction(formData: FormData) {
         treatmentId,
         providerId,
         operatoryId,
+        location: parsed.data.location,
         title: parsed.data.title,
         startsAt,
         status: parsed.data.status,
@@ -870,6 +873,7 @@ export async function saveInteractiveDemoAction(formData: FormData) {
 
   const { user, tenant } = await getCurrentContext();
   const escalated = parsed.data.escalated === "true";
+  const demoLocation = parseLocation(parsed.data.location);
   let transcript: Array<{ role: "patient" | "assistant"; body: string }>;
   try {
     transcript = parseInteractiveTranscript(parsed.data.transcript);
@@ -883,6 +887,7 @@ export async function saveInteractiveDemoAction(formData: FormData) {
     const patient = await prisma.patient.upsert({
       where: { tenantId_phone: { tenantId: tenant.id, phone: parsed.data.phone } },
       update: {
+        primaryLocation: demoLocation,
         name: parsed.data.patientName,
         status: escalated ? PatientStatus.URGENT : PatientStatus.NEW_LEAD,
         source: "Demo interactiva IA",
@@ -898,6 +903,7 @@ export async function saveInteractiveDemoAction(formData: FormData) {
       },
       create: {
         tenantId: tenant.id,
+        primaryLocation: demoLocation,
         name: parsed.data.patientName,
         phone: parsed.data.phone,
         status: escalated ? PatientStatus.URGENT : PatientStatus.NEW_LEAD,
@@ -986,11 +992,15 @@ export async function saveInteractiveDemoAction(formData: FormData) {
       const treatment = await prisma.treatment.findFirst({
         where: { tenantId: tenant.id, name: { contains: parsed.data.treatmentNeed.split(" ")[0] } }
       });
-      const provider = await prisma.provider.findFirst({ where: { tenantId: tenant.id, active: true }, orderBy: { name: "asc" } });
-      const operatory = await prisma.operatory.findFirst({ where: { tenantId: tenant.id, active: true }, orderBy: { name: "asc" } });
+      const provider = await prisma.provider.findFirst({
+        where: { tenantId: tenant.id, active: true, locationScope: { in: providerScopesForLocation(demoLocation) } },
+        orderBy: { name: "asc" }
+      });
+      const operatory = await prisma.operatory.findFirst({ where: { tenantId: tenant.id, active: true, location: demoLocation }, orderBy: { name: "asc" } });
       await prisma.appointment.create({
         data: {
           tenantId: tenant.id,
+          location: demoLocation,
           patientId: patient.id,
           treatmentId: treatment?.id ?? null,
           providerId: provider?.id ?? null,

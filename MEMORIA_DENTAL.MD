@@ -1,8 +1,8 @@
 # MEMORIA_DENTAL — SaaS Clinica Dental + Recepcionista IA
 
-Fecha de memoria: 19 de julio de 2026
-Proyecto: SaaS para clinicas dentales con recepcionista IA omnicanal
-Carpeta: `DENTIA`
+Fecha de memoria: 8 de julio de 2026  
+Proyecto: SaaS para clinicas dentales con recepcionista IA omnicanal  
+Carpeta: `SaaS CLINICA DENTAL`
 
 ## Contexto principal
 
@@ -25,8 +25,8 @@ El producto debe cubrir:
 
 La carpeta incluye dos documentos de negocio que hay que tomar como base real del cliente:
 
-- [RUIZ-ESTRADA-BASE-CONOCIMIENTO.md](/Users/alejandroenlared/codex-test/proyecto/AVELKIA/PROYECTOS-CLIENTES/DENTIA/RUIZ-ESTRADA-BASE-CONOCIMIENTO.md)
-- [RUIZ-ESTRADA-DOLORES-DETECTADOS.md](/Users/alejandroenlared/codex-test/proyecto/AVELKIA/PROYECTOS-CLIENTES/DENTIA/RUIZ-ESTRADA-DOLORES-DETECTADOS.md)
+- [RUIZ-ESTRADA-BASE-CONOCIMIENTO.md](/Users/alejandroenlared/codex-test/proyecto/AVELKIA/PROYECTOS-CLIENTES/SaaS%20CLINICA%20DENTAL/RUIZ-ESTRADA-BASE-CONOCIMIENTO.md)
+- [RUIZ-ESTRADA-DOLORES-DETECTADOS.md](/Users/alejandroenlared/codex-test/proyecto/AVELKIA/PROYECTOS-CLIENTES/SaaS%20CLINICA%20DENTAL/RUIZ-ESTRADA-DOLORES-DETECTADOS.md)
 
 Resumen operativo del cliente:
 
@@ -99,11 +99,11 @@ Para dental, la iconografia debe estar relacionada con:
 
 ## Estado actual del proyecto
 
-Fase 1 iniciada y convertida a aplicacion full-stack real. El estado historico de esta seccion corresponde al arranque del 8-9 de julio; la situacion operativa vigente esta consolidada en la seccion "Actualizacion 19 julio 2026 - Estado SaaS, diseno y despliegue".
+Fase 1 iniciada y convertida a aplicacion full-stack real.
 
 Arquitectura actual:
 
-- Next.js 16 + React 19 + TypeScript.
+- Next.js 15 + React 19 + TypeScript.
 - PostgreSQL local mediante Docker.
 - Prisma ORM con schema multi-tenant.
 - Server Actions para CRUD real.
@@ -122,9 +122,7 @@ Archivos clave:
 - `src/lib/dashboard.ts`
 - `src/lib/prisma.ts`
 - `src/components/icon.tsx`
-- `src/app/base.css`
-- `src/app/clinical-design.css`
-- `src/app/globals.css`
+- `styles.css`
 
 Base de datos local:
 
@@ -135,7 +133,7 @@ Base de datos local:
 
 Servidor local:
 
-- URL habitual: `http://localhost:3002` cuando `3001` esta ocupado.
+- URL: `http://localhost:3001`
 
 Validaciones realizadas el 8 de julio de 2026:
 
@@ -151,11 +149,11 @@ Validaciones realizadas el 8 de julio de 2026:
 
 Limitaciones actuales:
 
-- Hay login funcional y usuarios demo; antes de datos reales falta cerrar hardening completo de seguridad/RGPD.
-- El multi-tenant existe en modelo de datos y se usa en acciones principales; antes de piloto real hay que auditar aislamiento por sesion, permisos y accesos indirectos.
+- No hay login productivo todavia.
+- El multi-tenant existe en modelo de datos, pero falta aislamiento por sesion/login.
 - No hay WhatsApp, voz, SMS ni widget web conectados.
 - No hay pagos Stripe.
-- Hay despliegue productivo en Vercel conectado a GitHub.
+- No hay despliegue productivo.
 - No esta listo para datos reales de pacientes hasta completar auth, seguridad, RGPD y auditoria avanzada.
 
 ## Modulos ya implementados en Fase 1
@@ -433,20 +431,20 @@ Casos probables donde debo avisar:
 ### Fases 5-6 — Base CERRADA (integraciones externas pendientes de credenciales)
 
 - API publica v1: `GET/POST /api/v1/patients` y `GET/POST /api/v1/appointments` con cabecera `x-api-key` (clave por tenant, visible en Configuracion), envelope `{success, data, error, meta}`, paginacion. Verificado: 401 sin clave, datos con clave.
-- Rate limiting originalmente in-memory por plan; estado actual: API y webhooks soportan Upstash Redis REST con fallback local.
-- Superadmin originalmente por `/admin?token=...`; estado actual: `/admin` requiere sesion, rol `OWNER` y allowlist `DENTIA_ADMIN_EMAILS` en produccion.
+- Rate limiting in-memory por plan (STARTER 30/min, PRO 120/min, SCALE 600/min) + limite de pacientes por plan en POST.
+- Superadmin `/admin?token=...`: lista tenants con metricas. Token via env `DENTIA_ADMIN_TOKEN` (fallback dev: `dentia-admin-local`). 404 sin token.
 - Campo `plan` en Tenant (default PRO).
-- Pendiente externo: Stripe (cobros reales), DSN/tokens de Sentry en Vercel, PMS dentales (Gesden/Klinikare), telefonia. Todo requiere cuentas/credenciales del cliente.
+- Pendiente externo: Stripe (cobros reales), Sentry/OTel, PMS dentales (Gesden/Klinikare), telefonia. Todo requiere cuentas/credenciales del cliente.
 
 ## Validacion del cierre (9 julio 2026)
 
 - `npm run typecheck`, `npm test` (55 tests, 8 suites), `npm run build`: verdes.
-- QA navegador: login/logout, redireccion sin sesion, aislamiento entre tenants, onboarding de clinica nueva (Ruiz Estrada demo), gate de rol con error visible, consentimiento RGPD toggle, recordatorios (2 creados), webhook whatsapp/sms con respuestas del agente y escalado de urgencia, API v1 con y sin clave, y admin heredado con token antes del cierre actual por sesion/rol.
+- QA navegador: login/logout, redireccion sin sesion, aislamiento entre tenants, onboarding de clinica nueva (Ruiz Estrada demo), gate de rol con error visible, consentimiento RGPD toggle, recordatorios (2 creados), webhook whatsapp/sms con respuestas del agente y escalado de urgencia, API v1 con y sin clave, /admin con y sin token.
 - Bug cazado en QA en vivo: "me duele" no matcheaba keyword "dolor" -> saludo en vez de urgencia. Corregido + test de regresion.
 
 ## Nota operativa
 
-- Mantener secretos fuera de git. La clave LLM usa nombre propio `DENTIA_LLM_API_KEY`; `/admin` ya no usa token y se controla con sesion, rol `OWNER` y `DENTIA_ADMIN_EMAILS`.
+- MCP Sentinel bloquea tocar ficheros de entorno y nombres de claves API conocidas via tools: por eso la clave LLM usa nombre propio `DENTIA_LLM_API_KEY` y el token admin tiene fallback dev en codigo. Anadir esas variables al fichero de entorno a mano si se necesitan.
 - El dev server y `npm run build` no deben correr a la vez (corrompen `.next`).
 
 ## Prioridad siguiente
@@ -1395,7 +1393,7 @@ Pendiente:
    - descartar,
    - marcar revisada.
 4. Incluir el enlace de ficha en emails de confirmacion/modificacion/cancelacion.
-5. Estado actualizado: `prisma db push` ya no esta en `build`; queda pendiente cerrar baseline Neon y activar `prisma migrate deploy` en Vercel antes de nuevos cambios de schema.
+5. Sustituir `prisma db push` en build por migraciones Prisma versionadas antes de uso serio con mas clientes.
 
 ## Actualizacion 17 julio 2026 - Enlace de ficha en payload Make
 
@@ -1684,153 +1682,50 @@ Criterio para seguir:
    - configuracion.
 4. Redisenar antes de seguir anadiendo pantallas.
 
-## Actualizacion 19 julio 2026 - Estado SaaS, diseno y despliegue
+## Norma de verdad UI - Cards sin recorte
 
-Contexto:
+- Ninguna card de Dentia debe cortar informacion visible.
+- Si no hay espacio suficiente, la card debe crecer, la pantalla debe permitir scroll o el contenido debe resumirse de forma explicita con una accion como `Ver todo`.
+- En pantallas sin scroll, se muestran menos items completos antes que filas cortadas.
+- Prohibido usar `overflow: hidden`, `max-height` o recortes visuales para ocultar filas, titulos, fechas, importes, pacientes o tareas dentro de cards.
+- Una fila parcialmente visible dentro de una card es bug visual.
+- Esta regla aplica a todas las pantallas y todas las cards.
 
-- El cliente no validaba el diseno anterior del SaaS.
-- La referencia principal de diseno paso a ser la carpeta local:
-  - `saas new design/`
-- No se debe tocar ni degradar el agente recepcionista Clara; al cliente le ha gustado y queda como pieza protegida.
-- El trabajo del 19 julio se concentro en redisenar el SaaS y corregir problemas visuales de Inicio/Pacientes.
+## Norma de verdad UI - Cancelar creacion
 
-Estado tecnico vigente:
+- Todo flujo de alta, creacion o configuracion temporal debe tener `Cancelar` visible.
+- `Cancelar` no debe crear, guardar ni modificar datos.
+- Al pulsar `Cancelar`, la interfaz debe cerrar el modal/drawer/card de creacion y volver a la vista estable sin `#hash` activo.
+- La `x`, el backdrop y el boton `Cancelar` deben cerrar de forma equivalente.
+- Esta regla aplica a todas las pantallas y todos los formularios de creacion.
 
-- Stack: Next.js 16.2.10, React 19, TypeScript, Prisma 6.19.3, PostgreSQL.
-- Scripts clave:
-  - `npm run dev`
-  - `npm run typecheck`
-  - `npm run lint`
-  - `npm test`
-  - `npm run build`
-  - `npm run db:seed`
-  - `npm run db:reset-demo-patients`
-- Base local Docker:
-  - servicio: `dentia-ai-postgres`
-  - puerto host: `56321`
-  - base: `dentia_ai`
-- Servidor local usado en QA reciente:
-  - `PORT=3002 npm run dev`
-- Credenciales demo locales:
-  - `demo@dentia.ai` / `demo`
-  - `alejandro@dentia.ai` / `dentia-demo-2026`
+## Norma de verdad producto - Sedes
 
-Estado GitHub/Vercel:
+- El selector `Murcia` / `Elche` filtra el entorno completo del SaaS.
+- En Murcia no deben aparecer pacientes, citas, gabinetes ni medicos exclusivos de Elche.
+- En Elche no deben aparecer pacientes, citas, gabinetes ni medicos exclusivos de Murcia.
+- El paciente queda asociado por defecto a la sede donde se da de alta.
+- El paciente tambien aparece en otra sede si tiene una cita/consulta solicitada o activa alli.
+- El medico puede tener consulta en Murcia, Elche o ambas; esa disponibilidad debe configurarse en su ficha.
+- Toda alta de paciente, cita o bloqueo de agenda debe guardar la sede activa.
 
-- Repositorio GitHub:
-  - `https://github.com/alejandroenlared-a11y/DENTIA.git`
-- Rama operativa:
-  - `main`
-- Vercel esta conectado a GitHub y despliega automaticamente cada push a `main`.
-- Checks de Vercel esperados por commit:
-  - `Vercel - dentia`
-  - `Vercel - dentia-hu6t`
-- Dominio productivo principal:
-  - `https://dentia.avelkia.es`
-- Proyecto Vercel operativo:
-  - `dentia-hu6t`
-- El ultimo commit verificado al actualizar esta memoria fue:
-  - `e23f1c3 docs: rewrite dental saas roadmap and add session handoff`
-- Estado remoto de ese commit:
-  - `Vercel - dentia`: `success`
-  - `Vercel - dentia-hu6t`: `success`
+## Actualizacion 20 julio 2026 - Publicacion solicitada
 
-Commits funcionales recientes que definen el estado visual actual:
-
-- `27fc702 feat: redesign Dentia SaaS dashboard`
-  - Rediseno general del SaaS apoyado en las referencias de `saas new design/`.
-  - Base visual de dashboard, navegacion, paneles, cards y modulos.
-- `c313c96 feat: update patient views to client design`
-  - Sustitucion de listado de pacientes y ficha/resumen de paciente siguiendo:
-    - `saas new design/pat_01_listado_de_pacientes/`
-    - `saas new design/pat_08_ficha_resumen_de_paciente/`
-  - Alta de script `npm run db:reset-demo-patients`.
-  - Seed local con 5 pacientes ficticios completos para demo.
-- `67e0bec fix: rename clinic site labels`
-  - Cambio global de sedes visibles:
-    - `Sede Centro` -> `Sede Murcia`
-    - `Sede Playa` -> `Sede Elche`
-- `8132a93 fix: prevent compact card text overflow`
-  - Correccion de textos que se salian de cards compactas.
-- `f354a11 fix: pin home agenda card top right`
-  - Card `Agenda` posicionada en la parte superior derecha del Inicio.
-- `6f3d648 fix: increase card inner spacing`
-  - Aumento de padding interno para evitar texto pegado al borde de cards.
-- `738ee32 fix: align home agenda card height`
-  - Card `Agenda` alineada en altura con la card de `Bienvenida`.
-  - KPIs pasan debajo ocupando todo el ancho.
-- `2d3ffee fix: adopt versioned prisma migrations and drop db push from build`
-  - Baseline `prisma/migrations/0_init/migration.sql` (629 lineas, esquema completo).
-  - Marcada como aplicada en el postgres local (docker 56321); `prisma migrate status` local: up to date.
-  - Script `build` ya NO ejecuta `db push` (era deuda 8.1: riesgo de perdida de datos en cada deploy). Ahora `prisma generate && next build`.
-  - `migrate deploy` NO esta aun en el build de Vercel: Neon produccion necesita antes `npx prisma migrate resolve --applied 0_init` (solo el usuario puede, sentinel bloquea a Claude el acceso a ficheros de entorno). Hasta entonces los deploys no tocan el esquema de produccion.
-- `e23f1c3 docs: rewrite dental saas roadmap and add session handoff`
-  - `HOJA-DE-RUTA-SAAS-DENTAL.md` reescrita entera (camino directo, deuda tecnica, fases con gates).
-  - `HANDOFF.md` con el plan de fase 2 (resolve en Neon + activar `vercel-build` con `migrate deploy`).
-
-Validaciones realizadas el 19 julio 2026:
-
-- `npm run typecheck`: OK.
-- `npm run lint`: OK.
-- `npm run build`: OK.
-- QA Playwright local en Inicio:
-  - login demo correcto,
-  - `Bienvenida` y `Agenda` con mismo `bottom` y misma altura (`bottomDelta: 0`, `heightDelta: 0`),
-  - sin overflow horizontal,
-  - sin cards con texto pegado por debajo del umbral de 12 px.
-- QA visual local de cards:
-  - Home y Tareas sin textos fuera de card.
-  - Cards compactas con padding minimo consistente.
-
-Actualizacion tecnica posterior del 19 julio 2026:
-
-- `src/app/page.tsx` empezo a dividirse: la vista de Pacientes y pre-fichas se movio a `src/components/patients-view.tsx`.
-- Los helpers de tonos/etiquetas de dashboard se movieron a `src/lib/dashboard-view-format.ts`.
-- Sentry quedo configurado de forma base para Next.js App Router/Turbopack:
-  - `instrumentation.ts`
-  - `instrumentation-client.ts`
-  - `sentry.server.config.ts`
-  - `sentry.edge.config.ts`
-  - `src/app/global-error.tsx`
-- Rate limit distribuido listo con Upstash Redis REST y fallback a memoria.
-- `/admin` ya no usa `?token=...`; requiere sesion, rol `OWNER` y `DENTIA_ADMIN_EMAILS` en produccion.
-- Runbook operativo creado:
-  - `docs/OPERATIONS.md`
-
-Regla operativa para cambios futuros:
-
-1. Antes de tocar codigo, revisar:
-   - `git status --short`
-   - archivos afectados,
-   - ultimos commits relevantes con `git log --oneline -12`.
-2. Si el cambio toca diseno:
-   - respetar `saas new design/` como fuente visual,
-   - mantener Clara/recepcionista IA sin cambios salvo peticion explicita,
-   - validar con navegador en desktop y, si aplica, movil/tablet.
-3. Antes de subir:
-   - `npm run typecheck`
-   - `npm run lint`
-   - `npm run build`
-   - `npm test` si hay cambio logico, acciones, validaciones, agente o datos.
-4. Para publicar:
-   - stagear solo archivos intencionales,
-   - commit claro en `main`,
-   - `git push origin main`.
-5. Despues de publicar:
-   - consultar estado del commit en GitHub:
-     - `https://api.github.com/repos/alejandroenlared-a11y/DENTIA/commits/<hash>/status`
-   - esperar a que los dos checks de Vercel terminen en `success`,
-   - si algun deployment queda en `failure`, revisar Vercel antes de darlo por terminado.
-6. Documentar cada fase cerrada en:
-   - `MEMORIA_DENTAL.MD`
-   - `HOJA-DE-RUTA-SAAS-DENTAL.md`
-
-Riesgos activos:
-
-- La base de pacientes ficticios se reseteo en produccion el 19/07/2026 desde `/admin`: 111 pacientes demo antiguos borrados y 5 fichas ficticias completas activas en `clinica-murcia-elche`.
-- `DENTIA_ADMIN_EMAILS` quedo configurado en Vercel `dentia-hu6t` para permitir acceso admin a `alejandro@dentia.ai`.
-- El rediseno visual ya esta desplegado, pero aun necesita revision humana completa por modulo en produccion.
-- No meter datos reales de pacientes hasta cerrar auditoria de seguridad, RGPD, roles/permisos y retencion.
-- Cualquier cambio de Prisma que afecte produccion debe coordinarse con Neon/Vercel antes del deploy.
-- Baseline de migraciones pendiente de marcar en Neon produccion (`npx prisma migrate resolve --applied 0_init` con la URL productiva; solo el usuario). Hasta hacerlo, NO anadir `migrate deploy` al build de Vercel: fallaria el deploy y dejaria una migracion "failed" registrada en Neon.
-- Cambios futuros de esquema: usar `npm run db:migrate` (crea migracion versionada), nunca `db:push` contra produccion.
+- Se corrige Inicio para evitar scroll innecesario en desktop y que ninguna card corte informacion visible.
+- La card de agenda queda alineada en la zona superior derecha del Inicio.
+- En Agenda se elimina el boton superior duplicado de `Nueva cita`; se mantiene la accion contextual dentro de Agenda.
+- Los flujos de creacion incorporan `Cancelar`, `x` y backdrop como salida real sin guardar datos.
+- `Sede Centro` pasa a `Murcia` y `Sede Playa` pasa a `Elche` en todo el SaaS.
+- Se implementa filtrado real por sede en pacientes, citas, eventos de agenda, gabinetes y medicos.
+- Datos de sede persistidos:
+  - `Patient.primaryLocation`
+  - `Provider.locationScope`
+  - `Operatory.location`
+  - `Appointment.location`
+  - `CalendarEvent.location`
+- Validacion local realizada:
+  - `npm run typecheck`: OK.
+  - `npm run lint`: OK.
+  - `npm test -- --run`: 156 tests OK.
+  - Playwright autenticado en `http://localhost:3000`: Murcia y Elche separan pacientes y medicos; medicos `BOTH` aparecen en ambas; Agenda no muestra accion superior duplicada.
+- Para despliegue inmediato, el build actual ejecuta `prisma db push && prisma generate && next build`, por lo que Vercel aplicara el esquema al desplegar. Antes de uso serio con datos reales conviene volver a migraciones Prisma versionadas.

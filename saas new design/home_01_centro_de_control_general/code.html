@@ -580,12 +580,12 @@
         // Micro-interaction for search bar focus
         const searchInput = document.querySelector('input[type="text"]');
         const searchContainer = searchInput.parentElement;
-
+        
         searchInput.addEventListener('focus', () => {
             searchContainer.classList.add('ring-1', 'ring-primary', 'border-primary');
             searchContainer.classList.remove('border-border-base');
         });
-
+        
         searchInput.addEventListener('blur', () => {
             searchContainer.classList.remove('ring-1', 'ring-primary', 'border-primary');
             searchContainer.classList.add('border-border-base');

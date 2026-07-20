@@ -2,6 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import {
   AgentSessionOutcome,
   AppointmentStatus,
+  ClinicLocation,
   ConsentKind,
   ConversationChannel,
   ConversationStatus,
@@ -12,6 +13,7 @@ import {
   InvoiceReceiverType,
   MessageDirection,
   PatientStatus,
+  ProviderLocationScope,
   PrismaClient,
   SifMode,
   TaskPriority,
@@ -196,71 +198,77 @@ async function main() {
   const [draEstrada, drManuel, higienista, drErnesto] = await Promise.all([
     prisma.provider.upsert({
       where: { id: "seed-provider-vidal" },
-      update: { name: "Dra. Esther Estrada Mallada", specialty: "Ortodoncia" },
+      update: { tenantId: tenant.id, name: "Dra. Esther Estrada Mallada", specialty: "Ortodoncia", locationScope: ProviderLocationScope.BOTH },
       create: {
         id: "seed-provider-vidal",
         tenantId: tenant.id,
         name: "Dra. Esther Estrada Mallada",
-        specialty: "Ortodoncia"
+        specialty: "Ortodoncia",
+        locationScope: ProviderLocationScope.BOTH
       }
     }),
     prisma.provider.upsert({
       where: { id: "seed-provider-marin" },
-      update: { name: "Dr. Manuel Ruiz Chumilla", specialty: "Estetica dental y conservadora" },
+      update: { tenantId: tenant.id, name: "Dr. Manuel Ruiz Chumilla", specialty: "Estetica dental y conservadora", locationScope: ProviderLocationScope.MURCIA },
       create: {
         id: "seed-provider-marin",
         tenantId: tenant.id,
         name: "Dr. Manuel Ruiz Chumilla",
-        specialty: "Estetica dental y conservadora"
+        specialty: "Estetica dental y conservadora",
+        locationScope: ProviderLocationScope.MURCIA
       }
     }),
     prisma.provider.upsert({
       where: { id: "seed-provider-marta" },
-      update: { name: "Ana Isabel Garcia Marcos", specialty: "Higiene y mantenimiento periodontal" },
+      update: { tenantId: tenant.id, name: "Ana Isabel Garcia Marcos", specialty: "Higiene y mantenimiento periodontal", locationScope: ProviderLocationScope.BOTH },
       create: {
         id: "seed-provider-marta",
         tenantId: tenant.id,
         name: "Ana Isabel Garcia Marcos",
-        specialty: "Higiene y mantenimiento periodontal"
+        specialty: "Higiene y mantenimiento periodontal",
+        locationScope: ProviderLocationScope.BOTH
       }
     }),
     prisma.provider.upsert({
       where: { id: "seed-provider-ernesto" },
-      update: { name: "Dr. Ernesto Ruiz Chumilla", specialty: "Periodoncia, implantes y cirugia oral" },
+      update: { tenantId: tenant.id, name: "Dr. Ernesto Ruiz Chumilla", specialty: "Periodoncia, implantes y cirugia oral", locationScope: ProviderLocationScope.MURCIA },
       create: {
         id: "seed-provider-ernesto",
         tenantId: tenant.id,
         name: "Dr. Ernesto Ruiz Chumilla",
-        specialty: "Periodoncia, implantes y cirugia oral"
-      }
-    }),
-    prisma.provider.upsert({
-      where: { id: "seed-provider-laura" },
-      update: { name: "Dra. Laura Herencia Lizaran", specialty: "Endodoncia y odontopediatria" },
-      create: {
-        id: "seed-provider-laura",
-        tenantId: tenant.id,
-        name: "Dra. Laura Herencia Lizaran",
-        specialty: "Endodoncia y odontopediatria"
+        specialty: "Periodoncia, implantes y cirugia oral",
+        locationScope: ProviderLocationScope.MURCIA
       }
     })
   ]);
 
+  await prisma.provider.upsert({
+    where: { id: "seed-provider-laura" },
+    update: { tenantId: tenant.id, name: "Dra. Laura Herencia Lizaran", specialty: "Endodoncia y odontopediatria", locationScope: ProviderLocationScope.ELCHE },
+    create: {
+      id: "seed-provider-laura",
+      tenantId: tenant.id,
+      name: "Dra. Laura Herencia Lizaran",
+      specialty: "Endodoncia y odontopediatria",
+      locationScope: ProviderLocationScope.ELCHE
+    }
+  });
+
   const [gab1, gab2, urgencias] = await Promise.all([
     prisma.operatory.upsert({
       where: { id: "seed-operatory-1" },
-      update: {},
-      create: { id: "seed-operatory-1", tenantId: tenant.id, name: "Gabinete 1", kind: "Higiene" }
+      update: { tenantId: tenant.id, location: ClinicLocation.MURCIA, name: "Gabinete 1 Murcia" },
+      create: { id: "seed-operatory-1", tenantId: tenant.id, location: ClinicLocation.MURCIA, name: "Gabinete 1 Murcia", kind: "Higiene" }
     }),
     prisma.operatory.upsert({
       where: { id: "seed-operatory-2" },
-      update: {},
-      create: { id: "seed-operatory-2", tenantId: tenant.id, name: "Gabinete 2", kind: "General" }
+      update: { tenantId: tenant.id, location: ClinicLocation.ELCHE, name: "Gabinete 1 Elche" },
+      create: { id: "seed-operatory-2", tenantId: tenant.id, location: ClinicLocation.ELCHE, name: "Gabinete 1 Elche", kind: "General" }
     }),
     prisma.operatory.upsert({
       where: { id: "seed-operatory-urgencias" },
-      update: {},
-      create: { id: "seed-operatory-urgencias", tenantId: tenant.id, name: "Urgencias", kind: "Urgencias" }
+      update: { tenantId: tenant.id, location: ClinicLocation.MURCIA, name: "Urgencias Murcia" },
+      create: { id: "seed-operatory-urgencias", tenantId: tenant.id, location: ClinicLocation.MURCIA, name: "Urgencias Murcia", kind: "Urgencias" }
     })
   ]);
 
@@ -274,6 +282,7 @@ async function main() {
 
   const maria = await upsertPatient(tenant.id, {
     name: "Maria Lopez Gonzalez",
+    primaryLocation: ClinicLocation.MURCIA,
     phone: "+34 612 456 890",
     email: "maria.lopez@mail.com",
     fiscalName: "Maria Lopez Gonzalez",
@@ -289,6 +298,7 @@ async function main() {
 
   const javier = await upsertPatient(tenant.id, {
     name: "Javier Ruiz Moreno",
+    primaryLocation: ClinicLocation.MURCIA,
     phone: "+34 666 102 488",
     email: "javier.ruiz@mail.com",
     status: PatientStatus.URGENT,
@@ -301,6 +311,7 @@ async function main() {
 
   const ana = await upsertPatient(tenant.id, {
     name: "Ana Molina Prieto",
+    primaryLocation: ClinicLocation.ELCHE,
     phone: "+34 600 331 987",
     email: "ana.molina@mail.com",
     fiscalName: "Ana Molina Prieto",
@@ -316,6 +327,7 @@ async function main() {
 
   const carlos = await upsertPatient(tenant.id, {
     name: "Carlos Vega Martin",
+    primaryLocation: ClinicLocation.MURCIA,
     phone: "+34 689 220 187",
     email: "carlos.vega@mail.com",
     status: PatientStatus.ACTIVE,
@@ -339,6 +351,7 @@ async function main() {
     data: [
       {
         tenantId: tenant.id,
+        location: ClinicLocation.MURCIA,
         patientId: maria.id,
         treatmentId: treatments[2].id,
         providerId: draEstrada.id,
@@ -352,6 +365,7 @@ async function main() {
       },
       {
         tenantId: tenant.id,
+        location: ClinicLocation.MURCIA,
         patientId: javier.id,
         treatmentId: treatments[4].id,
         providerId: drManuel.id,
@@ -365,6 +379,7 @@ async function main() {
       },
       {
         tenantId: tenant.id,
+        location: ClinicLocation.MURCIA,
         patientId: carlos.id,
         treatmentId: treatments[1].id,
         providerId: higienista.id,
@@ -378,6 +393,7 @@ async function main() {
       },
       {
         tenantId: tenant.id,
+        location: ClinicLocation.ELCHE,
         patientId: ana.id,
         treatmentId: treatments[3].id,
         providerId: drErnesto.id,
@@ -510,6 +526,7 @@ async function upsertPatient(
   tenantId: string,
   data: {
     name: string;
+    primaryLocation?: ClinicLocation;
     phone: string;
     email: string;
     fiscalName?: string;
@@ -580,6 +597,7 @@ async function seedBilling(
 ) {
   const lucia = await upsertPatient(tenantId, {
     name: "Lucia Rivas Fernandez",
+    primaryLocation: ClinicLocation.MURCIA,
     phone: "+34 655 902 341",
     email: "lucia.rivas@mail.com",
     fiscalName: "Lucia Rivas Fernandez",
@@ -595,6 +613,7 @@ async function seedBilling(
 
   const antonio = await upsertPatient(tenantId, {
     name: "Antonio Fernandez Ruiz",
+    primaryLocation: ClinicLocation.ELCHE,
     phone: "+34 611 774 502",
     email: "antonio.fernandez@mail.com",
     fiscalName: "Antonio Fernandez Ruiz",

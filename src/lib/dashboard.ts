@@ -1,5 +1,7 @@
+import { AppointmentStatus, type ClinicLocation, type Prisma } from "@prisma/client";
 import { getCurrentContext } from "@/lib/tenant";
 import { prisma } from "@/lib/prisma";
+import { DEFAULT_LOCATION, providerScopesForLocation } from "@/lib/locations";
 
 export type AppView =
   | "home"
@@ -22,66 +24,47 @@ export type AppView =
   | "imaging"
   | "settings";
 
-export function getDashboardDataRequirements(view: AppView) {
+export async function getDashboardData(view: AppView = "home", activeLocation: ClinicLocation = DEFAULT_LOCATION) {
+  const { user: currentUser, tenant } = await getCurrentContext();
   const needsHome = view === "home";
   const needsCalendar = view === "calendar";
   const needsInbox = view === "inbox";
   const needsPatients = view === "patients";
   const needsTasks = view === "tasks";
   const needsAgent = view === "agent" || view === "aiReview";
-  const needsAiReview = view === "aiReview";
   const needsTreatments = view === "treatments";
   const needsBilling = view === "billing";
   const needsSettings = view === "settings";
   const needsClinical = view === "clinic" || view === "lab" || view === "imaging";
   const needsCrm = view === "crm" || view === "automations";
   const needsDocuments = view === "documents";
-  const needsInventory = view === "inventory";
   const needsTeam = view === "team";
   const needsAnalytics = view === "analytics";
 
-  return {
-    needsCalendar,
-    needsPatients,
-    needsAgent,
-    needsSettings,
-    needsTeam,
-    needsOverviewMetricCounts: needsHome,
-    needsPatientRows: needsHome || needsCalendar || needsInbox || needsPatients || needsTasks || needsBilling || needsClinical || needsCrm || needsDocuments || needsAnalytics || needsTeam,
-    needsAppointmentRows: needsHome || needsCalendar || needsInbox || needsPatients || needsClinical || needsCrm || needsInventory || needsTeam || needsAnalytics,
-    needsConversationRows: needsHome || needsInbox || needsCrm || needsAnalytics,
-    needsTaskRows: needsHome || needsTasks || needsClinical || needsCrm || needsDocuments || needsAnalytics || needsTeam,
-    needsTreatmentRows: needsCalendar || needsTreatments || needsClinical || needsCrm || needsAnalytics,
-    needsProviderRows: needsCalendar || needsClinical || needsTeam,
-    needsOperatoryRows: needsCalendar || needsClinical || needsTeam,
-    needsInvoiceRows: needsHome || needsPatients || needsBilling || needsAnalytics || needsDocuments,
-    needsExpenseRows: needsHome || needsBilling || needsAnalytics,
-    needsPatientIntakeRows: needsInbox || needsCrm || needsAiReview,
-    needsRecoveredAppointmentRows: needsHome || needsAnalytics
+  const needsPatientRows = needsHome || needsCalendar || needsInbox || needsPatients || needsTasks || needsBilling || needsClinical || needsCrm || needsDocuments || needsAnalytics || needsTeam || needsAgent;
+  const needsAppointmentRows = needsHome || needsCalendar || needsInbox || needsPatients || needsClinical || needsCrm || needsAnalytics || needsAgent;
+  const needsConversationRows = needsHome || needsInbox || needsCrm || needsAnalytics || needsAgent;
+  const needsTaskRows = needsHome || needsTasks || needsClinical || needsCrm || needsDocuments || needsAnalytics || needsTeam || needsAgent;
+  const needsTreatmentRows = needsCalendar || needsTreatments || needsClinical || needsCrm || needsAnalytics || needsAgent;
+  const needsProviderRows = needsCalendar || needsClinical || needsTeam;
+  const needsOperatoryRows = needsCalendar || needsClinical || needsTeam;
+  const needsBillingRows = needsHome || needsPatients || needsBilling || needsCrm || needsAnalytics || needsDocuments;
+  const needsPatientIntakeRows = needsInbox || needsCrm || needsAgent;
+  const patientLocationWhere: Prisma.PatientWhereInput = {
+    OR: [
+      { primaryLocation: activeLocation },
+      { appointments: { some: { location: activeLocation, status: { not: AppointmentStatus.CANCELLED } } } }
+    ]
   };
-}
-
-export async function getDashboardData(view: AppView = "home") {
-  const { user: currentUser, tenant } = await getCurrentContext();
-  const {
-    needsPatientRows,
-    needsAppointmentRows,
-    needsConversationRows,
-    needsTaskRows,
-    needsTreatmentRows,
-    needsProviderRows,
-    needsOperatoryRows,
-    needsInvoiceRows,
-    needsExpenseRows,
-    needsPatientIntakeRows,
-    needsRecoveredAppointmentRows,
-    needsOverviewMetricCounts,
-    needsCalendar,
-    needsAgent,
-    needsSettings,
-    needsTeam,
-    needsPatients
-  } = getDashboardDataRequirements(view);
+  const patientScopedWhere: Prisma.PatientWhereInput = { tenantId: tenant.id, ...patientLocationWhere };
+  const appointmentScopedWhere: Prisma.AppointmentWhereInput = { tenantId: tenant.id, location: activeLocation };
+  const providerScopedWhere: Prisma.ProviderWhereInput = {
+    tenantId: tenant.id,
+    active: true,
+    locationScope: { in: providerScopesForLocation(activeLocation) }
+  };
+  const operatoryScopedWhere: Prisma.OperatoryWhereInput = { tenantId: tenant.id, active: true, location: activeLocation };
+  const patientRelationScopedWhere: Prisma.PatientWhereInput = patientLocationWhere;
 
   const [
     unreadConversationCount,
@@ -105,50 +88,46 @@ export async function getDashboardData(view: AppView = "home") {
     expenses
   ] = await Promise.all([
     prisma.conversation.count({ where: { tenantId: tenant.id, unread: true } }),
-    needsOverviewMetricCounts
-      ? prisma.appointment.count({ where: { tenantId: tenant.id } })
-      : Promise.resolve(0),
-    prisma.task.count({ where: { tenantId: tenant.id, status: { not: "COMPLETED" } } }),
-    needsOverviewMetricCounts
-      ? prisma.patient.count({ where: { tenantId: tenant.id, status: { not: "INACTIVE" } } })
-      : Promise.resolve(0),
-    needsRecoveredAppointmentRows
+    prisma.appointment.count({ where: appointmentScopedWhere }),
+    prisma.task.count({ where: { tenantId: tenant.id, status: { not: "COMPLETED" }, patient: patientRelationScopedWhere } }),
+    prisma.patient.count({ where: { ...patientScopedWhere, status: { not: "INACTIVE" } } }),
+    needsHome
       ? prisma.appointment.findMany({
-          where: { tenantId: tenant.id, createdByAi: true },
+          where: { ...appointmentScopedWhere, createdByAi: true },
           select: { patient: { select: { estimatedValue: true } } }
         })
       : Promise.resolve([]),
     needsPatientRows
       ? prisma.patient.findMany({
-          where: { tenantId: tenant.id },
+          where: patientScopedWhere,
           orderBy: { createdAt: "desc" },
           include: { consents: true }
         })
       : Promise.resolve([]),
     needsAppointmentRows
       ? prisma.appointment.findMany({
-          where: { tenantId: tenant.id },
+          where: appointmentScopedWhere,
           orderBy: { startsAt: "asc" },
           include: { patient: true, provider: true, operatory: true, treatment: true }
         })
       : Promise.resolve([]),
     needsCalendar
       ? prisma.calendarEvent.findMany({
-          where: { tenantId: tenant.id },
+          where: { tenantId: tenant.id, location: activeLocation },
           orderBy: { startsAt: "asc" },
           include: { provider: true, operatory: true }
         })
       : Promise.resolve([]),
     needsConversationRows
       ? prisma.conversation.findMany({
-          where: { tenantId: tenant.id },
+          where: { tenantId: tenant.id, patient: patientRelationScopedWhere },
           orderBy: { updatedAt: "desc" },
           include: { patient: true, messages: { orderBy: { createdAt: "asc" } } }
         })
       : Promise.resolve([]),
     needsTaskRows
       ? prisma.task.findMany({
-          where: { tenantId: tenant.id },
+          where: { tenantId: tenant.id, patient: patientRelationScopedWhere },
           orderBy: [{ status: "asc" }, { dueAt: "asc" }],
           include: { patient: true }
         })
@@ -161,13 +140,13 @@ export async function getDashboardData(view: AppView = "home") {
       : Promise.resolve([]),
     needsProviderRows
       ? prisma.provider.findMany({
-          where: { tenantId: tenant.id, active: true },
+          where: providerScopedWhere,
           orderBy: { name: "asc" }
         })
       : Promise.resolve([]),
     needsOperatoryRows
       ? prisma.operatory.findMany({
-          where: { tenantId: tenant.id, active: true },
+          where: operatoryScopedWhere,
           orderBy: { name: "asc" }
         })
       : Promise.resolve([]),
@@ -194,7 +173,13 @@ export async function getDashboardData(view: AppView = "home") {
       : Promise.resolve([]),
     needsPatientIntakeRows
       ? prisma.patientIntake.findMany({
-          where: { tenantId: tenant.id },
+          where: {
+            tenantId: tenant.id,
+            OR: [
+              { location: { contains: activeLocation === "ELCHE" ? "Elche" : "Murcia" } },
+              { patient: patientRelationScopedWhere }
+            ]
+          },
           orderBy: { updatedAt: "desc" },
           include: {
             patient: true,
@@ -212,14 +197,14 @@ export async function getDashboardData(view: AppView = "home") {
           return [];
         })
       : Promise.resolve([]),
-    needsInvoiceRows
+    needsBillingRows
       ? prisma.invoice.findMany({
-          where: { tenantId: tenant.id },
+          where: { tenantId: tenant.id, patient: patientRelationScopedWhere },
           orderBy: { issuedAt: "desc" },
           include: { patient: true }
         })
       : Promise.resolve([]),
-    needsExpenseRows
+    needsBillingRows
       ? prisma.expense.findMany({
           where: { tenantId: tenant.id },
           orderBy: { incurredAt: "desc" }
@@ -232,6 +217,7 @@ export async function getDashboardData(view: AppView = "home") {
   return {
     tenant,
     currentUser,
+    activeLocation,
     patients,
     appointments,
     calendarEvents,

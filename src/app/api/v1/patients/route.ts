@@ -22,6 +22,7 @@ export async function GET(request: NextRequest) {
       take: limit,
       select: {
         id: true,
+        primaryLocation: true,
         name: true,
         phone: true,
         email: true,
@@ -70,6 +71,7 @@ export async function POST(request: NextRequest) {
     const patient = await prisma.patient.create({
       data: {
         tenantId: auth.tenant.id,
+        primaryLocation: parsed.data.primaryLocation,
         name: parsed.data.name,
         phone: parsed.data.phone,
         email: parsed.data.email || null,

@@ -584,7 +584,7 @@
             // Logic for checkboxes
             const masterCheckbox = document.querySelector('thead input[type="checkbox"]');
             const rowCheckboxes = document.querySelectorAll('tbody input[type="checkbox"]');
-
+            
             masterCheckbox?.addEventListener('change', (e) => {
                 rowCheckboxes.forEach(cb => {
                     cb.checked = e.target.checked;

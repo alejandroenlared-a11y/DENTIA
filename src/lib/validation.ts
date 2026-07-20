@@ -12,8 +12,10 @@ import {
 import { z } from "zod";
 
 const requiredString = z.string().trim().min(1, "es obligatorio");
+const clinicLocationSchema = z.enum(["MURCIA", "ELCHE"]).default("MURCIA");
 
 export const patientInputSchema = z.object({
+  primaryLocation: clinicLocationSchema,
   name: requiredString,
   phone: requiredString,
   email: z.string().trim().email("no es valido").optional().or(z.literal("")),
@@ -31,6 +33,7 @@ export const patientStatusSchema = z.object({
 });
 
 export const appointmentInputSchema = z.object({
+  location: clinicLocationSchema,
   patientId: requiredString,
   treatmentId: z.string().trim().optional(),
   providerId: z.string().trim().optional(),
@@ -43,6 +46,7 @@ export const appointmentInputSchema = z.object({
 });
 
 export const calendarEventInputSchema = z.object({
+  location: clinicLocationSchema,
   providerId: z.string().trim().optional(),
   operatoryId: z.string().trim().optional(),
   title: requiredString,

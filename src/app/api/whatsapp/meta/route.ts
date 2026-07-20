@@ -2,7 +2,7 @@ import { ConversationChannel } from "@prisma/client";
 import { NextResponse, type NextRequest } from "next/server";
 import { processInboundMessage } from "@/lib/agent";
 import { prisma } from "@/lib/prisma";
-import { checkPersistentRateLimit } from "@/lib/rate-limit";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { parseWhatsAppCloudMessages, sendWhatsAppText } from "@/lib/whatsapp";
 
 export const runtime = "nodejs";
@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   const tenantSlug = process.env.WHATSAPP_DEMO_TENANT_SLUG || process.env.DEFAULT_TENANT_SLUG || DEFAULT_DEMO_TENANT_SLUG;
-  const rate = await checkPersistentRateLimit(`whatsapp-meta:${tenantSlug}`, 180, 60_000);
+  const rate = checkRateLimit(`whatsapp-meta:${tenantSlug}`, 180, 60_000);
 
   if (!rate.allowed) {
     return NextResponse.json({ success: true, data: { received: 0, processed: 0, rateLimited: true }, error: null });

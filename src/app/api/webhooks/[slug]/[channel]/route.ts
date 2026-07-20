@@ -2,7 +2,7 @@ import { ConversationChannel } from "@prisma/client";
 import { NextResponse, type NextRequest } from "next/server";
 import { processInboundMessage } from "@/lib/agent";
 import { prisma } from "@/lib/prisma";
-import { checkPersistentRateLimit } from "@/lib/rate-limit";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { constantTimeEqual, isConfiguredSecret } from "@/lib/security";
 import { firstErrorMessage, inboundMessageSchema } from "@/lib/validation";
 
@@ -33,7 +33,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ success: false, data: null, error: "Canal no soportado." }, { status: 400 });
   }
 
-  const rate = await checkPersistentRateLimit(`webhook:${slug}`, 60, 60_000);
+  const rate = checkRateLimit(`webhook:${slug}`, 60, 60_000);
   if (!rate.allowed) {
     return NextResponse.json(
       { success: false, data: null, error: "Demasiadas peticiones. Espera un minuto." },

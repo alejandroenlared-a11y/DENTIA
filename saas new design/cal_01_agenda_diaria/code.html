@@ -428,10 +428,10 @@
             const startHour = 8;
             const hourHeight = 60;
             const headerHeight = 40; // Grid header offset
-
+            
             const currentHour = now.getHours();
             const currentMinutes = now.getMinutes();
-
+            
             if (currentHour >= startHour && currentHour <= 20) {
                 const minutesFromStart = (currentHour - startHour) * 60 + currentMinutes;
                 const topPos = (minutesFromStart / 60) * hourHeight + headerHeight;

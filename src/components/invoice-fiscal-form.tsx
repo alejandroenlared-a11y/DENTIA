@@ -2,6 +2,7 @@
 
 import { useMemo, useState, type FormEvent } from "react";
 import type { InvoiceDocumentType, InvoiceReceiverType } from "@prisma/client";
+import { CancelCreateLink } from "@/components/cancel-create-link";
 
 type InvoicePatient = {
   id: string;
@@ -17,9 +18,10 @@ type InvoicePatient = {
 type InvoiceFiscalFormProps = {
   patients: InvoicePatient[];
   action: (formData: FormData) => void | Promise<void>;
+  cancelHref?: string;
 };
 
-export function InvoiceFiscalForm({ patients, action }: InvoiceFiscalFormProps) {
+export function InvoiceFiscalForm({ patients, action, cancelHref }: InvoiceFiscalFormProps) {
   const firstPatient = patients[0];
   const [patientId, setPatientId] = useState(firstPatient?.id ?? "");
   const selectedPatient = useMemo(
@@ -126,6 +128,7 @@ export function InvoiceFiscalForm({ patients, action }: InvoiceFiscalFormProps) 
         <span>Motivo de exencion o notas internas</span>
         <textarea name="taxExemptionReason" value={taxExemptionReason} onChange={event => setTaxExemptionReason(event.target.value)} />
       </label>
+      {cancelHref ? <CancelCreateLink href={cancelHref}>Cancelar</CancelCreateLink> : null}
       <button className="button primary" type="submit">Emitir factura</button>
     </form>
   );

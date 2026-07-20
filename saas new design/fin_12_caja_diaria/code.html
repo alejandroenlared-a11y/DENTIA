@@ -406,7 +406,7 @@
         countedInput.addEventListener('input', (e) => {
             const counted = parseFloat(e.target.value) || 0;
             const diff = counted - expectedCash;
-
+            
             if (diff === 0) {
                 diffDisplay.innerText = "$0.00";
                 diffDisplay.className = "font-headline-md text-headline-md text-white";

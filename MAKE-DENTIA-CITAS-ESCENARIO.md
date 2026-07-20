@@ -250,3 +250,4 @@ El paciente {{patient.name}} no tiene email registrado. Evento: {{eventType}}. T
 9. Cancela la cita.
 
 Si los tres emails llegan, el flujo queda cerrado.
+

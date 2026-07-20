@@ -268,7 +268,7 @@
 
         function draw(e) {
             if (!drawing) return;
-
+            
             const rect = canvas.getBoundingClientRect();
             const x = (e.clientX || e.touches[0].clientX) - rect.left;
             const y = (e.clientY || e.touches[0].clientY) - rect.top;
@@ -298,12 +298,12 @@
         confirmBtn.addEventListener('click', () => {
             confirmBtn.disabled = true;
             confirmBtn.innerHTML = '<span class="material-symbols-outlined animate-spin" data-icon="progress_activity">progress_activity</span> Procesando...';
-
+            
             setTimeout(() => {
                 toast.classList.remove('translate-y-20', 'opacity-0');
                 confirmBtn.innerHTML = '<span class="material-symbols-outlined" data-icon="check">check</span> ¡Hecho!';
                 confirmBtn.classList.replace('bg-primary', 'bg-success');
-
+                
                 setTimeout(() => {
                     toast.classList.add('translate-y-20', 'opacity-0');
                 }, 3000);

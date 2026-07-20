@@ -23,6 +23,7 @@ export async function GET(request: NextRequest) {
       select: {
         id: true,
         title: true,
+        location: true,
         startsAt: true,
         durationMinutes: true,
         status: true,
@@ -76,6 +77,7 @@ export async function POST(request: NextRequest) {
     const appointment = await prisma.appointment.create({
       data: {
         tenantId: auth.tenant.id,
+        location: parsed.data.location,
         patientId: patient.id,
         treatmentId: parsed.data.treatmentId || null,
         title: parsed.data.title,

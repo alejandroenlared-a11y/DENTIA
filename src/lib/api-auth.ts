@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import type { Tenant } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { checkPersistentRateLimit } from "@/lib/rate-limit";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 export const planLimits: Record<string, { maxPatients: number; apiRequestsPerMinute: number }> = {
   STARTER: { maxPatients: 200, apiRequestsPerMinute: 30 },
@@ -31,7 +31,7 @@ export async function authenticateApiRequest(
   }
 
   const limits = getPlanLimits(tenant.plan);
-  const rate = await checkPersistentRateLimit(`api:${tenant.id}`, limits.apiRequestsPerMinute, 60_000);
+  const rate = checkRateLimit(`api:${tenant.id}`, limits.apiRequestsPerMinute, 60_000);
   if (!rate.allowed) {
     return { response: apiError(429, "Limite de peticiones del plan alcanzado. Espera un minuto.") };
   }

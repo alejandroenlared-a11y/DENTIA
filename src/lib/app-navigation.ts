@@ -89,13 +89,11 @@ export function isView(value: unknown): value is AppView {
   return typeof value === "string" && navItems.some(item => item.id === value);
 }
 
-export function primaryActionHref(view: AppView, actionView: AppView): string | null {
-  if (view === "calendar" || actionView === "calendar") return "/?view=calendar#new-appointment";
+export function primaryActionHref(view: AppView, actionView: AppView) {
+  if (view === "calendar") return "/?view=calendar#new-appointment";
   if (view === "patients") return "/?view=patients#new-patient";
   if (view === "treatments") return "/?view=treatments#new-treatment";
-  if (view === "crm") return "/?view=patients#new-patient";
-  if (view === "tasks" || actionView === "tasks") return "/?view=tasks#new-task";
   if (view === "billing") return "/?view=billing#new-invoice";
-  if (view === "team") return "/?view=settings#invite-user";
-  return null;
+  if (view === "settings" || actionView === "settings") return "/?view=settings";
+  return `/?view=${actionView}`;
 }

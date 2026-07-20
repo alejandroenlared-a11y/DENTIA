@@ -8,6 +8,7 @@ import {
   PatientStatus,
   TaskPriority,
   TaskStatus,
+  type ClinicLocation,
   type Prisma,
   type Tenant,
   type TenantSetting
@@ -36,6 +37,7 @@ import { detectSchedulingRequest, type SchedulingRequestKind } from "@/lib/agent
 import { parseSlotChoice } from "@/lib/agent/slot-choice";
 import { notifyAppointmentEvent } from "@/lib/notifications/appointment-notifications";
 import { ensurePatientIntakeFromDentalState } from "@/lib/patient-intake";
+import { parseLocation, parseOptionalLocation, providerScopesForLocation } from "@/lib/locations";
 
 export { roundUpToSlot };
 
@@ -62,11 +64,13 @@ export async function processInboundMessage(
 ): Promise<InboundResult> {
   const startedAt = Date.now();
   const inboundEmail = extractEmail(payload.body);
+  const inboundLocation = parseOptionalLocation(payload.body);
 
   const patient = await prisma.patient.upsert({
     where: { tenantId_phone: { tenantId: tenant.id, phone: payload.from } },
     create: {
       tenantId: tenant.id,
+      ...(inboundLocation ? { primaryLocation: inboundLocation } : {}),
       name: payload.name?.trim() || `Contacto ${payload.from}`,
       phone: payload.from,
       email: inboundEmail || null,
@@ -76,6 +80,7 @@ export async function processInboundMessage(
     },
     update: {
       ...(payload.name?.trim() ? { name: payload.name.trim() } : {}),
+      ...(inboundLocation ? { primaryLocation: inboundLocation } : {}),
       ...(inboundEmail ? { email: inboundEmail } : {})
     }
   });
@@ -455,6 +460,7 @@ type PendingBookingMetadata = {
   providerId: string | null;
   providerName: string | null;
   operatoryId: string | null;
+  location: ClinicLocation;
   durationMinutes: number;
   treatmentNeed: string;
   channel: ConversationChannel;
@@ -475,10 +481,12 @@ async function persistDentalOutcome(input: {
 }): Promise<PersistOutcome> {
   const { tenantId, patientId, conversationId, channel, dentalTurn, autoBook = true } = input;
   const state = dentalTurn.state;
+  const location = parseLocation(state.location);
 
   await prisma.patient.update({
     where: { id: patientId },
     data: {
+      primaryLocation: location,
       ...(state.name ? { name: state.name } : {}),
       ...(state.email ? { email: state.email } : {}),
       treatmentNeed: state.treatmentNeed,
@@ -534,8 +542,8 @@ async function persistDentalOutcome(input: {
     },
     orderBy: { name: "asc" }
   });
-  const provider = await findProviderForIntent(tenantId, state.intent);
-  const operatory = await prisma.operatory.findFirst({ where: { tenantId, active: true }, orderBy: { name: "asc" } });
+  const provider = await findProviderForIntent(tenantId, state.intent, location);
+  const operatory = await prisma.operatory.findFirst({ where: { tenantId, active: true, location }, orderBy: { name: "asc" } });
   const durationMinutes = treatment?.durationMinutes ?? 30;
   const preferredFrom = inferPreferredStart(state.availability);
   const startsAt = provider
@@ -545,6 +553,7 @@ async function persistDentalOutcome(input: {
   const createdAppointment = await prisma.appointment.create({
     data: {
       tenantId,
+      location,
       patientId,
       treatmentId: treatment?.id ?? null,
       providerId: provider?.id ?? null,
@@ -591,6 +600,7 @@ async function buildBookingProposal(input: {
 }): Promise<BookingProposal | null> {
   const { tenantId, patientId, channel, dentalTurn } = input;
   const state = dentalTurn.state;
+  const location = parseLocation(state.location);
   const treatment = await prisma.treatment.findFirst({
     where: {
       tenantId,
@@ -599,8 +609,8 @@ async function buildBookingProposal(input: {
     },
     orderBy: { name: "asc" }
   });
-  const provider = await findProviderForIntent(tenantId, state.intent);
-  const operatory = await prisma.operatory.findFirst({ where: { tenantId, active: true }, orderBy: { name: "asc" } });
+  const provider = await findProviderForIntent(tenantId, state.intent, location);
+  const operatory = await prisma.operatory.findFirst({ where: { tenantId, active: true, location }, orderBy: { name: "asc" } });
   const durationMinutes = treatment?.durationMinutes ?? 30;
   const options = provider
     ? await listGuidedBookingSlots(tenantId, provider.id, state.availability, durationMinutes)
@@ -615,6 +625,7 @@ async function buildBookingProposal(input: {
         providerId: provider?.id ?? null,
         providerName: provider?.name ?? null,
         operatoryId: operatory?.id ?? null,
+        location,
         durationMinutes,
         treatmentNeed: state.treatmentNeed,
         channel,
@@ -639,6 +650,7 @@ async function buildBookingProposal(input: {
       providerId: provider?.id ?? null,
       providerName: provider?.name ?? null,
       operatoryId: operatory?.id ?? null,
+      location,
       durationMinutes,
       treatmentNeed: state.treatmentNeed,
       channel,
@@ -830,6 +842,7 @@ async function resolvePendingBookingChoice(
   const appointment = await prisma.appointment.create({
     data: {
       tenantId,
+      location: pending.location,
       patientId: pending.patientId,
       treatmentId: pending.treatmentId,
       providerId: pending.providerId,
@@ -884,6 +897,7 @@ function parsePendingBooking(value: unknown): PendingBookingMetadata | null {
     providerId: typeof record.providerId === "string" ? record.providerId : null,
     providerName: typeof record.providerName === "string" ? record.providerName : null,
     operatoryId: typeof record.operatoryId === "string" ? record.operatoryId : null,
+    location: parseLocation(record.location),
     durationMinutes: typeof record.durationMinutes === "number" ? record.durationMinutes : 30,
     treatmentNeed: typeof record.treatmentNeed === "string" ? record.treatmentNeed : "valoracion dental",
     channel: isConversationChannel(record.channel) ? record.channel : ConversationChannel.WHATSAPP,
@@ -921,11 +935,12 @@ async function bookUrgentSlot(input: {
     return null;
   }
 
-  const provider = await findProviderForIntent(tenantId, dentalTurn.state.intent);
+  const location = parseLocation(dentalTurn.state.location);
+  const provider = await findProviderForIntent(tenantId, dentalTurn.state.intent, location);
   if (!provider) {
     return null;
   }
-  const operatory = await prisma.operatory.findFirst({ where: { tenantId, active: true }, orderBy: { name: "asc" } });
+  const operatory = await prisma.operatory.findFirst({ where: { tenantId, active: true, location }, orderBy: { name: "asc" } });
 
   const startsAt = await findNextAvailableSlot(tenantId, provider.id, {
     durationMinutes: URGENT_SLOT_MINUTES,
@@ -945,6 +960,7 @@ async function bookUrgentSlot(input: {
   const appointment = await prisma.appointment.create({
     data: {
       tenantId,
+      location,
       patientId,
       treatmentId: urgentTreatment?.id ?? null,
       providerId: provider.id,
@@ -1011,8 +1027,15 @@ const SPECIALTY_ROUTING: Partial<Record<DentalIntentId, ProviderRoutingProfile>>
   tmj_bruxism: { keywords: ["conservador", "urgenc"] }
 };
 
-async function findProviderForIntent(tenantId: string, intent: DentalIntentId | undefined) {
-  const providers = await prisma.provider.findMany({ where: { tenantId, active: true }, orderBy: { name: "asc" } });
+async function findProviderForIntent(tenantId: string, intent: DentalIntentId | undefined, location?: ClinicLocation) {
+  const providers = await prisma.provider.findMany({
+    where: {
+      tenantId,
+      active: true,
+      ...(location ? { locationScope: { in: providerScopesForLocation(location) } } : {})
+    },
+    orderBy: { name: "asc" }
+  });
   if (providers.length === 0) {
     return null;
   }

@@ -56,7 +56,6 @@ const icons = {
   analytics: BarChart3,
   automations: Wand2,
   aiReview: CheckCircle2,
-  checkCircle: CheckCircle2,
   imaging: Image,
   search: Search,
   filter: ListFilter,

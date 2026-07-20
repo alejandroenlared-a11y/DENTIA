@@ -1,4 +1,5 @@
 import { Fragment } from "react";
+import Link from "next/link";
 import { AppointmentStatus, CalendarEventType, ConversationChannel, ElectronicInvoiceStatus, PatientIntakeStatus, PatientStatus, TaskPriority } from "@prisma/client";
 import {
   EmptyState,
@@ -11,7 +12,6 @@ import {
   ViewHead,
   type Tone
 } from "@/components/clinical-ui";
-import { DashboardLink as Link } from "@/components/dashboard-link";
 import {
   cancelAppointmentAction,
   cancelCalendarEventAction,
@@ -19,7 +19,9 @@ import {
   createAppointmentAction,
   createCalendarEventAction,
   createInvoiceAction,
+  createPatientAction,
   createTaskFromConversationAction,
+  createTaskFromPatientIntakeAction,
   createTaskAction,
   createTreatmentAction,
   generateRemindersAction,
@@ -30,25 +32,22 @@ import {
   runAgentDemoAction,
   saveInteractiveDemoAction,
   toggleAssistantAction,
+  updatePatientStatusAction,
+  updatePatientIntakeStatusAction,
   updateInvoiceElectronicStatusAction,
   updateSettingsAction
 } from "@/app/actions";
 import { Icon, type IconName } from "@/components/icon";
+import { CancelCreateLink } from "@/components/cancel-create-link";
 import { InvoiceFiscalForm } from "@/components/invoice-fiscal-form";
 import { InteractiveAgentDemo } from "@/components/interactive-agent-demo";
-import { PatientIntakesPanel, PatientsView } from "@/components/patients-view";
 import { SaasAppShell } from "@/components/saas-app-shell";
 import { demoKnowledge, demoScenarios } from "@/lib/agent/demo-data";
 import { isView } from "@/lib/app-navigation";
 import { formatLongDate, formatMonthLabel, formatWeekRange, getBusinessWeekDays, getGreeting, getMonthDays } from "@/lib/calendar";
 import { type AppView, getDashboardData } from "@/lib/dashboard";
-import {
-  appointmentStatusLabel,
-  appointmentStatusTone,
-  patientIntakeStatusLabel,
-  patientIntakeStatusTone
-} from "@/lib/dashboard-view-format";
 import { formatDate, formatDateTime, formatMoney, formatTime, getInitials } from "@/lib/format";
+import { locationLabel, locationSlug, parseLocation } from "@/lib/locations";
 import { CLINIC_CLOSE_HOUR, CLINIC_OPEN_HOUR } from "@/lib/scheduling";
 
 type PageProps = {
@@ -61,9 +60,6 @@ export default async function Page({ searchParams }: PageProps) {
   const selectedConversationId = Array.isArray(params?.conversation) ? params?.conversation[0] : params?.conversation;
   const selectedPatientId = Array.isArray(params?.patient) ? params?.patient[0] : params?.patient;
   const patientQuery = Array.isArray(params?.q) ? params?.q[0] : params?.q;
-  const patientStatusFilter = Array.isArray(params?.patientStatus) ? params?.patientStatus[0] : params?.patientStatus;
-  const patientDebtFilter = Array.isArray(params?.debt) ? params?.debt[0] : params?.debt;
-  const patientProviderFilter = Array.isArray(params?.provider) ? params?.provider[0] : params?.provider;
   const errorNotice = Array.isArray(params?.error) ? params?.error[0] : params?.error;
   const okNotice = Array.isArray(params?.ok) ? params?.ok[0] : params?.ok;
   const weekParam = Array.isArray(params?.week) ? params?.week[0] : params?.week;
@@ -72,13 +68,16 @@ export default async function Page({ searchParams }: PageProps) {
   const monthOffset = Number.isFinite(Number(monthParam)) ? Math.trunc(Number(monthParam)) : 0;
   const modeParam = Array.isArray(params?.mode) ? params?.mode[0] : params?.mode;
   const calendarMode = modeParam === "month" ? "month" : "week";
+  const siteParam = Array.isArray(params?.site) ? params?.site[0] : params?.site;
+  const activeLocation = parseLocation(siteParam);
   const view = isView(requestedView) ? requestedView : "home";
-  const data = await getDashboardData(view);
+  const data = await getDashboardData(view, activeLocation);
 
   return (
     <SaasAppShell
       data={data}
       view={view}
+      activeLocation={activeLocation}
       patientQuery={patientQuery}
       notices={
         <>
@@ -87,17 +86,7 @@ export default async function Page({ searchParams }: PageProps) {
         </>
       }
     >
-      {renderView(view, data, {
-        selectedConversationId,
-        selectedPatientId,
-        patientQuery,
-        patientStatusFilter,
-        patientDebtFilter,
-        patientProviderFilter,
-        weekOffset,
-        monthOffset,
-        calendarMode
-      })}
+      {renderView(view, data, { selectedConversationId, selectedPatientId, patientQuery, weekOffset, monthOffset, calendarMode })}
     </SaasAppShell>
   );
 }
@@ -109,9 +98,6 @@ function renderView(
     selectedConversationId?: string;
     selectedPatientId?: string;
     patientQuery?: string;
-    patientStatusFilter?: string;
-    patientDebtFilter?: string;
-    patientProviderFilter?: string;
     weekOffset?: number;
     monthOffset?: number;
     calendarMode?: "week" | "month";
@@ -134,18 +120,7 @@ function renderView(
     case "aiReview":
       return <AiReviewView data={data} />;
     case "patients":
-      return (
-        <PatientsView
-          data={data}
-          selectedPatientId={options.selectedPatientId}
-          query={options.patientQuery}
-          filters={{
-            status: options.patientStatusFilter,
-            debt: options.patientDebtFilter,
-            provider: options.patientProviderFilter
-          }}
-        />
-      );
+      return <PatientsView data={data} selectedPatientId={options.selectedPatientId} query={options.patientQuery} />;
     case "clinic":
       return <ClinicView data={data} />;
     case "treatments":
@@ -182,7 +157,7 @@ function HomeView({ data }: { data: Awaited<ReturnType<typeof getDashboardData>>
     <div className="home-overview">
       <div className="home-intro">
         <h1>{getGreeting()}, {data.currentUser.name}</h1>
-        <p>Espacio de trabajo de {data.tenant.name} · {formatLongDate()}</p>
+        <p>Espacio de trabajo de {data.tenant.name} · {locationLabel(data.activeLocation)} · {formatLongDate()}</p>
         <div className="toolbar">
           <form action={toggleAssistantAction} className="form-inline">
             <input type="hidden" name="view" value="home" />
@@ -221,7 +196,7 @@ function HomeView({ data }: { data: Awaited<ReturnType<typeof getDashboardData>>
                 {data.appointments.length === 0 ? (
                   <p className="empty-note">No hay citas en agenda. Crea la primera desde Calendario.</p>
                 ) : (
-                  data.appointments.slice(0, 3).map(appointment => (
+                  data.appointments.slice(0, 2).map(appointment => (
                     <div className="compact-row" key={appointment.id}>
                       <strong>{appointment.title}</strong>
                       <span>
@@ -251,7 +226,7 @@ function HomeView({ data }: { data: Awaited<ReturnType<typeof getDashboardData>>
                 {data.tasks.length === 0 ? (
                   <p className="empty-note">Sin tareas pendientes en las colas de trabajo.</p>
                 ) : (
-                  data.tasks.slice(0, 5).map(task => (
+                  data.tasks.slice(0, 3).map(task => (
                     <div className="compact-row" key={task.id}>
                       <strong>{task.title}</strong>
                       <span>
@@ -267,7 +242,7 @@ function HomeView({ data }: { data: Awaited<ReturnType<typeof getDashboardData>>
                 {data.conversations.length === 0 ? (
                   <p className="empty-note">Sin conversaciones registradas todavia.</p>
                 ) : (
-                  data.conversations.slice(0, 3).map(conversation => (
+                  data.conversations.slice(0, 2).map(conversation => (
                     <div className="compact-row" key={conversation.id}>
                       <strong>{conversation.patient?.name ?? "Paciente sin ficha"}</strong>
                       <span>
@@ -328,6 +303,7 @@ function CalendarView({
     provider,
     count: visibleAppointments.filter(appointment => appointment.providerId === provider.id).length
   }));
+  const siteQuery = `site=${locationSlug(data.activeLocation)}`;
 
   return (
     <>
@@ -416,21 +392,21 @@ function CalendarView({
         <div className="calendar-main-panel">
           <div className="calendar-nav">
             <div className="calendar-segment" aria-label="Vista del calendario">
-              <Link className={mode === "week" ? "active" : ""} href={`/?view=calendar&mode=week&week=${weekOffset}`}>Semana</Link>
-              <Link className={mode === "month" ? "active" : ""} href={`/?view=calendar&mode=month&month=${monthOffset}`}>Mes</Link>
+              <Link className={mode === "week" ? "active" : ""} href={`/?view=calendar&${siteQuery}&mode=week&week=${weekOffset}`}>Semana</Link>
+              <Link className={mode === "month" ? "active" : ""} href={`/?view=calendar&${siteQuery}&mode=month&month=${monthOffset}`}>Mes</Link>
             </div>
             <div className="calendar-range-actions">
               {mode === "week" ? (
                 <>
-                  <Link className="button" href={`/?view=calendar&mode=week&week=${weekOffset - 1}`}>&larr; Anterior</Link>
-                  <Link className="button subtle" href="/?view=calendar&mode=week&week=0">Hoy</Link>
-                  <Link className="button" href={`/?view=calendar&mode=week&week=${weekOffset + 1}`}>Siguiente &rarr;</Link>
+                  <Link className="button" href={`/?view=calendar&${siteQuery}&mode=week&week=${weekOffset - 1}`}>&larr; Anterior</Link>
+                  <Link className="button subtle" href={`/?view=calendar&${siteQuery}&mode=week&week=0`}>Hoy</Link>
+                  <Link className="button" href={`/?view=calendar&${siteQuery}&mode=week&week=${weekOffset + 1}`}>Siguiente &rarr;</Link>
                 </>
               ) : (
                 <>
-                  <Link className="button" href={`/?view=calendar&mode=month&month=${monthOffset - 1}`}>&larr; Anterior</Link>
-                  <Link className="button subtle" href="/?view=calendar&mode=month&month=0">Hoy</Link>
-                  <Link className="button" href={`/?view=calendar&mode=month&month=${monthOffset + 1}`}>Siguiente &rarr;</Link>
+                  <Link className="button" href={`/?view=calendar&${siteQuery}&mode=month&month=${monthOffset - 1}`}>&larr; Anterior</Link>
+                  <Link className="button subtle" href={`/?view=calendar&${siteQuery}&mode=month&month=0`}>Hoy</Link>
+                  <Link className="button" href={`/?view=calendar&${siteQuery}&mode=month&month=${monthOffset + 1}`}>Siguiente &rarr;</Link>
                 </>
               )}
             </div>
@@ -612,18 +588,22 @@ function EventCard({ event }: { event: Awaited<ReturnType<typeof getDashboardDat
 
 function EventForm({ data }: { data: Awaited<ReturnType<typeof getDashboardData>> }) {
   const today = new Date().toISOString().slice(0, 10);
+  const calendarHref = `/?view=calendar&site=${locationSlug(data.activeLocation)}`;
   return (
     <section id="new-event" className="calendar-drawer" aria-label="Nuevo evento">
-      <Link className="calendar-drawer-backdrop" href="/?view=calendar" aria-label="Cerrar nuevo evento" />
+      <CancelCreateLink className="calendar-drawer-backdrop" href={calendarHref} ariaLabel="Cerrar nuevo evento">
+        <span className="sr-only">Cerrar nuevo evento</span>
+      </CancelCreateLink>
       <div className="calendar-drawer-panel">
         <header className="calendar-drawer-head">
           <div>
             <span>Agenda clinica</span>
             <h2>Bloquear agenda</h2>
           </div>
-          <Link className="icon-button" href="/?view=calendar" aria-label="Cerrar">x</Link>
+          <CancelCreateLink className="icon-button" href={calendarHref} ariaLabel="Cerrar">x</CancelCreateLink>
         </header>
         <form action={createCalendarEventAction} className="calendar-drawer-body form-grid">
+          <input type="hidden" name="location" value={data.activeLocation} />
           <label className="field">
             <span>Profesional</span>
             <select name="providerId">
@@ -658,7 +638,7 @@ function EventForm({ data }: { data: Awaited<ReturnType<typeof getDashboardData>
           </div>
           <Field label="Duracion minutos" name="durationMinutes" type="number" defaultValue="30" required />
           <footer className="calendar-drawer-foot">
-            <Link className="button" href="/?view=calendar">Cancelar</Link>
+            <CancelCreateLink href={calendarHref}>Cancelar</CancelCreateLink>
             <button className="button primary" type="submit">Crear evento</button>
           </footer>
         </form>
@@ -785,6 +765,498 @@ function InboxView({
         />
       )}
     </>
+  );
+}
+
+function PatientsView({
+  data,
+  selectedPatientId,
+  query
+}: {
+  data: Awaited<ReturnType<typeof getDashboardData>>;
+  selectedPatientId?: string;
+  query?: string;
+}) {
+  const appointmentLogsByAppointmentId = new Map<string, typeof data.auditLogs>();
+  for (const log of data.auditLogs) {
+    if (!log.entityId) continue;
+    const current = appointmentLogsByAppointmentId.get(log.entityId) ?? [];
+    current.push(log);
+    appointmentLogsByAppointmentId.set(log.entityId, current);
+  }
+
+  const appointmentsByPatientId = new Map<string, typeof data.appointments>();
+  for (const appointment of data.appointments) {
+    const current = appointmentsByPatientId.get(appointment.patientId) ?? [];
+    current.push(appointment);
+    appointmentsByPatientId.set(appointment.patientId, current);
+  }
+
+  const invoicesByPatientId = new Map<string, typeof data.invoices>();
+  for (const invoice of data.invoices) {
+    const current = invoicesByPatientId.get(invoice.patientId) ?? [];
+    current.push(invoice);
+    invoicesByPatientId.set(invoice.patientId, current);
+  }
+
+  const normalizedQuery = normalizeSearch(query ?? "");
+  const filteredPatients = normalizedQuery
+    ? data.patients.filter(patient => {
+        const searchable = normalizeSearch([
+          patient.name,
+          patient.phone,
+          patient.email,
+          patient.taxId,
+          patient.treatmentNeed,
+          patient.source,
+          patient.status
+        ].filter(Boolean).join(" "));
+        return searchable.includes(normalizedQuery);
+      })
+    : data.patients;
+  const selectedPatient =
+    filteredPatients.find(patient => patient.id === selectedPatientId) ??
+    data.patients.find(patient => patient.id === selectedPatientId) ??
+    filteredPatients[0] ??
+    data.patients[0];
+  const activePatients = data.patients.filter(patient => patient.status === PatientStatus.ACTIVE);
+  const fiscalPending = data.patients.filter(patient => !patient.taxId || !patient.fiscalName || !patient.fiscalAddress).length;
+  const contactPending = data.patients.filter(patient => !patient.email).length;
+  const patientsWithFutureAppointment = new Set(
+    data.appointments
+      .filter(appointment => appointment.startsAt >= new Date() && appointment.status !== AppointmentStatus.CANCELLED)
+      .map(appointment => appointment.patientId)
+  );
+  const openPipelineCents = data.patients
+    .filter(patient => patient.status === PatientStatus.NEW_LEAD || patient.status === PatientStatus.OPEN_BUDGET)
+    .reduce((sum, patient) => sum + patient.estimatedValue, 0);
+
+  return (
+    <>
+      <ViewHead title="Pacientes" subtitle="Registro maestro: altas, bajas, modificaciones y ficha 360 del paciente." />
+      <section className="patient-registry-hero">
+        <MiniPipeline label="Activos" value={data.patients.filter(patient => patient.status === PatientStatus.ACTIVE).length} accent="accent-green" />
+        <MiniPipeline label="Nuevos" value={data.patients.filter(patient => patient.status === PatientStatus.NEW_LEAD).length} accent="accent-blue" />
+        <MiniPipeline label="Presupuesto" value={data.patients.filter(patient => patient.status === PatientStatus.OPEN_BUDGET).length} accent="accent-purple" />
+        <MiniPipeline label="Baja/Inactivos" value={data.patients.filter(patient => patient.status === PatientStatus.INACTIVE).length} accent="accent-red" />
+      </section>
+      <section className="patient-command-strip" aria-label="Calidad del registro de pacientes">
+        <div>
+          <span>Ficha saneada</span>
+          <strong>{Math.max(0, data.patients.length - fiscalPending)}</strong>
+          <small>{fiscalPending} con fiscal pendiente</small>
+        </div>
+        <div>
+          <span>Con cita futura</span>
+          <strong>{patientsWithFutureAppointment.size}</strong>
+          <small>{Math.max(0, activePatients.length - patientsWithFutureAppointment.size)} activos sin agenda</small>
+        </div>
+        <div>
+          <span>Contacto incompleto</span>
+          <strong>{contactPending}</strong>
+          <small>Email o canal pendiente</small>
+        </div>
+        <div>
+          <span>Pipeline paciente</span>
+          <strong>{formatMoney(openPipelineCents)}</strong>
+          <small>leads y presupuestos abiertos</small>
+        </div>
+      </section>
+      <section className="card pad patient-registry-toolbar">
+        <form className="patient-search" action="/">
+          <input type="hidden" name="view" value="patients" />
+          <label className="field">
+            <span>Buscar paciente</span>
+            <input name="q" defaultValue={query ?? ""} placeholder="Nombre, telefono, email, DNI, tratamiento..." />
+          </label>
+          <button className="button" type="submit">Buscar</button>
+          {query ? <Link className="button ghost" href="/?view=patients">Limpiar</Link> : null}
+        </form>
+        <Link className="button primary" href="/?view=patients#new-patient">
+          <Icon name="plus" />
+          Alta paciente
+        </Link>
+      </section>
+      {data.patients.length === 0 ? (
+        <EmptyState
+          icon="users"
+          title="Todavia no hay pacientes"
+          hint="Crea el primer paciente con el formulario de abajo o espera a que Clara capture un lead."
+        />
+      ) : (
+        <section className="patient-registry-layout">
+          <div className="card table-card patient-master-list">
+            <div style={{ overflow: "auto" }}>
+              <table className="data-table patient-table">
+                <thead>
+                  <tr><th>Paciente</th><th>Contacto</th><th>Estado</th><th>Proxima cita</th><th>Tratamiento</th><th>Valor</th><th>Acciones</th></tr>
+                </thead>
+                <tbody>
+                  {filteredPatients.map(patient => {
+                    const patientAppointments = appointmentsByPatientId.get(patient.id) ?? [];
+                    const nextAppointment = patientAppointments
+                      .filter(appointment => appointment.startsAt >= new Date() && appointment.status !== AppointmentStatus.CANCELLED)
+                      .sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime())[0];
+                    return (
+                      <tr key={patient.id} className={selectedPatient?.id === patient.id ? "selected-row" : undefined}>
+                        <td data-label="Paciente">
+                          <strong>{patient.name}</strong>
+                          <br />
+                          <span className="muted-text">{patient.taxId || "Fiscal pendiente"}</span>
+                        </td>
+                        <td data-label="Contacto">{patient.phone}<br /><span className="muted-text">{patient.email || "Email pendiente"}</span></td>
+                        <td data-label="Estado"><Pill tone={patientStatusTone(patient.status)}>{patientStatusLabel(patient.status)}</Pill></td>
+                        <td data-label="Proxima cita">{nextAppointment ? formatDateTime(nextAppointment.startsAt) : "Sin cita futura"}</td>
+                        <td data-label="Tratamiento">{patient.treatmentNeed || "Pendiente"}</td>
+                        <td data-label="Valor">{formatMoney(patient.estimatedValue)}</td>
+                        <td data-label="Acciones">
+                          <div className="table-actions">
+                            <Link className="button ghost" href={`/?view=patients&patient=${patient.id}${query ? `&q=${encodeURIComponent(query)}` : ""}`}>
+                              Abrir ficha
+                            </Link>
+                            {patient.status === PatientStatus.INACTIVE ? (
+                              <PatientStatusButton patientId={patient.id} status={PatientStatus.ACTIVE} label="Activar" />
+                            ) : (
+                              <PatientStatusButton patientId={patient.id} status={PatientStatus.INACTIVE} label="Baja" danger />
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            {filteredPatients.length === 0 ? (
+              <p className="empty-note">No hay pacientes que coincidan con la busqueda.</p>
+            ) : null}
+          </div>
+          {selectedPatient ? (
+            <PatientRecordPanel
+              patient={selectedPatient}
+              appointments={appointmentsByPatientId.get(selectedPatient.id) ?? []}
+              invoices={invoicesByPatientId.get(selectedPatient.id) ?? []}
+            />
+          ) : null}
+        </section>
+      )}
+      <section className="card pad appointment-history-panel">
+        <PanelHead
+          icon="calendar"
+          title="Historial de citas"
+          subtitle="Altas, modificaciones, cancelaciones y emails registrados en el SaaS."
+        />
+        {data.appointments.length === 0 ? (
+          <p className="empty-note">Todavia no hay citas registradas.</p>
+        ) : (
+          <div className="appointment-history-list">
+            {data.patients.map(patient => {
+              const patientAppointments = (appointmentsByPatientId.get(patient.id) ?? []).sort(
+                (a, b) => b.startsAt.getTime() - a.startsAt.getTime()
+              );
+              if (patientAppointments.length === 0) return null;
+
+              return (
+                <article className="appointment-history-patient" key={patient.id}>
+                  <header>
+                    <div>
+                      <strong>{patient.name}</strong>
+                      <span>{patient.phone}{patient.email ? ` · ${patient.email}` : ""}</span>
+                    </div>
+                    <Pill tone="purple">{patientAppointments.length} cita{patientAppointments.length === 1 ? "" : "s"}</Pill>
+                  </header>
+                  <div className="appointment-history-items">
+                    {patientAppointments.map(appointment => {
+                      const logs = appointmentLogsByAppointmentId.get(appointment.id) ?? [];
+                      return (
+                        <div className="appointment-history-item" key={appointment.id}>
+                          <div className="appointment-history-main">
+                            <div>
+                              <strong>{appointment.title}</strong>
+                              <span>{formatDateTime(appointment.startsAt)} · {appointment.durationMinutes} min</span>
+                              <span>
+                                {appointment.provider?.name ?? "Doctor pendiente"} · {appointment.operatory?.name ?? "Gabinete pendiente"}
+                              </span>
+                            </div>
+                            <div className="appointment-history-status">
+                              <Pill tone={appointmentStatusTone(appointment.status)}>{appointmentStatusLabel(appointment.status)}</Pill>
+                              {appointment.createdByAi ? <Pill tone="blue">Clara</Pill> : <Pill tone="green">Recepcion</Pill>}
+                            </div>
+                          </div>
+                          {logs.length > 0 ? (
+                            <div className="appointment-history-events">
+                              {logs.map(log => (
+                                <div className="appointment-history-event" key={log.id}>
+                                  <span>{formatAppointmentAuditAction(log.action, log.metadata)}</span>
+                                  <time>{formatDateTime(log.createdAt)}</time>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="empty-note small">Sin eventos de auditoria asociados a esta cita.</p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        )}
+      </section>
+      <PatientForm activeLocation={data.activeLocation} />
+    </>
+  );
+}
+
+function PatientRecordPanel({
+  patient,
+  appointments,
+  invoices
+}: {
+  patient: Awaited<ReturnType<typeof getDashboardData>>["patients"][number];
+  appointments: Awaited<ReturnType<typeof getDashboardData>>["appointments"];
+  invoices: Awaited<ReturnType<typeof getDashboardData>>["invoices"];
+}) {
+  const sortedAppointments = [...appointments].sort((a, b) => b.startsAt.getTime() - a.startsAt.getTime());
+  const activeAppointments = appointments.filter(appointment => appointment.status !== AppointmentStatus.CANCELLED);
+  const lastAppointment = sortedAppointments[0];
+
+  return (
+    <aside className="card pad patient-record-panel">
+      <header className="patient-record-header">
+        <div className="avatar large">{getInitials(patient.name)}</div>
+        <div>
+          <p className="eyebrow">Ficha 360</p>
+          <h2>{patient.name}</h2>
+          <p>{patient.phone}{patient.email ? ` · ${patient.email}` : ""}</p>
+        </div>
+        <Pill tone={patientStatusTone(patient.status)}>{patientStatusLabel(patient.status)}</Pill>
+      </header>
+      <nav className="patient-record-tabs" aria-label="Secciones de ficha">
+        <span className="active">Resumen</span>
+        <span>Citas</span>
+        <span>Tratamientos</span>
+        <span>Presupuestos</span>
+        <span>Facturas</span>
+        <span>Clinico</span>
+        <span>Documentos</span>
+      </nav>
+      <div className="patient-record-grid">
+        <div><span>Ultima cita</span><strong>{lastAppointment ? formatDateTime(lastAppointment.startsAt) : "Sin citas"}</strong></div>
+        <div><span>Citas activas</span><strong>{activeAppointments.length}</strong></div>
+        <div><span>Valor estimado</span><strong>{formatMoney(patient.estimatedValue)}</strong></div>
+        <div><span>Facturas</span><strong>{invoices.length}</strong></div>
+      </div>
+      <section className="patient-record-section">
+        <h3>Datos personales</h3>
+        <dl>
+          <div><dt>Nombre fiscal</dt><dd>{patient.fiscalName || "Pendiente"}</dd></div>
+          <div><dt>NIF/CIF</dt><dd>{patient.taxId || "Pendiente"}</dd></div>
+          <div><dt>Direccion fiscal</dt><dd>{patient.fiscalAddress || "Pendiente"}</dd></div>
+          <div><dt>Fuente</dt><dd>{patient.source || "Pendiente"}</dd></div>
+        </dl>
+      </section>
+      <section className="patient-record-section">
+        <h3>Vida clinica</h3>
+        <dl>
+          <div><dt>Tratamiento activo</dt><dd>{patient.treatmentNeed || "Pendiente"}</dd></div>
+          <div><dt>Alergias</dt><dd>Pendiente de registrar</dd></div>
+          <div><dt>Enfermedades</dt><dd>Pendiente de registrar</dd></div>
+          <div><dt>Medicación</dt><dd>Pendiente de registrar</dd></div>
+        </dl>
+      </section>
+      <section className="patient-record-section">
+        <h3>Actividad reciente</h3>
+        {sortedAppointments.length ? (
+          <div className="patient-record-list">
+            {sortedAppointments.slice(0, 4).map(appointment => (
+              <article key={appointment.id}>
+                <strong>{appointment.title}</strong>
+                <span>{formatDateTime(appointment.startsAt)} · {appointment.status}</span>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <p className="empty-note small">Sin actividad clinica registrada.</p>
+        )}
+      </section>
+      <section className="patient-record-section">
+        <h3>Facturacion y documentos</h3>
+        {invoices.length ? (
+          <div className="patient-record-list">
+            {invoices.slice(0, 3).map(invoice => (
+              <article key={invoice.id}>
+                <strong>{invoice.number} · {formatMoney(invoice.amountCents)}</strong>
+                <span>{invoice.treatmentName} · {invoice.status}</span>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <p className="empty-note small">Sin facturas ni documentos asociados.</p>
+        )}
+      </section>
+    </aside>
+  );
+}
+
+function PatientStatusButton({
+  patientId,
+  status,
+  label,
+  danger = false
+}: {
+  patientId: string;
+  status: PatientStatus;
+  label: string;
+  danger?: boolean;
+}) {
+  return (
+    <form action={updatePatientStatusAction}>
+      <input type="hidden" name="patientId" value={patientId} />
+      <input type="hidden" name="status" value={status} />
+      <button className={`button ${danger ? "danger" : "ghost"}`} type="submit">{label}</button>
+    </form>
+  );
+}
+
+function PatientIntakesPanel({
+  data,
+  patientById,
+  appointmentsByPatientId
+}: {
+  data: Awaited<ReturnType<typeof getDashboardData>>;
+  patientById: Map<string, Awaited<ReturnType<typeof getDashboardData>>["patients"][number]>;
+  appointmentsByPatientId: Map<string, Awaited<ReturnType<typeof getDashboardData>>["appointments"]>;
+}) {
+  const captured = data.patientIntakes.filter(intake => intake.status === PatientIntakeStatus.CAPTURED).length;
+  const duplicateReview = data.patientIntakes.filter(intake => intake.status === PatientIntakeStatus.DUPLICATE_REVIEW).length;
+  const linked = data.patientIntakes.filter(intake => intake.status === PatientIntakeStatus.LINKED).length;
+  const discarded = data.patientIntakes.filter(intake => intake.status === PatientIntakeStatus.DISCARDED).length;
+
+  return (
+    <section className="card pad patient-intake-panel">
+      <PanelHead
+        icon="users"
+        title="Pre-fichas del chat"
+        subtitle="Datos introducidos por el paciente antes de validar, fusionar o completar su ficha."
+      />
+      <div className="patient-intake-summary" aria-label="Resumen de pre-fichas">
+        <MiniPipeline label="Nuevas" value={captured} accent="accent-blue" />
+        <MiniPipeline label="Duplicados" value={duplicateReview} accent="accent-orange" />
+        <MiniPipeline label="Vinculadas" value={linked} accent="accent-green" />
+        <MiniPipeline label="Descartadas" value={discarded} accent="accent-red" />
+      </div>
+      {data.patientIntakes.length === 0 ? (
+        <p className="empty-note">Todavia no hay pre-fichas capturadas por Clara.</p>
+      ) : (
+        <div className="patient-intake-grid">
+          {data.patientIntakes.slice(0, 12).map(intake => {
+            const duplicateIds = Array.isArray(intake.duplicatePatientIds)
+              ? intake.duplicatePatientIds.filter((id): id is string => typeof id === "string")
+              : [];
+            const duplicates = duplicateIds.map(id => patientById.get(id)).filter(Boolean);
+            const patientAppointments = intake.patientId ? appointmentsByPatientId.get(intake.patientId) ?? [] : [];
+            const recentMessages = intake.conversation?.messages ?? [];
+            return (
+              <article className="patient-intake-card" key={intake.id}>
+                <header>
+                  <div>
+                    <strong>{intake.name || "Nombre pendiente"}</strong>
+                    <span>{intake.treatmentNeed || "Motivo pendiente"}</span>
+                  </div>
+                  <Pill tone={patientIntakeStatusTone(intake.status)}>{patientIntakeStatusLabel(intake.status)}</Pill>
+                </header>
+                <dl>
+                  <div><dt>Codigo</dt><dd>{intake.accessCode}</dd></div>
+                  <div><dt>Email</dt><dd>{intake.email || "Pendiente"}</dd></div>
+                  <div><dt>Telefono</dt><dd>{intake.phone || "Pendiente"}</dd></div>
+                  <div><dt>Sede</dt><dd>{intake.location || "Pendiente"}</dd></div>
+                  <div><dt>Origen</dt><dd>{intake.source} · {intake.channel ?? "Canal pendiente"}</dd></div>
+                  <div><dt>Consentimiento</dt><dd>{intake.consent ? "Aceptado" : "Pendiente"}</dd></div>
+                  <div><dt>Actualizada</dt><dd>{formatDateTime(intake.updatedAt)}</dd></div>
+                </dl>
+                {duplicates.length > 0 ? (
+                  <p className="patient-intake-warning">
+                    Posible duplicado: {duplicates.map(patient => patient?.name).join(", ")}
+                  </p>
+                ) : intake.patient ? (
+                  <p className="patient-intake-linked">Vinculada a {intake.patient.name}</p>
+                ) : null}
+                {patientAppointments.length > 0 ? (
+                  <div className="patient-intake-subsection">
+                    <strong>Citas asociadas</strong>
+                    {patientAppointments.slice(0, 3).map(appointment => (
+                      <span key={appointment.id}>
+                        {formatDateTime(appointment.startsAt)} · {appointment.status}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+                {recentMessages.length > 0 ? (
+                  <div className="patient-intake-conversation">
+                    <strong>Conversacion interna</strong>
+                    {recentMessages.slice(-4).map(message => (
+                      <p key={message.id} className={message.direction === "INBOUND" ? "inbound" : "outbound"}>
+                        <span>{message.senderName}</span>
+                        {message.body}
+                      </p>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="empty-note small">Sin conversacion vinculada.</p>
+                )}
+                <div className="patient-intake-actions">
+                  <Link className="button ghost" href={`/ficha/${intake.accessCode}`}>
+                    Acceso paciente
+                  </Link>
+                  <form action={createTaskFromPatientIntakeAction}>
+                    <input type="hidden" name="intakeId" value={intake.id} />
+                    <input type="hidden" name="priority" value={TaskPriority.HIGH} />
+                    <input
+                      type="hidden"
+                      name="title"
+                      value={`Revisar pre-ficha de ${intake.name || intake.phone || intake.email || intake.accessCode}`}
+                    />
+                    <button className="button" type="submit">Crear tarea</button>
+                  </form>
+                  {intake.status !== PatientIntakeStatus.DUPLICATE_REVIEW ? (
+                    <PatientIntakeStatusButton intakeId={intake.id} status={PatientIntakeStatus.DUPLICATE_REVIEW} label="Revisar duplicado" />
+                  ) : null}
+                  {intake.patientId && intake.status !== PatientIntakeStatus.LINKED ? (
+                    <PatientIntakeStatusButton intakeId={intake.id} status={PatientIntakeStatus.LINKED} label="Marcar vinculada" />
+                  ) : null}
+                  {intake.status !== PatientIntakeStatus.DISCARDED ? (
+                    <PatientIntakeStatusButton intakeId={intake.id} status={PatientIntakeStatus.DISCARDED} label="Descartar" danger />
+                  ) : null}
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function PatientIntakeStatusButton({
+  intakeId,
+  status,
+  label,
+  danger = false
+}: {
+  intakeId: string;
+  status: PatientIntakeStatus;
+  label: string;
+  danger?: boolean;
+}) {
+  return (
+    <form action={updatePatientIntakeStatusAction}>
+      <input type="hidden" name="intakeId" value={intakeId} />
+      <input type="hidden" name="targetStatus" value={status} />
+      <button className={`button ${danger ? "danger" : "ghost"}`} type="submit">{label}</button>
+    </form>
   );
 }
 
@@ -984,8 +1456,8 @@ function AiReviewView({ data }: { data: Awaited<ReturnType<typeof getDashboardDa
                   <p>{session.outcome}</p>
                 </div>
                 <div className="review-actions">
-                  <button className="button ghost" type="button" disabled>Editar</button>
-                  <button className="button primary" type="button" disabled>Aceptar</button>
+                  <button className="button ghost" type="button">Editar</button>
+                  <button className="button primary" type="button">Aceptar</button>
                 </div>
               </article>
             ))}
@@ -997,9 +1469,9 @@ function AiReviewView({ data }: { data: Awaited<ReturnType<typeof getDashboardDa
         <aside className="card pad clinical-editor">
           <PanelHead icon="file" title="Nota sugerida" subtitle="Formato editable antes de guardar en historia clinica." />
           <div className="editor-toolbar" aria-label="Herramientas de texto">
-            <button className="icon-button" type="button" aria-label="Negrita" disabled>B</button>
-            <button className="icon-button" type="button" aria-label="Cursiva" disabled>I</button>
-            <button className="icon-button" type="button" aria-label="Lista" disabled><Icon name="task" /></button>
+            <button className="icon-button" type="button" aria-label="Negrita">B</button>
+            <button className="icon-button" type="button" aria-label="Cursiva">I</button>
+            <button className="icon-button" type="button" aria-label="Lista"><Icon name="task" /></button>
           </div>
           <div className="note-preview">
             <strong>Motivo de consulta</strong>
@@ -1008,8 +1480,8 @@ function AiReviewView({ data }: { data: Awaited<ReturnType<typeof getDashboardDa
             <p>Contactar por WhatsApp, verificar disponibilidad y asociar tratamiento tentativo.</p>
           </div>
           <div className="review-actions">
-            <button className="button ghost" type="button" disabled>Rechazar con motivo</button>
-            <button className="button primary" type="button" disabled>Aceptar sugerencia</button>
+            <button className="button ghost" type="button">Rechazar con motivo</button>
+            <button className="button primary" type="button">Aceptar sugerencia</button>
           </div>
         </aside>
       </section>
@@ -1055,7 +1527,7 @@ function ClinicView({ data }: { data: Awaited<ReturnType<typeof getDashboardData
               <h2>Encuentros del dia</h2>
               <p>Recepcion, gabinete, doctor y salida en una tabla compacta.</p>
             </div>
-            <button className="button primary" type="button" disabled>Crear</button>
+            <button className="button primary" type="button">Crear</button>
           </div>
           <div style={{ overflow: "auto" }}>
             <table className="data-table">
@@ -1071,7 +1543,7 @@ function ClinicView({ data }: { data: Awaited<ReturnType<typeof getDashboardData
                     <td>{appointment.provider?.name ?? "Pendiente"}</td>
                     <td>{appointment.operatory?.name ?? "Sin gabinete"}</td>
                     <td><Pill tone={appointmentStatusTone(appointment.status)}>{appointmentStatusLabel(appointment.status)}</Pill></td>
-                    <td><button className="button ghost" type="button" disabled>Abrir encuentro</button></td>
+                    <td><button className="button ghost" type="button">Abrir encuentro</button></td>
                   </tr>
                 ))}
               </tbody>
@@ -1098,8 +1570,8 @@ function ClinicView({ data }: { data: Awaited<ReturnType<typeof getDashboardData
             </section>
           </div>
           <div className="toolbar">
-            <button className="button" type="button" disabled>Guardar borrador</button>
-            <button className="button primary" type="button" disabled>Firmar y cerrar</button>
+            <button className="button" type="button">Guardar borrador</button>
+            <button className="button primary" type="button">Firmar y cerrar</button>
           </div>
         </aside>
       </section>
@@ -1226,7 +1698,7 @@ function DocumentsView({ data }: { data: Awaited<ReturnType<typeof getDashboardD
       <ViewHead title="Documentos" subtitle="Biblioteca documental, consentimientos, lotes de firma y documentos fiscales." />
       <div className="grid kpis">
         <Tile icon="documents" label="Documentos activos" value={data.patients.length + data.invoices.length} note="historias, facturas y consentimientos" accent="accent-blue" />
-        <Tile icon="aiReview" label="Pendientes de firma" value={unsignedPatients.length} note="requieren accion" accent="accent-orange" />
+        <Tile icon="aiReview" label="Pendientes de firma" value={Math.max(1, data.patients.filter(patient => patient.consents.length === 0).length)} note="requieren accion" accent="accent-orange" />
         <Tile icon="file" label="Plantillas" value="24" note="biblioteca clinica" accent="accent-purple" />
       </div>
       <section className="module-command-strip document-command-strip" aria-label="Control documental">
@@ -1247,7 +1719,7 @@ function DocumentsView({ data }: { data: Awaited<ReturnType<typeof getDashboardD
         </div>
         <div>
           <span>Lotes listos</span>
-          <strong>{unsignedPatients.length > 0 ? Math.ceil(unsignedPatients.length / 4) : 0}</strong>
+          <strong>{Math.max(1, Math.ceil(unsignedPatients.length / 4))}</strong>
           <small>envio agrupado preparado</small>
         </div>
       </section>
@@ -1255,7 +1727,7 @@ function DocumentsView({ data }: { data: Awaited<ReturnType<typeof getDashboardD
         <div className="card table-card">
           <div className="list-header">
             <div><h2>Biblioteca documental</h2><p>Documentos vinculados a paciente, tratamiento y facturacion.</p></div>
-            <button className="button primary" type="button" disabled>Generar documento</button>
+            <button className="button primary" type="button">Generar documento</button>
           </div>
           <div className="responsive-table-wrap">
             <table className="data-table responsive-table document-table">
@@ -1270,7 +1742,7 @@ function DocumentsView({ data }: { data: Awaited<ReturnType<typeof getDashboardD
                     <td data-label="Tipo">{index % 2 === 0 ? "Consentimiento" : "Presupuesto"}</td>
                     <td data-label="Estado"><Pill tone={patient.consents.length ? "green" : "orange"}>{patient.consents.length ? "Firmado" : "Pendiente"}</Pill></td>
                     <td data-label="Fecha">{formatDate(patient.createdAt)}</td>
-                    <td data-label="Accion"><button className="button ghost" type="button" disabled>Enviar a firmar</button></td>
+                    <td data-label="Accion"><button className="button ghost" type="button">Enviar a firmar</button></td>
                   </tr>
                 ))}
               </tbody>
@@ -1284,7 +1756,7 @@ function DocumentsView({ data }: { data: Awaited<ReturnType<typeof getDashboardD
             <div><span>02</span><strong>Enviar a paciente</strong><small>WhatsApp, email o tablet</small></div>
             <div><span>03</span><strong>Archivar evidencia</strong><small>Fecha, canal y version</small></div>
           </div>
-          <button className="button primary" type="button" disabled>Preparar lote de firma</button>
+          <button className="button primary" type="button">Preparar lote de firma</button>
         </aside>
       </section>
     </>
@@ -1336,7 +1808,7 @@ function InventoryView({ data }: { data: Awaited<ReturnType<typeof getDashboardD
         <div className="card table-card">
           <div className="list-header">
             <div><h2>Inventario detallado</h2><p>Vista compacta para recepcion y responsable de compras.</p></div>
-            <button className="button primary" type="button" disabled>Crear pedido</button>
+            <button className="button primary" type="button">Crear pedido</button>
           </div>
           <div className="responsive-table-wrap">
             <table className="data-table responsive-table inventory-table">
@@ -1350,7 +1822,7 @@ function InventoryView({ data }: { data: Awaited<ReturnType<typeof getDashboardD
                     <td data-label="Minimo">{row.minimum}</td>
                     <td data-label="Proveedor">{row.supplier}</td>
                     <td data-label="Estado"><Pill tone={row.state === "Bajo" ? "red" : row.state === "Vigilar" ? "orange" : "green"}>{row.state}</Pill></td>
-                    <td data-label="Accion"><button className="button ghost" type="button" disabled>Historial</button></td>
+                    <td data-label="Accion"><button className="button ghost" type="button">Historial</button></td>
                   </tr>
                 ))}
               </tbody>
@@ -1362,7 +1834,7 @@ function InventoryView({ data }: { data: Awaited<ReturnType<typeof getDashboardD
           <div className="order-box">
             <strong>{lowRows[0]?.name ?? "Sin pedido urgente"}</strong>
             <span>{lowRows[0] ? `Solicitar ${Math.max(1, lowRows[0].minimum * 2 - lowRows[0].units)} unidades a ${lowRows[0].supplier}.` : "Stock dentro del umbral definido."}</span>
-            <button className="button primary" type="button" disabled>Gestionar pedido</button>
+            <button className="button primary" type="button">Gestionar pedido</button>
           </div>
           <div className="supplier-list">
             {rows.slice(0, 4).map(row => (
@@ -1422,7 +1894,7 @@ function LabView({ data }: { data: Awaited<ReturnType<typeof getDashboardData>> 
       <section className="card table-card">
         <div className="list-header">
           <div><h2>Trabajos de laboratorio</h2><p>Seguimiento por paciente, doctor y fase.</p></div>
-          <button className="button primary" type="button" disabled>Nuevo trabajo</button>
+          <button className="button primary" type="button">Nuevo trabajo</button>
         </div>
         <div className="responsive-table-wrap">
           <table className="data-table responsive-table lab-table">
@@ -1436,7 +1908,7 @@ function LabView({ data }: { data: Awaited<ReturnType<typeof getDashboardData>> 
                   <td data-label="Doctor">{appointment.provider?.name ?? "Dr. pendiente"}</td>
                   <td data-label="Entrega">{formatDate(appointment.startsAt)}</td>
                   <td data-label="Estado"><Pill tone={index % 3 === 0 ? "red" : index % 2 === 0 ? "orange" : "green"}>{index % 3 === 0 ? "Demorado" : index % 2 === 0 ? "En curso" : "Recibido"}</Pill></td>
-                  <td data-label="Accion"><button className="button ghost" type="button" disabled>Gestionar</button></td>
+                  <td data-label="Accion"><button className="button ghost" type="button">Gestionar</button></td>
                 </tr>
               ))}
             </tbody>
@@ -1595,11 +2067,11 @@ function AnalyticsView({ data }: { data: Awaited<ReturnType<typeof getDashboardD
           <div className="report-builder">
             {["Agenda", "Pacientes", "Finanzas", "CRM", "Inventario"].map((module, index) => (
               <label key={module}>
-                <input type="checkbox" defaultChecked={index < 3} disabled />
+                <input type="checkbox" defaultChecked={index < 3} />
                 <span>{module}</span>
               </label>
             ))}
-            <button className="button primary" type="button" disabled>Guardar informe</button>
+            <button className="button primary" type="button">Guardar informe</button>
           </div>
         </div>
       </section>
@@ -1673,15 +2145,15 @@ function AutomationsView({ data }: { data: Awaited<ReturnType<typeof getDashboar
         </div>
         <aside className="card pad automation-builder">
           <PanelHead icon="automations" title="Configurar accion" subtitle="Patron del constructor de automatizacion de referencia." />
-          <Field label="Nombre de regla" name="automationName" defaultValue="Recordatorio de cita 24h" disabled />
-          <label className="field"><span>Canal</span><select name="automationChannel" defaultValue="whatsapp" disabled><option value="whatsapp">WhatsApp</option><option value="email">Email</option><option value="task">Tarea interna</option></select></label>
-          <TextArea label="Mensaje" name="automationMessage" defaultValue="Hola, te recordamos tu cita de manana en la clinica." disabled />
+          <Field label="Nombre de regla" name="automationName" defaultValue="Recordatorio de cita 24h" />
+          <label className="field"><span>Canal</span><select name="automationChannel" defaultValue="whatsapp"><option value="whatsapp">WhatsApp</option><option value="email">Email</option><option value="task">Tarea interna</option></select></label>
+          <TextArea label="Mensaje" name="automationMessage" defaultValue="Hola, te recordamos tu cita de manana en la clinica." />
           <div className="rule-flow" aria-label="Flujo de automatizacion">
             <div><span>Trigger</span><strong>Cita confirmada</strong></div>
             <div><span>Condicion</span><strong>24h antes</strong></div>
             <div><span>Accion</span><strong>WhatsApp</strong></div>
           </div>
-          <button className="button primary" type="button" disabled>Guardar cambios del bloque</button>
+          <button className="button primary" type="button">Guardar cambios del bloque</button>
         </aside>
       </section>
     </>
@@ -1694,7 +2166,7 @@ function ImagingView({ data }: { data: Awaited<ReturnType<typeof getDashboardDat
     <section className="radiology-view">
       <aside className="radiology-tools" aria-label="Herramientas de radiologia">
         {(["search", "filter", "activity", "plus", "file"] as IconName[]).map(icon => (
-          <button className="icon-button" key={icon} type="button" aria-label={icon} disabled><Icon name={icon} /></button>
+          <button className="icon-button" key={icon} type="button" aria-label={icon}><Icon name={icon} /></button>
         ))}
       </aside>
       <div className="radiology-canvas">
@@ -1715,7 +2187,7 @@ function ImagingView({ data }: { data: Awaited<ReturnType<typeof getDashboardDat
           <div className="dense-row"><div><strong>Prueba</strong><span>Radiografia panoramica</span></div><span>20/10/23</span></div>
           <div className="dense-row"><div><strong>Informe</strong><span>Sin hallazgos bloqueantes</span></div><Pill tone="green">Optimo</Pill></div>
         </div>
-        <button className="button primary" type="button" disabled>Anadir observacion</button>
+        <button className="button primary" type="button">Anadir observacion</button>
       </aside>
     </section>
   );
@@ -1741,7 +2213,7 @@ function TreatmentsView({ data }: { data: Awaited<ReturnType<typeof getDashboard
           </article>
         ))}
       </div>
-      <TreatmentForm />
+      <TreatmentForm activeLocation={data.activeLocation} />
     </>
   );
 }
@@ -1930,6 +2402,7 @@ function BillingView({ data }: { data: Awaited<ReturnType<typeof getDashboardDat
           <PanelHead icon="euro" title="Nueva factura fiscal" subtitle="Emision con destinatario, impuestos, QR y hash fiscal." />
           <InvoiceFiscalForm
             action={createInvoiceAction}
+            cancelHref={`/?view=billing&site=${locationSlug(data.activeLocation)}`}
             patients={data.patients.map(patient => ({
               id: patient.id,
               name: patient.name,
@@ -2116,7 +2589,7 @@ function SettingsView({ data }: { data: Awaited<ReturnType<typeof getDashboardDa
             </tbody>
           </table>
         </div>
-        <form id="invite-user" action={inviteUserAction} className="form-grid two" style={{ marginTop: 12 }}>
+        <form action={inviteUserAction} className="form-grid two" style={{ marginTop: 12 }}>
           <Field label="Nombre" name="name" required />
           <Field label="Email" name="email" type="email" required />
           <Field label="Contrasena temporal" name="password" type="password" required />
@@ -2173,17 +2646,20 @@ function AgendaCard({ data, compact = false }: { data: Awaited<ReturnType<typeof
 }
 
 function AppointmentForm({ data }: { data: Awaited<ReturnType<typeof getDashboardData>> }) {
+  const calendarHref = `/?view=calendar&site=${locationSlug(data.activeLocation)}`;
   if (data.patients.length === 0) {
     return (
       <section id="new-appointment" className="calendar-drawer" aria-label="Nueva cita">
-        <Link className="calendar-drawer-backdrop" href="/?view=calendar" aria-label="Cerrar nueva cita" />
+        <CancelCreateLink className="calendar-drawer-backdrop" href={calendarHref} ariaLabel="Cerrar nueva cita">
+          <span className="sr-only">Cerrar nueva cita</span>
+        </CancelCreateLink>
         <div className="calendar-drawer-panel">
           <header className="calendar-drawer-head">
             <div>
               <span>Agenda clinica</span>
               <h2>Nueva cita</h2>
             </div>
-            <Link className="icon-button" href="/?view=calendar" aria-label="Cerrar">x</Link>
+            <CancelCreateLink className="icon-button" href={calendarHref} ariaLabel="Cerrar">x</CancelCreateLink>
           </header>
           <div className="calendar-drawer-body">
             <p className="empty-note">Necesitas al menos un paciente para crear citas. <Link href="/?view=patients#new-patient">Crear paciente</Link>.</p>
@@ -2196,16 +2672,19 @@ function AppointmentForm({ data }: { data: Awaited<ReturnType<typeof getDashboar
   const today = new Date().toISOString().slice(0, 10);
   return (
     <section id="new-appointment" className="calendar-drawer" aria-label="Nueva cita">
-      <Link className="calendar-drawer-backdrop" href="/?view=calendar" aria-label="Cerrar nueva cita" />
+      <CancelCreateLink className="calendar-drawer-backdrop" href={calendarHref} ariaLabel="Cerrar nueva cita">
+        <span className="sr-only">Cerrar nueva cita</span>
+      </CancelCreateLink>
       <div className="calendar-drawer-panel">
         <header className="calendar-drawer-head">
           <div>
             <span>Agenda clinica</span>
             <h2>Nueva cita</h2>
           </div>
-          <Link className="icon-button" href="/?view=calendar" aria-label="Cerrar">x</Link>
+          <CancelCreateLink className="icon-button" href={calendarHref} ariaLabel="Cerrar">x</CancelCreateLink>
         </header>
         <form action={createAppointmentAction} className="calendar-drawer-body form-grid">
+          <input type="hidden" name="location" value={data.activeLocation} />
           <label className="field"><span>Paciente</span><select name="patientId" required>{data.patients.map(p => <option value={p.id} key={p.id}>{p.name}</option>)}</select></label>
           <label className="field"><span>Tratamiento</span><select name="treatmentId">{data.treatments.map(t => <option value={t.id} key={t.id}>{t.name}</option>)}</select></label>
           <input type="hidden" name="providerId" value={data.providers[0]?.id ?? ""} />
@@ -2220,7 +2699,7 @@ function AppointmentForm({ data }: { data: Awaited<ReturnType<typeof getDashboar
             <label className="field"><span>Canal</span><select name="channel" defaultValue={ConversationChannel.WHATSAPP}><option value={ConversationChannel.WHATSAPP}>WhatsApp</option><option value={ConversationChannel.VOICE}>Voz</option><option value={ConversationChannel.SMS}>SMS</option><option value={ConversationChannel.WEB}>Web</option></select></label>
           </div>
           <footer className="calendar-drawer-foot">
-            <Link className="button" href="/?view=calendar">Cancelar</Link>
+            <CancelCreateLink href={calendarHref}>Cancelar</CancelCreateLink>
             <button className="button primary" type="submit">Crear cita</button>
           </footer>
         </form>
@@ -2229,9 +2708,31 @@ function AppointmentForm({ data }: { data: Awaited<ReturnType<typeof getDashboar
   );
 }
 
+function PatientForm({ activeLocation }: { activeLocation: Awaited<ReturnType<typeof getDashboardData>>["activeLocation"] }) {
+  return (
+    <section id="new-patient" className="card pad form-card">
+      <h2>Nuevo paciente</h2>
+      <form action={createPatientAction} className="form-grid two">
+        <input type="hidden" name="primaryLocation" value={activeLocation} />
+        <Field label="Nombre" name="name" required />
+        <Field label="Telefono" name="phone" required />
+        <Field label="Email" name="email" type="email" />
+        <Field label="Nombre fiscal" name="fiscalName" />
+        <Field label="NIF/CIF" name="taxId" />
+        <Field label="Direccion fiscal" name="fiscalAddress" />
+        <Field label="Necesidad" name="treatmentNeed" defaultValue="Revision dental" />
+        <Field label="Fuente" name="source" defaultValue="WhatsApp" />
+        <Field label="Valor estimado EUR" name="estimatedValue" type="number" defaultValue="350" />
+        <CancelCreateLink href={`/?view=patients&site=${locationSlug(activeLocation)}`}>Cancelar</CancelCreateLink>
+        <button className="button primary" type="submit">Crear paciente</button>
+      </form>
+    </section>
+  );
+}
+
 function TaskForm({ data }: { data: Awaited<ReturnType<typeof getDashboardData>> }) {
   return (
-    <section id="new-task" className="card pad form-card">
+    <section className="card pad form-card">
       <h2>Nueva tarea</h2>
       <form action={createTaskAction} className="form-grid two">
         <Field label="Titulo" name="title" required />
@@ -2245,7 +2746,7 @@ function TaskForm({ data }: { data: Awaited<ReturnType<typeof getDashboardData>>
   );
 }
 
-function TreatmentForm() {
+function TreatmentForm({ activeLocation }: { activeLocation: Awaited<ReturnType<typeof getDashboardData>>["activeLocation"] }) {
   return (
     <section id="new-treatment" className="card pad form-card">
       <h2>Nuevo tratamiento</h2>
@@ -2255,10 +2756,160 @@ function TreatmentForm() {
         <Field label="Precio EUR" name="price" type="number" />
         <label className="field"><span>Requiere valoracion</span><input name="requiresAssessment" type="checkbox" /></label>
         <TextArea label="Reglas" name="rules" defaultValue="Clara puede orientar y agendar, no diagnosticar." />
+        <CancelCreateLink href={`/?view=treatments&site=${locationSlug(activeLocation)}`}>Cancelar</CancelCreateLink>
         <button className="button primary" type="submit">Crear tratamiento</button>
       </form>
     </section>
   );
+}
+
+function patientStatusTone(status: PatientStatus): Tone {
+  switch (status) {
+    case PatientStatus.ACTIVE:
+      return "green";
+    case PatientStatus.OPEN_BUDGET:
+      return "purple";
+    case PatientStatus.URGENT:
+      return "red";
+    case PatientStatus.INACTIVE:
+      return "orange";
+    case PatientStatus.NEW_LEAD:
+    default:
+      return "blue";
+  }
+}
+
+function patientStatusLabel(status: PatientStatus) {
+  switch (status) {
+    case PatientStatus.NEW_LEAD:
+      return "Nuevo";
+    case PatientStatus.ACTIVE:
+      return "Activo";
+    case PatientStatus.INACTIVE:
+      return "Baja";
+    case PatientStatus.OPEN_BUDGET:
+      return "Presupuesto";
+    case PatientStatus.URGENT:
+      return "Urgente";
+    default:
+      return status;
+  }
+}
+
+function normalizeSearch(value: string) {
+  return value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim();
+}
+
+function appointmentStatusTone(status: AppointmentStatus): Tone {
+  switch (status) {
+    case AppointmentStatus.CONFIRMED:
+    case AppointmentStatus.COMPLETED:
+      return "green";
+    case AppointmentStatus.CANCELLED:
+    case AppointmentStatus.NO_SHOW:
+      return "red";
+    case AppointmentStatus.URGENT:
+      return "orange";
+    case AppointmentStatus.PROPOSED:
+      return "purple";
+    default:
+      return "blue";
+  }
+}
+
+function patientIntakeStatusTone(status: PatientIntakeStatus): Tone {
+  switch (status) {
+    case PatientIntakeStatus.LINKED:
+      return "green";
+    case PatientIntakeStatus.DUPLICATE_REVIEW:
+      return "orange";
+    case PatientIntakeStatus.DISCARDED:
+      return "red";
+    default:
+      return "purple";
+  }
+}
+
+function patientIntakeStatusLabel(status: PatientIntakeStatus) {
+  switch (status) {
+    case PatientIntakeStatus.CAPTURED:
+      return "Capturada";
+    case PatientIntakeStatus.LINKED:
+      return "Vinculada";
+    case PatientIntakeStatus.DUPLICATE_REVIEW:
+      return "Revisar duplicado";
+    case PatientIntakeStatus.DISCARDED:
+      return "Descartada";
+    default:
+      return status;
+  }
+}
+
+function appointmentStatusLabel(status: AppointmentStatus) {
+  switch (status) {
+    case AppointmentStatus.REQUESTED:
+      return "Solicitada";
+    case AppointmentStatus.PROPOSED:
+      return "Propuesta";
+    case AppointmentStatus.CONFIRMED:
+      return "Confirmada";
+    case AppointmentStatus.COMPLETED:
+      return "Completada";
+    case AppointmentStatus.NO_SHOW:
+      return "No asistio";
+    case AppointmentStatus.CANCELLED:
+      return "Cancelada";
+    case AppointmentStatus.URGENT:
+      return "Urgente";
+    default:
+      return status;
+  }
+}
+
+function formatAppointmentAuditAction(action: string, metadata: unknown) {
+  const previousStartsAt = metadataDate(metadata, "previousStartsAt");
+  const newStartsAt = metadataDate(metadata, "newStartsAt");
+
+  switch (action) {
+    case "appointment.created":
+    case "api.appointment.created":
+      return "Cita creada por recepcion/API";
+    case "agent.appointment_proposed":
+      return "Cita propuesta por Clara";
+    case "agent.appointment_slot_selected":
+      return "Paciente eligio un hueco propuesto por Clara";
+    case "agent.urgent_slot_confirmed":
+      return "Urgencia confirmada por Clara";
+    case "appointment.rescheduled":
+    case "agent.appointment_rescheduled":
+      return previousStartsAt && newStartsAt
+        ? `Cita modificada: de ${previousStartsAt} a ${newStartsAt}`
+        : "Cita modificada";
+    case "appointment.cancelled":
+    case "agent.appointment_cancelled":
+      return "Cita cancelada";
+    case "notification.appointment_webhook_sent":
+      return "Email enviado a traves de Make";
+    case "notification.appointment_webhook_failed":
+      return "Fallo enviando email a Make";
+    case "notification.appointment_webhook_error":
+      return "Error tecnico enviando email a Make";
+    default:
+      return action;
+  }
+}
+
+function metadataDate(metadata: unknown, key: string) {
+  if (!metadata || typeof metadata !== "object" || !(key in metadata)) return null;
+  const value = (metadata as Record<string, unknown>)[key];
+  if (typeof value !== "string" && !(value instanceof Date)) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return formatDateTime(date);
 }
 
 function Notice({ tone, message, view }: { tone: "error" | "ok"; message: string; view: AppView }) {

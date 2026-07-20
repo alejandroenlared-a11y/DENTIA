@@ -1,5 +1,5 @@
+import Link from "next/link";
 import type React from "react";
-import { DashboardLink as Link } from "@/components/dashboard-link";
 import { Icon, type IconName } from "@/components/icon";
 
 export type Tone = "blue" | "green" | "orange" | "purple" | "red";
@@ -59,41 +59,27 @@ export function Field({
   name,
   defaultValue = "",
   type = "text",
-  required = false,
-  disabled = false
+  required = false
 }: {
   label: string;
   name: string;
   defaultValue?: string;
   type?: string;
   required?: boolean;
-  disabled?: boolean;
 }) {
   return (
     <label className="field">
       <span>{label}{required ? <em className="required-mark">*</em> : null}</span>
-      <input name={name} defaultValue={defaultValue} type={type} required={required} disabled={disabled} />
+      <input name={name} defaultValue={defaultValue} type={type} required={required} />
     </label>
   );
 }
 
-export function TextArea({
-  label,
-  name,
-  defaultValue = "",
-  hint,
-  disabled = false
-}: {
-  label: string;
-  name: string;
-  defaultValue?: string;
-  hint?: string;
-  disabled?: boolean;
-}) {
+export function TextArea({ label, name, defaultValue = "", hint }: { label: string; name: string; defaultValue?: string; hint?: string }) {
   return (
     <label className="field" style={{ gridColumn: "1 / -1" }}>
       <span>{label}</span>
-      <textarea name={name} defaultValue={defaultValue} disabled={disabled} />
+      <textarea name={name} defaultValue={defaultValue} />
       {hint ? <small style={{ color: "var(--muted)", fontWeight: 400 }}>{hint}</small> : null}
     </label>
   );

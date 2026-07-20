@@ -48,6 +48,17 @@ enum ConversationChannel {
   EMAIL
 }
 
+enum ClinicLocation {
+  MURCIA
+  ELCHE
+}
+
+enum ProviderLocationScope {
+  MURCIA
+  ELCHE
+  BOTH
+}
+
 enum ConversationStatus {
   ACTIVE
   AI_HANDLING
@@ -235,6 +246,7 @@ model Session {
 model Patient {
   id               String               @id @default(cuid())
   tenantId         String
+  primaryLocation  ClinicLocation        @default(MURCIA)
   name             String
   phone            String
   email            String?
@@ -261,39 +273,42 @@ model Patient {
   intakes       PatientIntake[]
 
   @@unique([tenantId, phone])
+  @@index([tenantId, primaryLocation])
   @@index([tenantId, status])
 }
 
 model Provider {
-  id        String   @id @default(cuid())
-  tenantId  String
-  name      String
-  specialty String
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id            String                @id @default(cuid())
+  tenantId      String
+  name          String
+  specialty     String
+  locationScope ProviderLocationScope @default(BOTH)
+  active        Boolean               @default(true)
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
 
   tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   appointments   Appointment[]
   calendarEvents CalendarEvent[]
 
-  @@index([tenantId])
+  @@index([tenantId, locationScope])
 }
 
 model Operatory {
-  id        String   @id @default(cuid())
+  id        String         @id @default(cuid())
   tenantId  String
+  location  ClinicLocation @default(MURCIA)
   name      String
   kind      String
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  active    Boolean        @default(true)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
 
   tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   appointments   Appointment[]
   calendarEvents CalendarEvent[]
 
-  @@index([tenantId])
+  @@index([tenantId, location])
 }
 
 model Treatment {
@@ -320,6 +335,7 @@ model Treatment {
 model Appointment {
   id              String               @id @default(cuid())
   tenantId        String
+  location        ClinicLocation        @default(MURCIA)
   patientId       String
   treatmentId     String?
   providerId      String?
@@ -340,6 +356,7 @@ model Appointment {
   operatory Operatory? @relation(fields: [operatoryId], references: [id], onDelete: SetNull)
 
   @@index([tenantId, startsAt])
+  @@index([tenantId, location])
   @@index([tenantId, status])
 }
 
@@ -353,6 +370,7 @@ enum CalendarEventType {
 model CalendarEvent {
   id              String            @id @default(cuid())
   tenantId        String
+  location        ClinicLocation     @default(MURCIA)
   providerId      String?
   operatoryId     String?
   title           String
@@ -369,6 +387,7 @@ model CalendarEvent {
   operatory Operatory? @relation(fields: [operatoryId], references: [id], onDelete: SetNull)
 
   @@index([tenantId, startsAt])
+  @@index([tenantId, location])
   @@index([providerId, startsAt])
 }
 

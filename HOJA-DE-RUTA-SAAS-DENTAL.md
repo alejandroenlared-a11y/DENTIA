@@ -1,421 +1,439 @@
 # HOJA DE RUTA — SAAS PARA CLÍNICAS DENTALES + AGENTE IA RECEPCIONISTA
 
-> Proyecto AVELKIA · Última actualización: 19 de julio de 2026
+> Proyecto AVELKIA · Fecha: 8 de julio de 2026
 > Basado en investigación de RingLab, competidores internacionales (Arini, Annie, TrueLark/Weave, Savvy Agents, Adit) y el mercado español (Gesden, Klinikare, Clinic Cloud).
-> Documentos hermanos: `MEMORIA_DENTAL.MD` (memoria operativa), `HOJA-RUTA-100.MD` (calidad de Clara), `NEW-HOJA DE RUTA.MD` (decisión estratégica PULSO+Clara), `DENTIA-SAAS-SITEMAP-DESIGN.md` (sistema de diseño).
-
----
-
-## 0. EL CAMINO DIRECTO AL ÉXITO (LEER PRIMERO)
-
-El proyecto ya no está en fase de investigación ni de fase cero. Hay un SaaS funcional desplegado en `https://dentia.avelkia.es`, un agente IA (Clara) con evaluación 100/100 sobre 103 conversaciones, y un cliente piloto real (Ruiz Estrada, Murcia + Elche) que **cierra en agosto**.
-
-Ese cierre de agosto es la palanca estratégica número uno: una clínica cerrada que sigue captando pacientes, agendando primeras visitas gratuitas y recuperando presupuestos mediante IA es la demostración de ROI perfecta. Nadie más en España puede enseñar ese caso en septiembre.
-
-El camino directo, en orden, sin desvíos:
-
-```text
-1. Clara viva en WhatsApp real de Ruiz Estrada ANTES del 1 de agosto  ← todo lo demás espera
-2. Agosto = mes de captura autónoma → datos reales → caso de éxito en €
-3. Septiembre = hardening técnico y RGPD para datos reales + demo comercial pulida
-4. Oct-Dic = 10 primeras clínicas de pago (Stripe + onboarding) usando el caso Ruiz Estrada
-5. 2027 T1 = voz entrante + primera integración PMS (Google Calendar → Klinikare)
-6. 2027 T2+ = motor de ingresos completo, Gesden, escala nacional
-```
-
-Regla de decisión para cada tarea nueva: **si no acerca el hito activo de esta lista, no se hace ahora.**
-
-Decisión estratégica vigente (de `NEW-HOJA DE RUTA.MD`): no construimos un PMS completo. Vendemos una **capa de recuperación de ingresos + recepción IA encima del software actual de la clínica**, sin migración, sin tocar historia clínica. El PMS es visión a largo plazo, no dirige el trabajo inmediato.
 
 ---
 
 ## 1. RESUMEN EJECUTIVO
 
-Producto: **plataforma SaaS de gestión de comunicación y citas para clínicas dentales**, con un **agente IA recepcionista** (WhatsApp + web hoy; voz + SMS en roadmap) que atiende al paciente 24/7, conoce el nicho odontológico, orienta al paciente y **agenda citas de forma autónoma**, con el calendario nativo de Dentia como fuente de verdad y sincronización futura con el PMS de la clínica.
+Producto: **plataforma SaaS de gestión de comunicación y citas para clínicas dentales**, con un **agente IA recepcionista** (voz + WhatsApp + SMS) que atiende al paciente 24/7, conoce el nicho odontológico a la perfección, orienta al paciente y **agenda citas de forma autónoma** sincronizadas con el software de gestión de la clínica.
 
-La tesis: las clínicas dentales pierden entre el 30% y el 40% de sus llamadas entrantes, cada paciente nuevo vale ~350 €, y la recepción está saturada y en rotación constante. Un agente IA que responde en segundos, agenda directamente y reduce no-shows tiene ROI demostrable desde el primer mes. RingLab ya valida este modelo en España (integración con Gesden G5); el mercado internacional (Arini, Annie, TrueLark) valida pricing y demanda.
+La tesis: las clínicas dentales pierden entre el 30% y el 40% de sus llamadas entrantes, cada paciente nuevo vale ~350 €, y la recepción está saturada y en rotación constante. Un agente IA que responde en segundos, agenda directamente en el PMS de la clínica y reduce no-shows, tiene un ROI demostrable desde el primer mes. RingLab ya valida este modelo en España (integración con Gesden G5); el mercado internacional (Arini, Annie, TrueLark) valida el pricing y la demanda.
 
-**Diferenciación:**
-1. Omnicanal real (WhatsApp + web + voz + SMS) en una sola bandeja — la mayoría de competidores son solo voz o solo mensajería.
-2. Integración con el ecosistema español (Gesden G5, Klinikare, Clinic Cloud) — los players americanos no cubren España; RingLab solo cubre Gesden.
-3. Agente IA con conocimiento clínico dental real: triaje de urgencias en dos tiempos, orientación por tratamiento, gestión de primeras visitas, guardrails evaluados automáticamente (100/100 en suite propia).
+**Diferenciación propuesta:**
+1. Omnicanal real (voz + WhatsApp + SMS + web) en una sola bandeja — la mayoría de competidores son solo voz o solo mensajería.
+2. Integración profunda con el ecosistema español (Gesden G5, Klinikare, Clinic Cloud) — los players americanos no cubren España.
+3. Agente IA con conocimiento clínico dental real: triaje de urgencias, orientación por tratamiento, gestión de primeras visitas.
 4. Cumplimiento RGPD nativo (dato de salud = categoría especial) como ventaja competitiva frente a soluciones USA.
-5. **Panel de "dinero recuperado" en €** — el argumento de venta y renovación: no vendemos actividad, vendemos ingresos.
 
 ---
 
-## 2. ESTADO REAL DEL PROYECTO A 19 DE JULIO DE 2026
+## 2. INVESTIGACIÓN DE MERCADO
 
-### 2.1. Lo que ya existe y funciona
+### 2.1. RINGLAB — ANÁLISIS DEL REFERENTE DIRECTO
 
-**Plataforma:**
-- App full-stack: Next.js 16.2.10, React 19, TypeScript, Prisma 6.19.3, PostgreSQL.
-- Producción: Vercel (proyecto `dentia-hu6t`) desde GitHub `main`, dominio `https://dentia.avelkia.es`, BD Neon.
-- Local: Docker Postgres (`dentia-ai-postgres`, puerto 56321).
-- Módulos navegables: Dashboard, Agenda, Conversaciones, Pacientes, Tratamientos, Tareas, Facturación, Analítica, Automatizaciones, Configuración.
-- UI rediseñada según `saas new design/` (sistema "Clinical Precision": denso, sobrio, profesional).
-- Auth propia (scrypt + sesiones httpOnly), multi-tenant real por sesión, roles con jerarquía (OWNER > MANAGER > RECEPTION/DOCTOR > READ_ONLY), auditoría con actor.
-- API pública v1 (`/api/v1/patients`, `/api/v1/appointments`) con API key por tenant, envelope estándar, paginación, rate limit por plan.
-- Facturación fiscal base: series, IVA, hash encadenado, QR, payload preliminar FacturaE, preparación SIF/VERI*FACTU (sin homologación aún — no afirmar "cumplimiento 100% Hacienda").
+RingLab (ring-lab.com) es una plataforma española de gestión inteligente para clínicas dentales. Funciona como recepcionista virtual con IA.
 
-**Clara (agente IA) — módulo protegido, no tocar sin petición explícita:**
-- Motor híbrido: engine determinista (`dental-senior-agent.ts`) + LLM (`openai-dental-agent.ts`) con fallback automático a reglas.
-- Evaluador automático propio: `npm run quality:clara` → 100/100, 620/620 puntos, 103 conversaciones, 0 fallos críticos. Gate de release: `npm run quality:release`.
-- Flujo validado en producción: consentimiento → nombre → email → teléfono → sede → 3 huecos numerados → elección 1/2/3 → cita + email.
-- Triaje de urgencias en dos tiempos, guardrails clínicos (nunca diagnostica, precios solo del catálogo del tenant, se identifica como IA).
-- Pre-fichas (`PatientIntake`) con código `DENTIA-XXXXXX`, detección de duplicados y portal paciente `/ficha/[code]` protegido por email/teléfono.
-- 150+ tests en verde, 19 suites.
+**Qué hace:**
+- Mensajería unificada: WhatsApp, SMS y llamadas telefónicas en una sola interfaz.
+- Agendado automático de citas sin intervención humana, también fuera de horario.
+- Recordatorios automáticos multicanal y predicción/prevención de no-shows.
+- Alta automatizada de pacientes nuevos, historial, seguimiento post-tratamiento y encuestas de satisfacción.
+- Dashboard en tiempo real: conversión, ocupación de agenda, estado del recepcionista virtual.
+- IA con respuestas contextuales según historial, reconocimiento de intención, transcripción de llamadas en tiempo real, escalado de casos complejos al personal y personalidad configurable.
 
-**Canales e integraciones:**
-- Webhook genérico multicanal: `POST /api/webhooks/[slug]/[channel]` (whatsapp|sms|voice|web|email).
-- Widget web público operativo: `/widget/clinica-murcia-elche`. Demo WhatsApp: `/demo-whatsapp/clinica-murcia-elche`.
-- Webhook Meta WhatsApp Cloud listo: `/api/whatsapp/meta` — **solo faltan credenciales de Meta**.
-- Make (emails de cita): escenario montado con Router + filtros `created`/`rescheduled`/`cancelled`, variable `MAKE_APPOINTMENT_WEBHOOK_URL` en Vercel. Pendiente: activación final + prueba E2E real.
+**Integraciones:**
+- Sincronización directa con **Gesden G5** (único PMS soportado hoy; más en desarrollo).
+- Soporte de sistemas legacy on-premise mediante **conector local seguro** (sin acceso remoto).
+- Desvío de número de teléfono sin necesidad de portabilidad.
 
-### 2.2. Lo que NO existe todavía (honestidad brutal)
-
-| Falta | Impacto |
+**Métricas que publican:**
+| Métrica | Valor |
 |---|---|
-| WhatsApp real conectado (credenciales Meta) | Bloquea el piloto — prioridad nº1 |
-| Prueba E2E de Make (elegir opción 1/2/3 y recibir email) | Bloquea confianza en confirmaciones |
-| Clientes de pago (Stripe) | 0 € de MRR |
-| Voz (telefonía, STT/TTS) | Paridad con RingLab pendiente |
-| Integraciones PMS (Gesden/Klinikare/Clinic Cloud) | El moat aún no está construido |
-| Migraciones Prisma versionadas | Riesgo de pérdida de datos en cada deploy (ver §8) |
-| Observabilidad (Sentry/OTel), backups documentados | Ceguera operativa en producción |
-| Hardening RGPD completo (EIPD, DPA, retención) | Bloquea datos reales de pacientes |
-| Arquitectura de menús validada por el usuario | UX actual marcada como "liosa" — rediseño pendiente |
+| Primera respuesta media | 5 segundos |
+| Reducción de no-shows | 68% de media en los primeros 3 meses |
+| Confirmación de citas | +92% |
+| Reducción de llamadas operativas | 35% |
+| Satisfacción del paciente | 4,9 estrellas |
+| Tiempo de implantación | hasta 72 horas |
 
-### 2.3. Cliente piloto: Ruiz Estrada
+**Seguridad que comunican:** aislamiento físico de datos, cifrado en reposo, sistema de permisos, logs de auditoría, cero acceso remoto, monitorización 24/7, los datos del paciente nunca se almacenan en servidores de RingLab.
 
-- 2 sedes: Murcia (Paseo Duques de Lugo, 16) y Elche (Carrer Reina Victoria, 49).
-- Ganchos: primera visita a coste cero, financiación hasta 24 meses sin intereses.
-- **Agosto cerrado** → Clara captura demanda mientras la clínica no atiende. Es la oportunidad de caso de éxito.
-- Dolores monetizables: cita online que no agenda nada, agosto perdido, sin 24/7, dos sedes con canales duplicados, presupuestos sin seguimiento.
-- Base de conocimiento en `RUIZ-ESTRADA-BASE-CONOCIMIENTO.md` y dolores en `RUIZ-ESTRADA-DOLORES-DETECTADOS.md`.
+**Modelo comercial:** sin precios públicos; demo + onboarding progresivo con responsable técnico dedicado y garantía de resolución en 24h para incidencias críticas.
+
+**Debilidades detectadas (oportunidad):**
+- Solo integra Gesden G5 → clínicas con Klinikare, Clinic Cloud, iDental o Clinicbox quedan fuera.
+- Sin precios públicos → fricción comercial (los competidores USA publican desde $89/mes).
+- Producto centrado en comunicación; no es el sistema de gestión → depende siempre del PMS de terceros.
+
+### 2.2. COMPETIDORES INTERNACIONALES (AGENTES IA DENTALES)
+
+| Plataforma | Enfoque | Precio | Integraciones PMS | Notas |
+|---|---|---|---|---|
+| **Arini** (YC) | Voz IA pura para dental | ~$249/mes | Dentrix, Open Dental, Eaglesoft, Curve | Booking en tiempo real, multiidioma. Referente en voz. |
+| **Annie** (Dental Intelligence) | Relación con paciente | Bundle | Agendado directo en PMS | FAQ inteligente, respuestas personalizadas. |
+| **TrueLark / Weave** | Todo-en-uno comunicaciones | Bundle (VoIP+SMS+pagos) | Amplio | Weave adquirió TrueLark en 2025. Orientado a DSOs grandes. |
+| **Savvy Agents** | 4 agentes especializados | Desde $89/mes | Sync bidireccional con 15+ PMS | Ira (recepción), Sia (notas clínicas), Novi (retención), Milo (seguros). 5 idiomas. |
+| **Adit** | PMS todo-en-uno con IA | Bundle | Propio | 5.000+ clínicas. AI Front Desk lanzado feb-2026. |
+| **My AI Front Desk, Goodcall, Resonate, HeyGent** | Voz genérica/dental | $49–$800/mes | Variable | Gama baja del mercado. |
+
+**Aprendizajes de pricing:** el rango va de $49 a $800+/mes. Los modelos de tarifa plana ganan a los de por-minuto ($1–3/min) o por-llamada en clínicas con 200+ llamadas/mes. Punto dulce: **$150–300/mes por sede**.
+
+### 2.3. GESTIÓN DE CLÍNICAS (PMS) — MERCADO GLOBAL
+
+- Mercado de software de gestión dental: **$2.620M en 2026 → $4.440M en 2031 (CAGR 11,12%)**.
+- Henry Schein (Dentrix), Carestream, NextGen, Patterson y Veradigm concentran ~70% del mercado.
+- Dentrix pierde cuota (problemas de ciberseguridad + migración cloud); **CareStack y tab32 crecen** con arquitectura multi-tenant, API abierta y FHIR.
+- **Denticon** (Planet DDS): 13.000+ clínicas, diseñado para DSOs multi-sede.
+- **Curve Dental**: cloud, para clínicas pequeñas/medianas, foco en simplicidad.
+- Tendencia clara: **cloud + IA + interoperabilidad** desplazan al software de escritorio.
+
+### 2.4. MERCADO ESPAÑOL (PMS)
+
+| Software | Modelo | Precio orientativo | Posición |
+|---|---|---|---|
+| **Gesden G5** (Infomed/Henry Schein) | Licencia + cloud | 2.000–3.000 € licencia + 400–600 €/año mantenimiento, o 50–100 €/mes cloud | Líder histórico (20+ años), base instalada enorme, cadenas grandes |
+| **Klinikare** | 100% cloud | 80–150 €/mes según sillones/módulos | Moderno, todo-en-uno |
+| **Clinic Cloud** | 100% cloud | Desde 70 €/mes; clínica 2 gabinetes: 120–180 €/mes | Alternativa moderna |
+| **Clinicbox / iDental** | Cloud | Variable | Entre los 4 más usados |
+
+**Conclusión:** el mercado español de PMS está cubierto, pero la **capa de agente IA conversacional integrado apenas tiene un player (RingLab) y solo cubre Gesden**. Hueco claro: agente IA multicanal integrable con TODOS los PMS españoles + versión standalone con agenda propia para clínicas sin PMS moderno.
 
 ---
 
-## 3. INVESTIGACIÓN DE MERCADO (RESUMEN VIGENTE)
+## 3. DOLORES DEL SECTOR (VALIDADOS CON DATOS)
 
-### 3.1. RingLab — referente directo español
+### 3.1. LLAMADAS PERDIDAS — EL DOLOR Nº1
 
-Recepcionista virtual IA para dental: mensajería unificada (WhatsApp/SMS/llamadas), agendado automático, recordatorios, predicción de no-shows, dashboard en tiempo real. Integra **solo Gesden G5** (conector local para legacy). Métricas publicadas: primera respuesta 5 s, −68% no-shows en 3 meses, +92% confirmación, implantación en 72 h. Sin precios públicos.
+- La clínica dental media **pierde ~300 llamadas al mes** (fuentes conservadoras: 30–50/mes; ~40% son pacientes reales buscando cita).
+- **El 32% de las llamadas de pacientes nuevos no se contestan.**
+- Valor medio de un paciente nuevo: **~350 €** (primer tratamiento; el lifetime value es muy superior).
+- Pérdida estimada: **4.200–7.000 €/mes**; clínicas con 100 llamadas nuevas/mes pueden perder **+200.000 €/año**.
+- Los pacientes que no logran contactar tienen un **73% más de probabilidad de reservar con un competidor ese mismo día**.
+- **El 70%+ de los pacientes nuevos eligen clínica según su primer contacto** — casi siempre telefónico.
 
-**Debilidades = nuestra oportunidad:** solo Gesden; sin pricing público (fricción); solo capa de comunicación.
+### 3.2. CRISIS DE PERSONAL EN RECEPCIÓN
 
-### 3.2. Competidores internacionales
+- El 60% de las clínicas que pierden llamadas citan **escasez de personal** como causa principal.
+- **Más del 50% del personal de recepción está buscando activamente otro empleo.**
+- Coste de reemplazar una recepcionista: **11.000–14.000 €** (selección + onboarding + pérdida de productividad).
+- La recepción hace demasiadas cosas a la vez: atención presencial, seguros, cobros, agenda → las llamadas van al buzón.
 
-| Plataforma | Enfoque | Precio | Notas |
-|---|---|---|---|
-| **Arini** (YC) | Voz IA dental | ~$249/mes | Booking en tiempo real, multiidioma. Referente en voz. |
-| **Annie** (Dental Intelligence) | Relación con paciente | Bundle | Agendado directo en PMS. |
-| **TrueLark / Weave** | Todo-en-uno comunicaciones | Bundle | Weave adquirió TrueLark en 2025. Para DSOs. |
-| **Savvy Agents** | 4 agentes especializados | Desde $89/mes | Sync con 15+ PMS, 5 idiomas. |
-| **Adit** | PMS todo-en-uno con IA | Bundle | 5.000+ clínicas. AI Front Desk feb-2026. |
+### 3.3. NO-SHOWS Y CANCELACIONES
 
-**Pricing del mercado:** $49–800+/mes. Tarifa plana gana a por-minuto en clínicas con volumen. Punto dulce: **$150–300/mes por sede**.
+- Causa raíz: coordinación pobre durante el agendado (sin confirmación, sin recordatorios estructurados).
+- Clínicas con sistemas de intake estructurados reducen no-shows **15–30% en 90 días** (RingLab reporta hasta 68%).
+- Cada hueco vacío de sillón es coste fijo puro (odontólogo + gabinete parados).
 
-### 3.3. PMS — mercado global y español
+### 3.4. OTROS DOLORES RELEVANTES
 
-- Mercado global de software dental: $2.620M (2026) → $4.440M (2031), CAGR 11%. Tendencia: cloud + IA + interoperabilidad.
-- España: **Gesden G5** (líder histórico, licencia+cloud), **Klinikare** (80–150 €/mes cloud), **Clinic Cloud** (desde 70 €/mes), Clinicbox/iDental.
-- **Conclusión:** la capa de agente IA conversacional integrado en España tiene un solo player (RingLab) y solo cubre Gesden. Hueco claro: agente IA multicanal integrable con TODOS los PMS españoles + modo standalone con agenda propia.
-
-### 3.4. Dolores del sector (validados con datos)
-
-1. **Llamadas perdidas:** ~300/mes por clínica; 32% de llamadas de pacientes nuevos sin contestar; paciente nuevo ≈ 350 €; pérdida 4.200–7.000 €/mes; 73% más probabilidad de reservar con competidor el mismo día si no contactan.
-2. **Crisis de recepción:** >50% del personal buscando otro empleo; reemplazo cuesta 11.000–14.000 €.
-3. **No-shows:** intake estructurado los reduce 15–30% en 90 días (RingLab reporta 68%).
-4. **Fuera de horario, fragmentación de canales, presupuestos sin seguimiento, reactivación inexistente, cero visibilidad de negocio, PMS sin API.**
+- **Fuera de horario:** una parte importante de las solicitudes de cita llega por la tarde-noche o fin de semana; nadie responde.
+- **Fragmentación de canales:** teléfono + WhatsApp personal + Instagram + web sin unificar; se pierden hilos de conversación.
+- **Presupuestos no seguidos:** tratamientos presupuestados que nunca se cierran por falta de follow-up sistemático.
+- **Reactivación inexistente:** pacientes que no vuelven a revisión/higiene anual y nadie les llama.
+- **Cero visibilidad de negocio:** el gerente no sabe cuántas llamadas se pierden, ni la tasa de conversión de primera visita, ni la ocupación real de agenda.
+- **Software heredado:** PMS de escritorio (Gesden clásico) sin API pública → la integración exige conectores locales.
 
 ---
 
 ## 4. PROPUESTA DE PRODUCTO
 
-### 4.1. Visión
+### 4.1. VISIÓN
 
-"La recepcionista perfecta que nunca duerme": toda la comunicación de la clínica en una bandeja, un agente IA que atiende, orienta y agenda en segundos por cualquier canal, y un panel que enseña al gerente el dinero que está dejando de perder.
+"La recepcionista perfecta que nunca duerme": toda la comunicación de la clínica en una bandeja, un agente IA que atiende, orienta y agenda al paciente en segundos por cualquier canal, y un panel que enseña al gerente el dinero que está dejando de perder.
 
-### 4.2. Posicionamiento comercial (Fase activa)
+### 4.2. MÓDULOS DEL SAAS
 
-```text
-Recuperamos pacientes, presupuestos y huecos perdidos sin cambiar tu software actual.
-```
+**M1 — Bandeja omnicanal unificada**
+- WhatsApp Business API, llamadas de voz (desvío de número, sin portabilidad), SMS, formulario web/widget.
+- Timeline por paciente: todas las conversaciones de todos los canales en un hilo.
+- Traspaso IA → humano con contexto completo (transcripción + intención + datos capturados).
 
-- NO vendemos un nuevo PMS. NO pedimos migración. NO tocamos historia clínica.
-- SÍ vendemos: captura de leads 24/7, recepción IA, pre-fichas sin duplicados, propuesta/confirmación/modificación/cancelación de citas, recuperación de presupuestos dormidos, reactivación, recalls, relleno de huecos, y **euros recuperados medidos**.
+**M2 — Agente IA recepcionista** (detallado en sección 5)
 
-### 4.3. Módulos
+**M3 — Agenda y citas**
+- Agenda propia multi-gabinete/multi-doctor (modo standalone) O sincronización bidireccional con el PMS de la clínica (modo integrado).
+- Motor de disponibilidad: reglas por tipo de tratamiento (duración, gabinete, doctor, buffers).
+- Confirmaciones y recordatorios automáticos (T-72h, T-24h, T-3h) por el canal preferido del paciente.
+- Lista de espera inteligente: hueco por cancelación → oferta automática a pacientes en espera.
 
-- **M1 Bandeja omnicanal:** WhatsApp Business API, widget web (ambos con contrato de webhook ya construido), voz y SMS después. Timeline por paciente. Traspaso IA → humano con contexto.
-- **M2 Agente IA (Clara):** ver §5.
-- **M3 Agenda y citas:** agenda propia multi-sede/multi-doctor (fuente de verdad hoy) O sync bidireccional con PMS (futuro). Motor de disponibilidad por tratamiento. Confirmaciones y recordatorios (T-72h/24h/3h). Lista de espera inteligente.
-- **M4 CRM de pacientes:** ficha 360, pre-fichas de chat, segmentación, campañas de reactivación y seguimiento de presupuestos.
-- **M5 Dashboard:** llamadas atendidas vs perdidas, citas por IA, no-shows, ocupación, **panel "dinero recuperado" en €**.
-- **M6 Integraciones:** Google Calendar (fallback rápido) → Klinikare → Clinic Cloud → Gesden G5 (conector local) → API pública + webhooks (ya existe v1).
+**M4 — CRM de pacientes**
+- Ficha del paciente: datos, historial de comunicación, citas, presupuestos, preferencias, consentimientos RGPD.
+- Segmentación: nuevos, activos, inactivos +12 meses, presupuestos abiertos.
+- Campañas de reactivación y seguimiento de presupuestos (secuencias automáticas).
 
-### 4.4. Alcance negativo
+**M5 — Dashboard y analítica**
+- KPIs firma: llamadas atendidas vs perdidas, citas agendadas por IA, tasa de no-show, ocupación de agenda, ingresos recuperados (€).
+- Panel "dinero salvado": cada cita agendada por la IA fuera de horario o en llamada que se habría perdido, valorizada.
+- Transcripciones y análisis de sentimiento de llamadas.
 
-- No es un PMS completo: sin odontograma, sin gestión de laboratorio. La facturación fiscal existente es base preparatoria, no sustituto del PMS fiscal del cliente hasta homologación.
-- El agente orienta y agenda; **nunca diagnostica**.
+**M6 — Integraciones**
+- Fase 1: Gesden G5 (conector local, mismo enfoque RingLab), Klinikare y Clinic Cloud (API cloud).
+- Fase 2: Clinicbox, iDental, Google Calendar, y API pública propia + webhooks.
+
+### 4.3. LO QUE NO ES (ALCANCE NEGATIVO)
+
+- No es un PMS completo: no hace odontograma, ni facturación fiscal, ni gestión de laboratorio (fase 1-3). Se integra con los PMS, no los reemplaza. Esto acelera el time-to-market y evita competir con Gesden/Klinikare de frente.
+- No da consejo clínico ni diagnóstico: el agente orienta y agenda, nunca diagnostica.
 
 ---
 
-## 5. AGENTE IA — ESTADO Y DISEÑO
+## 5. AGENTE IA — DISEÑO COMPLETO
 
-Clara está construida y evaluada. Reglas de oro vigentes (no romper al evolucionar):
+### 5.1. PERSONALIDAD Y COMPORTAMIENTO
 
-- Mensajes cortos estilo WhatsApp: 2-3 frases, UNA pregunta por turno.
-- Datos por separado y en orden: consentimiento → nombre → email → teléfono → sede → 3 huecos numerados.
-- Urgencias en dos tiempos: primero pregunta de seguridad, cita urgente en el turno siguiente (salvo banderas rojas presentes → prioridad inmediata).
-- Nunca diagnostica, nunca inventa precios, se identifica como IA, consentimiento solo en contexto.
-- Cita gestionada por Clara O llamada de recepción — nunca ambas en el mismo flujo normal.
-- Modificación de citas solo con identidad verificada (mismo teléfono); ante duda, escalar.
-- Base de conocimiento por tenant: tratamientos, sedes, doctores y especialidades, seguros, financiación, políticas.
+- Nombre configurable por clínica (ej. "Clara, la asistente de Clínica Sonrisa").
+- Tono: cercano, profesional, empático; configurable (formal/informal, tuteo/usted).
+- Idiomas: español (día 1), catalán/inglés (fase 2), más idiomas después.
+- Latencia objetivo en voz: **< 1 segundo** entre turno y respuesta; primera respuesta en mensajería **< 5 segundos**.
 
-**Calidad como sistema, no como esfuerzo puntual:** cada fallo real de producción se convierte en fixture de regresión (`tests/fixtures/clara-conversations*.json`). El gate `quality:release` (eval 100/100 + lint + typecheck + tests + build) es obligatorio antes de todo deploy.
+### 5.2. BASE DE CONOCIMIENTO DEL NICHO (LO QUE EL AGENTE DOMINA)
 
-**Stack del agente (vigente/previsto):**
+**Catálogo de tratamientos** (con lenguaje de paciente, no técnico):
+- Preventiva: revisión, higiene/limpieza, fluorización, selladores.
+- Conservadora: empastes (obturaciones), endodoncia, reconstrucciones.
+- Prótesis: coronas, puentes, prótesis removibles, prótesis sobre implantes.
+- Implantología: implante unitario, All-on-4/6, elevación de seno, injertos.
+- Ortodoncia: brackets metálicos/estéticos, alineadores invisibles, retenedores.
+- Estética: blanqueamiento, carillas de composite/porcelana.
+- Periodoncia: curetajes, mantenimiento periodontal, tratamiento de piorrea.
+- Cirugía: extracciones, cordales, apicectomía.
+- Odontopediatría e infantil: primera visita niño, PADI/programas públicos por comunidad.
+- ATM/bruxismo: férulas de descarga.
 
-| Capa | Hoy | Futuro |
+Por cada tratamiento el agente sabe: qué es en lenguaje llano, duración típica de cita, si requiere valoración previa, rangos de precio de la clínica (si la clínica los autoriza), financiación disponible, y qué doctor/gabinete lo hace.
+
+**Triaje de urgencias (protocolo crítico):**
+| Síntoma | Clasificación | Acción del agente |
 |---|---|---|
-| Razonamiento | Engine determinista + LLM configurable (fallback a reglas) | Claude/GPT con tool-use pleno |
-| WhatsApp | Meta Cloud API (webhook listo) | BSP si el volumen lo exige |
-| Voz | — | Comprar primero (Vapi/Retell) para validar; migrar a Pipecat/LiveKit + Twilio a >50 clínicas |
-| STT/TTS voz | — | Deepgram + ElevenLabs (es-ES, baja latencia) |
-| RAG conocimiento | Configuración estructurada por tenant | pgvector cuando el corpus crezca |
-| Evaluación | Golden dialogs propios (103 conversaciones, gate automático) | Ampliar con conversaciones reales, audio transcrito, mal escritas |
+| Traumatismo con avulsión (diente fuera), sangrado que no cesa, inflamación con fiebre/dificultad para tragar | URGENCIA REAL | Escalado inmediato a humano + instrucciones de primeros auxilios validadas + hueco de urgencia el mismo día o derivación a urgencias hospitalarias si la clínica está cerrada |
+| Dolor agudo, flemón, empaste/corona caída con dolor | PRIORITARIA | Ofrece primer hueco disponible en 24h, marca la cita como urgencia |
+| Sensibilidad, revisión, estética, molestia leve | ORDINARIA | Agenda normal |
+
+Regla de oro: **ante duda, escalar**. El agente jamás minimiza un síntoma ni da diagnóstico ("eso suena a caries") — describe opciones y agenda.
+
+**Conocimiento operativo de la clínica (configurable por tenant):**
+- Horarios, direcciones, parking, cómo llegar.
+- Doctores y especialidades de cada uno.
+- Seguros/mutuas aceptados (Adeslas, Sanitas, DKV, Asisa…) y qué cubre cada convenio.
+- Política de precios, financiación (ej. 12 meses sin intereses), promociones vigentes.
+- Políticas: cancelación, retraso, primera visita gratuita o no, radiografías.
+
+**Conocimiento del funnel del paciente:**
+- Paciente nuevo → capta: nombre, teléfono, motivo, cómo nos conoció, seguro → agenda primera visita/valoración → dispara secuencia de bienvenida (ubicación, qué traer, consentimiento RGPD).
+- Paciente existente → identifica por teléfono → contexto de su historial de citas → agenda/reprograma/cancela.
+- Presupuesto abierto → responde dudas de precio/financiación → ofrece cita de cierre.
+
+### 5.3. FLUJOS CONVERSACIONALES PRINCIPALES
+
+1. **AGENDAR CITA NUEVA** — intención detectada → identifica/da de alta al paciente → motivo → triaje → propone 2-3 huecos según reglas de tratamiento → confirma → escribe en agenda/PMS → envía confirmación con ubicación e instrucciones.
+2. **REPROGRAMAR / CANCELAR** — localiza cita → ofrece alternativas → actualiza PMS → si cancela, ofrece hueco a lista de espera automáticamente.
+3. **URGENCIA** — protocolo de triaje → hueco de urgencia o escalado inmediato.
+4. **INFORMACIÓN DE TRATAMIENTO/PRECIO** — explica en lenguaje llano → rango de precios autorizado → propone valoración gratuita → captura lead aunque no agende.
+5. **CONFIRMACIÓN / RECORDATORIO (saliente)** — T-72h/24h/3h → si no confirma, reintento por otro canal → si cancela, recupera el hueco.
+6. **REACTIVACIÓN (saliente)** — pacientes sin visita en 12 meses → mensaje personalizado de revisión → agenda.
+7. **SEGUIMIENTO POST-TRATAMIENTO** — 24-48h tras intervención → pregunta cómo se encuentra → detecta complicaciones (escala) → encuesta de satisfacción + petición de reseña Google si es positiva.
+8. **ESCALADO A HUMANO** — triggers: urgencia real, enfado/queja, petición explícita, 2 intentos fallidos de entender, temas clínicos fuera de guion, pagos/reclamaciones. Entrega: transcripción + resumen + datos capturados.
+
+### 5.4. GUARDRAILS (INNEGOCIABLES)
+
+- Nunca diagnostica, nunca prescribe, nunca contradice al odontólogo.
+- Nunca inventa precios ni promociones: solo lee de la configuración del tenant.
+- Nunca confirma disponibilidad sin verificar la agenda en tiempo real.
+- Identifica que es un asistente virtual si el paciente lo pregunta (transparencia, exigible por AI Act).
+- Datos de salud: solo captura lo mínimo necesario para agendar (motivo general, no historial).
+- Grabación/transcripción de llamadas: locución informativa previa + base legal (RGPD).
+
+### 5.5. STACK TÉCNICO DEL AGENTE
+
+| Capa | Tecnología propuesta | Alternativa |
+|---|---|---|
+| LLM / razonamiento | Claude (Anthropic API) con tool-use para agenda, CRM y escalado | GPT-4o |
+| Orquestación | Motor de agente propio (state machine + tools) con Agent SDK | LangGraph |
+| Voz — telefonía | Twilio Programmable Voice / SIP trunk local español | Vonage, Telnyx |
+| Voz — STT | Deepgram (streaming, español) | Whisper streaming |
+| Voz — TTS | ElevenLabs (voz natural es-ES, baja latencia) | Azure TTS |
+| Pipeline voz tiempo real | Pipecat / LiveKit Agents (turn-taking, barge-in) | Vapi (build vs buy) |
+| WhatsApp | WhatsApp Business API (Meta / BSP tipo 360dialog) | Twilio WA |
+| RAG conocimiento clínica | pgvector sobre PostgreSQL, embeddings por tenant | Pinecone |
+| Evaluación | Suite de tests de conversación (golden dialogs) + revisión humana de muestras + métricas de resolución | — |
+
+Decisión clave **build vs buy en voz**: empezar con plataforma (Vapi/Retell) para validar en semanas y migrar a pipeline propio (Pipecat + Twilio) cuando el volumen justifique el margen. El coste por minuto de plataforma (~$0,10–0,20/min) se come el margen a escala.
 
 ---
 
-## 6. ARQUITECTURA TÉCNICA
+## 6. ARQUITECTURA TÉCNICA DEL SAAS
 
-### 6.1. Principios
+### 6.1. PRINCIPIOS
 
-- **Multi-tenant estricto:** scoping por `tenant_id` en toda consulta; auditar aislamiento antes de cada piloto real; RLS de PostgreSQL como refuerzo futuro.
-- **API-first:** todo lo que hace la UI lo hace la API (v1 ya pública).
-- **Calendario nativo = fuente de verdad.** Make y cualquier integración externa solo reciben eventos; jamás deciden disponibilidad.
-- **Inmutabilidad y auditoría:** log de auditoría de todo acceso/cambio sobre datos de paciente (obligación RGPD + argumento de venta).
-- **Event-driven para lo asíncrono:** hoy webhooks salientes (Make); recordatorios y secuencias necesitarán colas reales (ver §8).
+- **Multi-tenant desde el día 1**: PostgreSQL con Row-Level Security por `tenant_id`; aislamiento estricto de datos entre clínicas.
+- **API-first**: todo lo que hace la UI lo hace la API; API pública documentada en fase 3.
+- **Event-driven** para lo asíncrono: recordatorios, secuencias, sincronización PMS → colas (BullMQ/Redis).
+- **Inmutabilidad y auditoría**: log de auditoría append-only de todo acceso a datos de paciente (obligación RGPD + argumento de venta).
 
-### 6.2. Stack vigente
+### 6.2. STACK
 
 | Capa | Tecnología |
 |---|---|
-| Frontend + Backend | Next.js 16 App Router + Server Actions + TypeScript |
-| BD | PostgreSQL (Neon producción, Docker local) + Prisma 6 |
-| Deploy | Vercel desde GitHub `main` (checks `Vercel - dentia` y `Vercel - dentia-hu6t`) |
-| Auth | Propia: scrypt + sesiones en BD + roles. MFA pendiente |
-| Emails transaccionales | Make (Webhooks → Router → Gmail); migrar a Brevo/SendGrid/SMTP en producción seria |
-| Jobs/colas | Pendiente: Vercel Cron + Upstash Redis (QStash/BullMQ) para recordatorios y secuencias |
-| Observabilidad | Pendiente: Sentry + logs estructurados |
+| Frontend | Next.js (App Router) + TypeScript + Tailwind — design system AVELKIA |
+| Backend | NestJS (Node/TypeScript) — API REST + WebSockets para bandeja en tiempo real |
+| Base de datos | PostgreSQL (RLS multi-tenant) + pgvector |
+| Colas/cache | Redis + BullMQ |
+| Infra | Docker + despliegue EU (Hetzner/AWS eu-west) — datos SIEMPRE en la UE |
+| Conector local PMS | Agente ligero instalado en el servidor de la clínica (para Gesden on-premise): túnel saliente cifrado, sin puertos abiertos, sin acceso remoto — mismo patrón que RingLab |
+| Observabilidad | Sentry + OpenTelemetry + dashboards de latencia del agente |
+| Auth | Auth propia con MFA + roles (gerente, recepción, doctor, solo-lectura) |
 
-Nota: la hoja de ruta original proponía NestJS separado. Decisión vigente: **Next.js full-stack se mantiene** mientras el equipo sea pequeño; extraer servicios (voz, conectores PMS) solo cuando existan y lo exijan.
+### 6.3. MODELO DE DATOS (NÚCLEO)
 
-### 6.3. Modelo de datos (núcleo ya implementado)
-
-`Tenant` → `Location` → `Provider` → `Operatory` · `Patient` (+ fiscales) → `Conversation` → `Message` · `Appointment` → `AppointmentType` · `Treatment` · `Invoice` (fiscal) · `PatientIntake` (pre-fichas) · `Task` · `Session` · `AgentSession` · `AuditLog` · consentimientos RGPD.
+`tenants` → `locations` → `providers` (doctores) → `operatories` (gabinetes)
+`patients` → `conversations` → `messages` (canal, dirección, transcripción)
+`appointments` (estado: solicitada/confirmada/completada/no-show/cancelada) → `appointment_types` (duración, reglas, precio)
+`treatments_catalog` · `budgets` (presupuestos + estado de seguimiento) · `waitlist` · `consents` (RGPD) · `audit_log`
+`agent_sessions` (intención, resultado, escalado, coste tokens/minutos)
 
 ---
 
 ## 7. CUMPLIMIENTO LEGAL (ESPAÑA/UE) — VENTAJA COMPETITIVA
 
-- **RGPD + LOPDGDD:** datos de salud = categoría especial (art. 9). Base jurídica: consentimiento explícito + relación asistencial. Registro de actividades, DPO designado, **EIPD obligatoria** antes de datos reales a escala.
-- **Encargado del tratamiento:** la clínica es responsable; nosotros encargados → **DPA robusto (art. 28) con cada cliente** — plantilla necesaria antes del primer contrato de pago.
-- **Residencia UE**, TLS 1.3, cifrado en reposo, retención configurable, derecho de supresión automatizado.
-- **AI Act:** transparencia obligatoria (Clara ya se identifica como IA); caso de uso = riesgo limitado — documentarlo.
-- **LLM providers:** zero-data-retention/no-training por contrato; mínima PII al modelo; seudonimización donde sea posible.
-- **Llamadas (cuando haya voz):** locución previa informando de asistente virtual y grabación.
-
-Checklist operativo antes de datos reales de pacientes: EIPD hecha · DPA firmado · retención y supresión implementadas · auditoría de aislamiento multi-tenant · backups verificados · MFA para staff · pentest básico.
+- **RGPD + LOPDGDD**: los datos de salud son **categoría especial (art. 9 RGPD)**. Base jurídica: consentimiento explícito + relación asistencial. Registro de actividades de tratamiento, DPO designado, EIPD (evaluación de impacto) obligatoria por tratamiento a gran escala de datos de salud.
+- **Encargado del tratamiento**: la clínica es responsable; nosotros encargados → contrato DPA robusto con cada cliente (art. 28).
+- **Residencia de datos en la UE**, cifrado en tránsito (TLS 1.3) y en reposo (AES-256), retención configurable, derecho de supresión automatizado.
+- **Llamadas**: locución previa informando de asistente virtual y grabación; opt-out a humano siempre disponible.
+- **AI Act (UE)**: transparencia obligatoria (el usuario debe saber que habla con IA); el caso de uso (agendado) es riesgo limitado, no alto — documentarlo.
+- **LLM providers**: acuerdos con zero-data-retention / no-training (Anthropic lo ofrece vía API); nunca enviar más PII de la necesaria al modelo; seudonimización donde sea posible.
 
 ---
 
-## 8. DEUDA TÉCNICA CRÍTICA (BLOQUEA ESCALA — RESOLVER EN SPRINT 2)
+## 8. HOJA DE RUTA POR FASES
 
-Lista honesta, por orden de riesgo:
+### FASE 0 — VALIDACIÓN (SEMANAS 1–4)
 
-1. **Migraciones Prisma a medio camino.** `build` ya NO ejecuta `prisma db push`; ahora hace `prisma generate && next build`. Falta cerrar el paso productivo: marcar/aplicar baseline `0_init` en Neon y activar `prisma migrate deploy` en el build de Vercel cuando producción esté resuelta. **La más urgente antes de nuevos cambios de schema.**
-2. **`src/app/page.tsx` con 3.206 líneas.** Monolito de vistas; frena cada cambio de UI y viola el estándar propio (<800 líneas/archivo). → Trocear por módulo en rutas/componentes al ejecutar el rediseño de menús.
-3. **Rate limiting distribuido: base implementada.** API pública y webhooks ya pueden usar Upstash Redis REST con fallback a memoria. Pendiente: configurar `UPSTASH_REDIS_REST_URL` y `UPSTASH_REDIS_REST_TOKEN` en Vercel antes de tráfico real.
-4. **Admin cerrado: base implementada.** `/admin` ya no usa token por query param; requiere sesión, rol `OWNER` y allowlist `DENTIA_ADMIN_EMAILS` en producción.
-5. **Sentry: base implementada.** SDK configurado para Next.js App Router/Turbopack, sin PII ni replay. Pendiente: crear proyecto Sentry y configurar DSN/tokens en Vercel.
-6. **Backups/restore documentados.** Runbook en `docs/OPERATIONS.md`. Pendiente: ejecutar restore real de prueba en Neon y registrar resultado.
-7. **Sin MFA** en auth propia. → Obligatorio para roles MANAGER+ antes de datos reales.
-8. **Emails vía Gmail personal en Make.** → Brevo/SendGrid con dominio propio antes de clientes de pago.
-9. **Datos de QA en producción** (pacientes/conversaciones de test). → Script de limpieza + tenant de staging separado.
+- 15–20 entrevistas con gerentes de clínica y recepcionistas (guion sobre los 6 dolores de la sección 3).
+- Mapear el parque de PMS de las clínicas entrevistadas (¿% Gesden vs Klinikare vs otros?).
+- Prototipo Wizard-of-Oz: número de WhatsApp atendido con IA supervisada en 2 clínicas amigas; medir tasa de agendado real.
+- 5 cartas de intención (LOI) con precio anclado antes de escribir código de producción.
+- **Gate de salida:** ≥60% de entrevistados confirman dolor nº1 (llamadas perdidas) y ≥3 LOIs firmadas.
 
----
+### FASE 1 — MVP MENSAJERÍA (MESES 1–3)
 
-## 9. HOJA DE RUTA POR FASES (ACTUALIZADA AL ESTADO REAL)
+Alcance:
+- Bandeja unificada WhatsApp + widget web.
+- Agente IA texto: flujos 1, 2, 4 y 8 (agendar, reprogramar, info, escalado).
+- Agenda propia standalone (sin integración PMS aún) multi-doctor.
+- Confirmaciones y recordatorios automáticos por WhatsApp.
+- Panel básico: citas agendadas por IA, conversaciones, tasa de respuesta.
+- Onboarding self-service del conocimiento de clínica (horarios, tratamientos, precios, seguros).
+- 3–5 clínicas piloto de las LOIs, gratis 2 meses a cambio de feedback semanal.
 
-> Las fases 0–1 originales (validación y MVP mensajería) están **superadas técnicamente**. Se renumeran las fases desde la realidad actual.
+**Gate:** ≥50% de las conversaciones entrantes resueltas sin humano; ≥30 citas/mes agendadas por IA por clínica.
 
-### SPRINT 1 — PILOTO VIVO (AHORA → 1 DE AGOSTO DE 2026) 🔴 CRÍTICO
+### FASE 2 — VOZ + INTEGRACIÓN GESDEN (MESES 4–6)
 
-Objetivo único: **Clara contestando el WhatsApp real de Ruiz Estrada antes del cierre de agosto.**
+- Agente de voz entrante: desvío de número, STT/TTS es-ES, latencia <1s, transferencia a humano en caliente.
+- Triaje de urgencias completo (flujo 3) con protocolo validado por odontólogo asesor.
+- Conector local Gesden G5 (lectura/escritura de agenda) — paridad con RingLab.
+- Integración API con Klinikare y Clinic Cloud (ventaja sobre RingLab).
+- Transcripción + resumen de cada llamada en la ficha del paciente.
+- Lanzamiento comercial: pricing público, web, casos de éxito de los pilotos.
 
-1. Alta del número en Meta Business / WhatsApp Cloud API; configurar `WHATSAPP_VERIFY_TOKEN`, `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID` en Vercel (webhook `/api/whatsapp/meta` ya listo).
-2. Activar escenario Make y prueba E2E real: conversación completa → elegir opción 1 → email de confirmación recibido → enlace `/ficha/DENTIA-XXXXXX` funcional. Probar también `rescheduled` y `cancelled`.
-3. Cargar/verificar base de conocimiento Ruiz Estrada completa en el tenant (tratamientos, precios autorizados, doctores, horarios de agosto, mensaje "clínica cerrada, te agendamos para septiembre").
-4. Modo agosto: Clara captura lead + pre-ficha + propone citas de septiembre + urgencias → derivación clara (teléfono de urgencias o instrucciones pactadas con la clínica).
-5. Panel mínimo para el cliente: leads capturados, citas propuestas/confirmadas, presupuestos detectados — visible sin formación.
-6. Acordar con Ruiz Estrada el protocolo de agosto por escrito (quién revisa pre-fichas, qué hace Clara ante urgencia real).
+**Gate:** 15 clínicas de pago; churn < 5% mensual; >70% de llamadas fuera de horario convertidas en cita o lead.
 
-**Gate:** ≥1 conversación real de paciente gestionada de punta a punta con email de confirmación entregado. Cero incidentes de datos.
+### FASE 3 — MOTOR DE INGRESOS (MESES 7–9)
 
-### SPRINT 2 — HARDENING PRE-DATOS-REALES (AGOSTO 2026)
-
-Mientras Clara trabaja sola, se blinda la plataforma (la clínica está cerrada: ventana perfecta para deuda técnica).
-
-- Toda la lista de §8, en orden (migraciones Prisma primero; Sentry, admin, rate limit y runbook de backups ya tienen base implementada).
-- Checklist RGPD de §7 (EIPD, DPA plantilla, retención/supresión, auditoría de aislamiento).
-- Rediseño de arquitectura de menús/submenús (pendiente de directrices del usuario) + troceo de `page.tsx` en el mismo movimiento. Separación clara: recepción IA · pacientes/ficha · agenda · tratamientos/presupuestos · facturación · crecimiento · configuración.
-- Recordatorios T-72h/24h/3h reales con cron + cola (hoy solo generación manual de tareas).
-- Corpus de Clara ampliado con las conversaciones reales de agosto → fixtures de regresión.
-
-**Gate:** migraciones versionadas en producción; Sentry activo; EIPD y DPA listos; menús validados por el usuario; `quality:release` en verde.
-
-### FASE B — PRIMEROS CLIENTES DE PAGO (SEPT–DIC 2026)
-
-- Caso de éxito Ruiz Estrada documentado en €: "clínica cerrada capturó X leads y Y citas en agosto".
-- Stripe + planes reales (§10) + límites por plan ya modelados en API.
-- Onboarding self-service del conocimiento de clínica (horarios, tratamientos, precios, seguros) — hoy requiere trabajo manual; convertirlo en asistente guiado.
-- GTM (§10.3): outbound quirúrgico + auditoría gratuita de llamadas perdidas + partners prescriptores.
-- Soporte y SLA básicos; contrato + DPA firmables.
-
-**Gate:** 10 clínicas de pago; churn <5% mensual; NPS del piloto >8; MRR ≥2.500 €.
-
-### FASE C — VOZ + PRIMERA INTEGRACIÓN PMS (2027 T1)
-
-- Agente de voz entrante: desvío de número, plataforma comprada (Vapi/Retell) para validar en semanas; latencia <1s; transferencia a humano en caliente; transcripción + resumen en ficha.
-- Triaje de urgencias por voz validado por odontólogo asesor.
-- Integraciones por orden de esfuerzo/retorno: Google Calendar (fallback rápido) → Klinikare (API cloud) → Clinic Cloud.
-- SMS como canal de fallback.
-- Lanzamiento comercial ampliado: pricing público en web (ventaja frente a RingLab).
-
-**Gate:** 25 clínicas; >70% de llamadas fuera de horario convertidas en cita o lead; coste de voz por clínica dentro del margen del plan PRO.
-
-### FASE D — MOTOR DE INGRESOS + GESDEN (2027 T2–T3)
-
-- Predicción de no-shows + sobreagendado inteligente.
+- Predicción de no-shows (modelo sobre historial: antigüedad, canal, tipo de cita, clima de confirmaciones) + sobreagendado inteligente.
 - Lista de espera automática y relleno de huecos por cancelación.
 - Secuencias de reactivación (+12 meses) y seguimiento de presupuestos abiertos.
-- Post-tratamiento + reseñas Google.
-- **Panel "dinero recuperado" en €** como centro del producto — el argumento de renovación.
-- Conector local Gesden G5 (patrón RingLab: túnel saliente cifrado, sin puertos abiertos) — paridad y superación del referente.
+- Flujo 7 (post-tratamiento + reseñas Google).
+- Panel "dinero recuperado" en € — el argumento de renovación.
+- SMS como canal de fallback.
 
-**Gate:** 40 clínicas; NRR >100%; "+X €/mes recuperados" documentado en 3 clientes.
+**Gate:** 40 clínicas; NRR >100%; caso de éxito medible: "+X€/mes recuperados" documentado en 3 clientes.
 
-### FASE E — ESCALA NACIONAL (2027 T4 → 2028)
+### FASE 4 — ESCALA (MESES 10–18)
 
-- Multi-sede/grupos y DSOs: vista consolidada, enrutado entre sedes.
-- Marketplace de integraciones sobre la API pública; webhooks para partners.
-- Catalán/inglés; Portugal como segunda geografía natural.
+- Multi-sede / grupos y DSOs: vista consolidada, enrutado de llamadas entre sedes.
+- API pública + webhooks + marketplace de integraciones (contabilidad, marketing, laboratorios).
+- Catalán, inglés, francés (mercado belga/francés como segunda geografía; Portugal natural por proximidad).
 - Llamadas salientes proactivas de confirmación con IA de voz.
-- Respuesta automática a leads de Google/Meta Ads en <1 min.
-- ISO 27001 / SOC 2 para cadenas grandes.
+- Módulo de campañas de captación (respuesta automática a leads de Google/Meta Ads en <1 min).
+- SOC 2 / ISO 27001 para entrar en cadenas grandes.
 
 ---
 
-## 10. MODELO DE NEGOCIO
+## 9. MODELO DE NEGOCIO
 
-### 10.1. Pricing (propuesta vigente)
+### 9.1. PRICING (PROPUESTA)
 
 | Plan | Precio/mes por sede | Incluye |
 |---|---|---|
-| **ESENCIAL** | 149 € | Bandeja omnicanal + Clara mensajería (WhatsApp/web) + recordatorios + panel básico. 500 conversaciones/mes |
-| **PRO** | 299 € | + voz (500 min/mes) + integración PMS + triaje urgencias + transcripciones |
-| **CRECIMIENTO** | 499 € | + no-show prediction + reactivación + presupuestos + reseñas + volúmenes ampliados |
+| **ESENCIAL** | 149 € | Bandeja omnicanal + agente IA mensajería (WhatsApp/web) + recordatorios + panel básico. 500 conversaciones/mes |
+| **PRO** | 299 € | Todo lo anterior + agente de voz (500 min/mes) + integración PMS + triaje urgencias + transcripciones |
+| **CRECIMIENTO** | 499 € | Todo + no-show prediction + reactivación + presupuestos + reseñas + minutos/conversaciones ampliados |
 | **GRUPOS/DSO** | Custom | Multi-sede, SLA, SSO, onboarding dedicado |
 
-- Setup 250–500 € (bonificado con anual). Excedentes por packs.
-- Justificación: si Clara salva 3–4 pacientes nuevos/mes (~350 €/ud), el plan PRO se paga solo ×4. **Anclar SIEMPRE la venta al dinero recuperado.**
-- Benchmark: Arini $249, Savvy desde $89, mercado $49–800 → zona media con más producto.
+- Setup: 250–500 € (se bonifica con contrato anual). Excedentes: packs de minutos/conversaciones.
+- Justificación de precio: si el agente salva 3–4 pacientes nuevos/mes (~350 €/ud), el plan PRO se paga solo ×4. Anclar SIEMPRE la venta al "dinero recuperado".
+- Benchmark: Arini $249, Savvy desde $89, mercado $49–800 → estamos en zona media con más producto (omnicanal + integración española).
 
-### 10.2. Unit economics (estimación)
+### 9.2. UNIT ECONOMICS (ESTIMACIÓN INICIAL)
 
-- Coste variable clínica/mes (PRO): LLM 15–30 € + voz 40–70 € + WhatsApp ~10 € + infra ~5 € → 70–115 € → margen bruto 60–75% (mejora al migrar voz a pipeline propio).
+- Coste variable por clínica/mes (plan PRO): LLM ~15–30 € + voz (STT/TTS/telefonía) ~40–70 € + WhatsApp ~10 € + infra ~5 € → **~70–115 €** → margen bruto ~60–75%. Mejora al migrar de plataforma de voz a pipeline propio.
 - CAC objetivo <900 € (payback <6 meses en PRO). LTV con churn 2%/mes ≈ 15.000 € → LTV/CAC >15.
 
-### 10.3. Go-to-market España
+### 9.3. GO-TO-MARKET ESPAÑA
 
-1. **Nicho concentrado:** clínicas privadas independientes de 1–3 sedes (~24.000 clínicas en España, >80% pequeñas). Cadenas en Fase E.
-2. **Caso Ruiz Estrada como arma:** "una clínica cerrada en agosto siguió captando pacientes" — apertura de puerta inigualable en septiembre.
-3. **Outbound quirúrgico:** llamar a clínicas fuera de horario; si no contesta nadie, ese es el pitch.
-4. **Auditoría gratuita de llamadas perdidas** (2 semanas de desvío) → informe con € perdidos → conversión.
-5. **Partners prescriptores:** asesorías dentales, consultores, depósitos, protésicos; comisión 15–20% primer año.
-6. **Contenido:** calculadora de llamadas perdidas como lead magnet; SEO/LinkedIn.
-7. **Presencia sectorial:** Expodental (IFEMA), SEPA/SEPES, colegios de odontólogos.
+1. **Nicho concentrado primero:** clínicas privadas independientes de 1–3 sedes (España tiene ~24.000 clínicas dentales; >80% pequeñas). Evitar cadenas (ciclo largo) hasta fase 4.
+2. **Canal directo:** outbound quirúrgico — llamar a clínicas fuera de horario; si no contesta nadie, ese es el pitch ("acabo de ser el paciente que has perdido").
+3. **Partners prescriptores:** asesorías dentales, consultores de gestión, depósitos dentales, protésicos; comisión 15–20% primer año.
+4. **Prueba con riesgo cero:** auditoría gratuita de llamadas perdidas (desvío de no-contestadas al agente 2 semanas) → informe con € perdidos → conversión.
+5. **Contenido SEO/LinkedIn:** "cuánto dinero pierde tu clínica en llamadas", calculadora online de llamadas perdidas como lead magnet.
+6. **Presencia sectorial:** Expodental (IFEMA), congresos SEPA/SEPES, colegios de odontólogos.
 
 ---
 
-## 11. KPIS
+## 10. KPIS DEL PRODUCTO
 
-| Categoría | KPI | Objetivo |
+| Categoría | KPI | Objetivo año 1 |
 |---|---|---|
-| Agente | Evaluación Clara (gate automático) | 100/100 siempre — regresión = bloqueo de release |
 | Agente | % conversaciones resueltas sin humano | >65% |
-| Agente | Tasa de agendado (intención → cita) | >55% |
-| Agente | Latencia voz (cuando exista) | <1 s |
-| Cliente | No-shows | −30% en 90 días |
-| Cliente | Llamadas/mensajes perdidos | −80% |
-| Negocio | MRR a 12 meses de Fase B | 25–40 k€ (40–80 clínicas) |
+| Agente | Tasa de agendado (conversaciones con intención → cita) | >55% |
+| Agente | Latencia voz (turno a turno) | <1 s |
+| Cliente | No-shows del cliente | −30% en 90 días |
+| Cliente | Llamadas perdidas del cliente | −80% |
+| Negocio | MRR | 25–40 k€ (40–80 clínicas) |
 | Negocio | Churn mensual | <3% |
 | Negocio | NRR | >105% |
 
 ---
 
-## 12. RIESGOS Y MITIGACIONES
+## 11. RIESGOS Y MITIGACIONES
 
 | Riesgo | Prob. | Impacto | Mitigación |
 |---|---|---|---|
-| Deploy con schema fuera de control | Media hasta cerrar baseline Neon | Muy alto | §8.1 — completar baseline productiva y activar `migrate deploy` antes de nuevos cambios Prisma |
-| Alucinación del agente (precio/consejo clínico) | Media | Muy alto | Guardrails duros + eval automática 100/100 como gate + fallos reales → fixtures + seguro RC |
-| Incidente RGPD con datos de salud | Baja | Muy alto | Checklist §7 completo ANTES de datos reales; mínima PII al LLM; residencia UE |
-| RingLab consolida el mercado antes | Media | Alto | Velocidad + PMS que ellos no cubren + pricing público + caso agosto |
-| Integración Gesden sin API pública | Alta | Alto | Conector local (patrón validado por RingLab); empezar por PMS cloud |
-| Coste de voz se come el margen | Media | Medio | Buy primero, migrar a pipeline propio a >50 clínicas |
-| Meta/WhatsApp cambia políticas o precios | Media | Medio | Multicanal real: voz y SMS como fallback |
-| Recepción percibe amenaza laboral | Alta | Medio | Posicionar como asistente, no sustituto; formación en onboarding |
-| Dependencia de Make/Gmail para emails | Media | Medio | Migrar a Brevo/SendGrid con dominio propio en Fase B |
-| UX "liosa" frena la venta | Media | Alto | Rediseño de menús en Sprint 2 con directrices del usuario antes de demo comercial |
+| Integración Gesden sin API pública | Alta | Alto | Conector local (patrón RingLab validado); empezar por PMS cloud con API; ingeniería inversa de BD local solo con autorización del cliente |
+| Alucinación del agente (precio/consejo clínico erróneo) | Media | Muy alto | Guardrails duros, respuestas de precio solo desde configuración, suite de golden dialogs, revisión humana de muestras, seguro de RC |
+| RingLab consolida el mercado español antes | Media | Alto | Velocidad + cubrir los PMS que ellos no cubren + pricing público transparente |
+| Coste de voz se come el margen | Media | Medio | Empezar buy (Vapi/Retell), migrar a Pipecat/Twilio a >50 clínicas |
+| RGPD: incidente con datos de salud | Baja | Muy alto | EIPD, DPO, cifrado, residencia UE, pentest anual, mínimos datos al LLM, DPA con proveedores |
+| Adopción: recepción percibe amenaza laboral | Alta | Medio | Posicionar como "asistente de la recepción, no sustituto": les quita llamadas repetitivas, no el puesto. Formación incluida en onboarding |
+| Meta/WhatsApp cambia políticas o precios | Media | Medio | Multicanal real: voz y SMS como fallback; BSP con contrato |
 
 ---
 
-## 13. EQUIPO Y PRESUPUESTO ORIENTATIVO (12 MESES)
+## 12. EQUIPO Y PRESUPUESTO ORIENTATIVO (12 MESES)
 
 | Rol | Dedicación | Coste anual aprox. |
 |---|---|---|
 | Full-stack senior (founder/lead) | 100% | 55–70 k€ |
-| Ingeniero IA/voz | 100% (desde Fase C) | 50–65 k€ |
-| Full-stack mid | 100% (desde Fase B) | 40–50 k€ |
-| Odontólogo asesor (protocolos) | 10% | 6–10 k€ |
-| Sales/CS (founder-led al inicio; hire en Fase B) | 100% | 35–45 k€ + variable |
+| Ingeniero IA/voz | 100% | 50–65 k€ |
+| Full-stack mid | 100% (desde mes 4) | 40–50 k€ |
+| Odontólogo asesor (protocolos + validación) | 10% | 6–10 k€ |
+| Sales/CS (founder-led al inicio; hire mes 6) | 100% | 35–45 k€ + variable |
 | Legal/DPO externo | Puntual | 8–12 k€ |
 | Infra + APIs (LLM, voz, WhatsApp) | — | 15–30 k€ |
 | **Total año 1** | | **~210–280 k€** |
 
 ---
 
-## 14. PRÓXIMOS PASOS INMEDIATOS (SEMANA DEL 20 DE JULIO)
+## 13. PRÓXIMOS PASOS INMEDIATOS (ESTA SEMANA)
 
-1. **Credenciales Meta WhatsApp Cloud** para el número del piloto → configurar en Vercel → verificar webhook. (Bloqueante nº1; requiere acción del usuario en Meta Business.)
-2. **Prueba E2E Make completa:** conversación real → opción 1 → email recibido → ficha accesible. Después `rescheduled` y `cancelled`.
-3. **Base de conocimiento Ruiz Estrada de agosto** cargada y validada con la clínica (horarios de cierre, protocolo de urgencias, citas para septiembre).
-4. **Protocolo de agosto firmado** con Ruiz Estrada: quién revisa pre-fichas, escalados, teléfono de urgencias.
-5. Completar **migraciones Prisma versionadas en producción** (§8.1): baseline Neon resuelto, `migrate deploy` activado en Vercel y `db push` reservado solo para desarrollo local controlado.
-
-Protocolo de entrega vigente (invariable):
-
-1. `git status --short` + últimos commits antes de tocar código.
-2. Cambios pequeños y coherentes con `saas new design/`.
-3. No tocar Clara salvo petición explícita.
-4. Validar: `npm run typecheck` · `npm run lint` · `npm run build` · `npm test` (y `quality:release` antes de deploy).
-5. Verificación visual en navegador de cambios de UI.
-6. Commit claro en `main` → `git push origin main` → esperar checks Vercel en `success`.
-7. Actualizar `MEMORIA_DENTAL.MD` y esta hoja de ruta al cerrar fase o decisión relevante.
+1. Cerrar 5 entrevistas con clínicas (guion de descubrimiento sobre sección 3).
+2. Auditoría mystery-shopper: llamar a 30 clínicas locales en horario punta y fuera de horario; documentar % sin respuesta → primer dato propio para el pitch.
+3. Prototipo del agente de texto (WhatsApp sandbox + Claude + agenda dummy) — demo interna en 2 semanas.
+4. Solicitar demo de RingLab como cliente potencial → desmontar su onboarding y pricing real.
+5. Contactar con 1 odontólogo asesor para validar el protocolo de triaje.
 
 ---
 

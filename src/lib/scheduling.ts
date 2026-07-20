@@ -1,6 +1,7 @@
-import { AppointmentStatus, CalendarEventType, type Prisma } from "@prisma/client";
+import { AppointmentStatus, CalendarEventType, type ClinicLocation, type Prisma } from "@prisma/client";
 import { notifyAppointmentEvent } from "@/lib/notifications/appointment-notifications";
 import { prisma } from "@/lib/prisma";
+import { DEFAULT_LOCATION } from "@/lib/locations";
 
 export const SLOT_MINUTES = 30;
 export const CLINIC_OPEN_HOUR = 9;
@@ -196,6 +197,7 @@ export type SchedulingActor = { type: "staff" | "ai"; userId?: string };
 export async function createCalendarEvent(
   tenantId: string,
   input: {
+    location?: ClinicLocation;
     providerId?: string | null;
     operatoryId?: string | null;
     title: string;
@@ -220,6 +222,7 @@ export async function createCalendarEvent(
   const event = await prisma.calendarEvent.create({
     data: {
       tenantId,
+      location: input.location ?? DEFAULT_LOCATION,
       providerId: input.providerId || null,
       operatoryId: input.operatoryId || null,
       title: input.title,

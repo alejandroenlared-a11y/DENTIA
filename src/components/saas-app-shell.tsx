@@ -1,26 +1,29 @@
+import Link from "next/link";
 import type React from "react";
+import type { ClinicLocation as ClinicLocationType } from "@prisma/client";
 import { logoutAction } from "@/app/auth-actions";
 import { ThemeToggle } from "@/app/theme-toggle";
-import { DashboardLink as Link } from "@/components/dashboard-link";
-import { MobileNavigation, SidebarNavigation } from "@/components/dashboard-navigation";
 import { Icon } from "@/components/icon";
-import { primaryActionHref, viewMeta } from "@/lib/app-navigation";
+import { navGroups, navItems, primaryActionHref, viewMeta } from "@/lib/app-navigation";
 import type { AppView, getDashboardData } from "@/lib/dashboard";
 import { getInitials } from "@/lib/format";
+import { LOCATION_ELCHE, LOCATION_MURCIA, locationSlug } from "@/lib/locations";
 
 type DashboardData = Awaited<ReturnType<typeof getDashboardData>>;
 
 type SaasAppShellProps = {
   data: DashboardData;
   view: AppView;
+  activeLocation: ClinicLocationType;
   patientQuery?: string;
   notices?: React.ReactNode;
   children: React.ReactNode;
 };
 
-export function SaasAppShell({ data, view, patientQuery, notices, children }: SaasAppShellProps) {
+export function SaasAppShell({ data, view, activeLocation, patientQuery, notices, children }: SaasAppShellProps) {
   const currentView = viewMeta[view];
-  const primaryHref = primaryActionHref(view, currentView.actionView);
+  const siteHref = (targetView: AppView, location: ClinicLocationType) => `/?view=${targetView}&site=${locationSlug(location)}`;
+  const withActiveSite = (href: string) => appendSite(href, activeLocation);
 
   return (
     <div className="app-shell">
@@ -32,11 +35,30 @@ export function SaasAppShell({ data, view, patientQuery, notices, children }: Sa
             <span>Dental Software</span>
           </div>
         </div>
-        <SidebarNavigation
-          view={view}
-          unreadConversations={data.metrics.unreadConversations}
-          openTasks={data.metrics.openTasks}
-        />
+        {navGroups.map(group => (
+          <div className="nav-group" key={group.label}>
+            <div className="nav-label">{group.label}</div>
+            <nav className="nav-section" aria-label={group.label}>
+              {group.items.map(item => (
+                <Link
+                  key={item.id}
+                  aria-current={view === item.id ? "page" : undefined}
+                  className={`nav-item ${view === item.id ? "active" : ""}`}
+                  href={siteHref(item.id, activeLocation)}
+                >
+                  <Icon name={item.icon} />
+                  <span>{item.label}</span>
+                  {item.badge === "unread" && data.metrics.unreadConversations > 0 ? (
+                    <span className="count">{data.metrics.unreadConversations}</span>
+                  ) : null}
+                  {item.badge === "tasks" && data.metrics.openTasks > 0 ? (
+                    <span className="count">{data.metrics.openTasks}</span>
+                  ) : null}
+                </Link>
+              ))}
+            </nav>
+          </div>
+        ))}
         <div className="sidebar-bottom">
           <div className={`assistant-pill ${data.tenant.assistantEnabled ? "online" : ""}`}>
             <span />
@@ -55,11 +77,22 @@ export function SaasAppShell({ data, view, patientQuery, notices, children }: Sa
           </form>
         </div>
       </aside>
-      <MobileNavigation
-        view={view}
-        unreadConversations={data.metrics.unreadConversations}
-        openTasks={data.metrics.openTasks}
-      />
+      <nav className="mobile-switch" aria-label="Navegacion principal">
+        {navItems.slice(0, 6).map(item => (
+          <Link
+            key={item.id}
+            aria-current={view === item.id ? "page" : undefined}
+            className={`mobile-nav-item ${view === item.id ? "active" : ""}`}
+            href={siteHref(item.id, activeLocation)}
+          >
+            <Icon name={item.icon} />
+            <span>{item.shortLabel ?? item.label}</span>
+            {item.id === "inbox" && data.metrics.unreadConversations > 0 ? (
+              <span className="count">{data.metrics.unreadConversations}</span>
+            ) : null}
+          </Link>
+        ))}
+      </nav>
       <main className="main">
         <header className="topbar">
           <div className="topbar-left">
@@ -69,37 +102,39 @@ export function SaasAppShell({ data, view, patientQuery, notices, children }: Sa
             </div>
             <form className="global-search" action="/">
               <input type="hidden" name="view" value={view} />
+              <input type="hidden" name="site" value={locationSlug(activeLocation)} />
               <Icon name="search" />
               <input name="q" defaultValue={view === "patients" ? patientQuery ?? "" : ""} placeholder={currentView.search} />
             </form>
             <nav className="site-tabs" aria-label="Sedes">
-              <span className="active">Sede Murcia</span>
-              <span>Sede Elche</span>
+              <Link className={activeLocation === LOCATION_MURCIA ? "active" : ""} href={siteHref(view, LOCATION_MURCIA)}>Murcia</Link>
+              <Link className={activeLocation === LOCATION_ELCHE ? "active" : ""} href={siteHref(view, LOCATION_ELCHE)}>Elche</Link>
             </nav>
           </div>
           <div className="top-actions">
             <ThemeToggle />
-            <Link className="icon-button" href="/?view=inbox" title="Notificaciones" aria-label="Notificaciones">
+            <Link className="icon-button" href={siteHref("inbox", activeLocation)} title="Notificaciones" aria-label="Notificaciones">
               <Icon name="inbox" />
             </Link>
-            {primaryHref ? (
-              <Link className="button primary" href={primaryHref}>
+            {view === "calendar" ? null : (
+              <Link className="button primary" href={withActiveSite(primaryActionHref(view, currentView.actionView))}>
                 <Icon name="plus" />
                 {currentView.action}
               </Link>
-            ) : (
-              <button className="button primary" type="button" disabled>
-                <Icon name="plus" />
-                {currentView.action}
-              </button>
             )}
           </div>
         </header>
-        <section id="main-content" className={`content ${view === "calendar" ? "calendar-content" : "panel-content"}`}>
+        <section id="main-content" className={`content content-${view} ${view === "calendar" ? "calendar-content" : "panel-content"}`}>
           {notices}
-          {view === "calendar" ? children : <div className="view-workspace">{children}</div>}
+          {view === "calendar" ? children : <div className={`view-workspace view-workspace-${view}`}>{children}</div>}
         </section>
       </main>
     </div>
   );
+}
+
+function appendSite(href: string, location: ClinicLocationType) {
+  const [pathAndQuery, hash = ""] = href.split("#");
+  const separator = pathAndQuery.includes("?") ? "&" : "?";
+  return `${pathAndQuery}${separator}site=${locationSlug(location)}${hash ? `#${hash}` : ""}`;
 }
