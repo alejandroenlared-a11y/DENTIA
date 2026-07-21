@@ -316,6 +316,13 @@ export function runDentalSeniorTurn(current: DentalAgentState, rawText: string):
     detectedSignals = unique(messageSignals);
   }
   const profile = intent ? intentProfiles[intent] : null;
+  // Datos como nombre/telefono/email/sede son "sticky" por defecto (no se
+  // repiten ni se pisan con ruido posterior). Pero si el paciente corrige
+  // explicitamente ("en realidad es Elche", "perdona me confundi, soy Maria
+  // Lopez"), el dato nuevo debe ganar; si no, Clara se queda con el primer
+  // valor para siempre aunque el paciente lo corrija (bug real detectado en
+  // QA: sede y nombre corregidos por el paciente se ignoraban).
+  const isCorrecting = isExplicitCorrection(normalized);
   // Si la pregunta pendiente era el nombre, aceptar una respuesta que sea
   // solo el nombre ("Alejandro Marti"), sin exigir "soy" o "me llamo"; una
   // pregunta de identidad no cuenta como nombre aunque sea una frase corta.
@@ -323,10 +330,18 @@ export function runDentalSeniorTurn(current: DentalAgentState, rawText: string):
     extractName(text) ||
     extractNameNextToPhone(text) ||
     (wasAskedForName(current) && !asksIdentity ? extractBareName(text) : "");
-  const name = current.name ? completeNameWithSurname(current.name, incomingName) : incomingName;
-  const phone = current.phone || extractPhone(text);
-  const email = current.email || extractEmail(text);
-  const location = current.location || extractLocation(normalized);
+  const name =
+    isCorrecting && incomingName
+      ? incomingName
+      : current.name
+        ? completeNameWithSurname(current.name, incomingName)
+        : incomingName;
+  const incomingPhone = extractPhone(text);
+  const phone = isCorrecting && incomingPhone ? incomingPhone : current.phone || incomingPhone;
+  const incomingEmail = extractEmail(text);
+  const email = isCorrecting && incomingEmail ? incomingEmail : current.email || incomingEmail;
+  const incomingLocation = extractLocation(normalized);
+  const location = isCorrecting && incomingLocation ? incomingLocation : current.location || incomingLocation;
   const selectedAvailability = extractSelectedAvailabilityOption(current, normalized);
   const asksForAvailabilityOptions = Boolean(requestedSlotOptionsPeriod(text));
   const availability = current.availability || selectedAvailability || (asksForAvailabilityOptions ? "" : extractAvailability(normalized, text));
@@ -814,7 +829,15 @@ function nextStep(state: DentalAgentState, latestPatientText: string) {
 }
 
 function mentionsPrice(latestPatientText: string) {
-  return /(precio|cuanto|coste|costar|cuesta|vale|financi|presupuesto)/.test(normalize(latestPatientText));
+  const normalized = normalize(latestPatientText);
+  if (/(precio|cuanto|coste|costar|cuesta|financi|presupuesto)/.test(normalized)) {
+    return true;
+  }
+  // "vale" solo, sin "cuanto/que" delante, suele ser muletilla de cierre
+  // ("me vale", "vale, gracias") y no una pregunta de precio ("cuanto vale",
+  // "que vale la limpieza"). Sin esto, despedirse con "vale" reabria el
+  // flujo de presupuesto (visto en QA: "con el telefono me vale, gracias").
+  return /(cuanto|que)\s+val/.test(normalized);
 }
 
 function wantsPrice(intent: DentalIntentId | undefined, latestPatientText: string) {
@@ -828,8 +851,26 @@ function firstName(fullName: string) {
   return fullName.trim().split(/\s+/)[0] || "";
 }
 
-function hasFullName(name: string) {
+export function hasFullName(name: string) {
   return name.trim().split(/\s+/).filter(Boolean).length >= 2;
+}
+
+// Compartido con guardrails.ts (preparePatientReply) y openai-dental-agent.ts
+// (computeReady): un dia sin franja u hora concreta ("la semana que viene")
+// no cuenta como disponibilidad reservable.
+export function hasConcreteAvailability(availability: string) {
+  const normalized = normalize(availability);
+  const hasDay = /\b(hoy|manana|pasado manana|lunes|martes|miercoles|jueves|viernes|esta semana|proxima semana|\d{1,2}[/-]\d{1,2})\b/.test(normalized);
+  const hasTime =
+    /\b([01]?\d|2[0-3])(?::|\.|h)([0-5]\d)?\b/.test(availability) ||
+    /\b(manana|tarde|por la manana|por la tarde|primera hora|ultima hora|temprano)\b/.test(normalized);
+  return hasDay && hasTime;
+}
+
+const CORRECTION_PATTERNS = [/en realidad/, /me (he )?confund/, /me (he )?equivoc/, /\bcorrijo\b/, /quise decir/];
+
+function isExplicitCorrection(normalized: string): boolean {
+  return CORRECTION_PATTERNS.some(pattern => pattern.test(normalized));
 }
 
 function completeNameWithSurname(currentName: string, incomingName: string) {
