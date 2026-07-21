@@ -1331,4 +1331,190 @@ describe("runDentalAgentTurn", () => {
     expect(result.state.escalated).toBe(true);
     expect(result.state.ready).toBe(false);
   });
+
+  it("keeps escalated true when a minor self-reports and Gemini disagrees (requiresGuardian)", async () => {
+    process.env.LLM_PROVIDER = "gemini";
+    process.env.GEMINI_API_KEY = "gemini-test-key";
+    process.env.GEMINI_MODEL = "gemini-test-model";
+
+    const output = {
+      reply: "Cuentame mas sobre el dolor.",
+      intent: "urgent_pain",
+      intentCode: "TRIAJE_DOLOR_INFECCION",
+      treatmentNeed: "Pendiente",
+      budget: "Pendiente",
+      estimatedValue: 0,
+      escalated: false,
+      consent: false,
+      name: "",
+      phone: "",
+      location: "",
+      availability: "",
+      triageLevel: "ROUTINE",
+      triageLabel: "Rutina",
+      clinicalReading: "Sin hallazgos.",
+      likelyCauses: [],
+      detectedSignals: [],
+      redFlags: [],
+      missingClinicalData: [],
+      confidence: "Media",
+      safetyScreened: false
+    };
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => geminiResponse(JSON.stringify(output))
+    } as Response);
+
+    const result = await runDentalAgentTurn({
+      latestPatientMessage: "Tengo 15 anos y me duele mucho una muela",
+      history: [],
+      state: initialDentalAgentState
+    });
+
+    expect(result.state.requiresGuardian).toBe(true);
+    expect(result.state.escalated).toBe(true);
+    expect(result.state.ready).toBe(false);
+  });
+
+  it("keeps escalated true for non-Spanish input and Gemini disagrees (needsHumanForLanguage)", async () => {
+    process.env.LLM_PROVIDER = "gemini";
+    process.env.GEMINI_API_KEY = "gemini-test-key";
+    process.env.GEMINI_MODEL = "gemini-test-model";
+
+    const output = {
+      reply: "Sure, tell me more about your appointment.",
+      intent: "unknown",
+      intentCode: "INTENCION_PENDIENTE",
+      treatmentNeed: "Pendiente",
+      budget: "Pendiente",
+      estimatedValue: 0,
+      escalated: false,
+      consent: false,
+      name: "",
+      phone: "",
+      location: "",
+      availability: "",
+      triageLevel: "ROUTINE",
+      triageLabel: "Rutina",
+      clinicalReading: "Esperando motivo.",
+      likelyCauses: [],
+      detectedSignals: [],
+      redFlags: [],
+      missingClinicalData: [],
+      confidence: "Baja",
+      safetyScreened: false
+    };
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => geminiResponse(JSON.stringify(output))
+    } as Response);
+
+    const result = await runDentalAgentTurn({
+      latestPatientMessage: "Hello, I have a toothache and need an appointment please",
+      history: [],
+      state: initialDentalAgentState
+    });
+
+    expect(result.state.escalated).toBe(true);
+    expect(result.state.ready).toBe(false);
+  });
+
+  it("escalates when Gemini detects an emergency the local engine missed", async () => {
+    process.env.LLM_PROVIDER = "gemini";
+    process.env.GEMINI_API_KEY = "gemini-test-key";
+    process.env.GEMINI_MODEL = "gemini-test-model";
+
+    const output = {
+      reply: "Esto puede ser una urgencia, te doy prioridad.",
+      intent: "urgent_pain",
+      intentCode: "TRIAJE_DOLOR_INFECCION",
+      treatmentNeed: "Urgencia dental",
+      budget: "desde 70 EUR",
+      estimatedValue: 70,
+      escalated: true,
+      consent: false,
+      name: "",
+      phone: "",
+      location: "",
+      availability: "",
+      triageLevel: "EMERGENCY",
+      triageLabel: "Emergencia inmediata",
+      clinicalReading: "Posible complicacion grave detectada por matices del lenguaje.",
+      likelyCauses: ["complicacion post-tratamiento"],
+      detectedSignals: [],
+      redFlags: [],
+      missingClinicalData: [],
+      confidence: "Media",
+      safetyScreened: true
+    };
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => geminiResponse(JSON.stringify(output))
+    } as Response);
+
+    const result = await runDentalAgentTurn({
+      latestPatientMessage: "no se que hacer, esto no tiene buena pinta",
+      history: [],
+      state: initialDentalAgentState
+    });
+
+    expect(result.state.escalated).toBe(true);
+  });
+
+  it("does not force escalated or block ready when nothing triggers escalation and Gemini agrees", async () => {
+    process.env.LLM_PROVIDER = "gemini";
+    process.env.GEMINI_API_KEY = "gemini-test-key";
+    process.env.GEMINI_MODEL = "gemini-test-model";
+
+    const state = {
+      ...initialDentalAgentState,
+      consent: true,
+      name: "Pedro Test",
+      phone: "612000111",
+      email: "pedro@example.com",
+      location: "Murcia centro",
+      availability: "viernes tarde"
+    };
+
+    const output = {
+      reply: "Perfecto, quedas registrado para la revision.",
+      intent: "first_visit",
+      intentCode: "PRIMERA_VISITA",
+      treatmentNeed: "Revision general",
+      budget: "Pendiente",
+      estimatedValue: 0,
+      escalated: false,
+      consent: true,
+      name: "Pedro Test",
+      phone: "612000111",
+      location: "Murcia centro",
+      availability: "viernes tarde",
+      triageLevel: "ROUTINE",
+      triageLabel: "Rutina",
+      clinicalReading: "Sin hallazgos.",
+      likelyCauses: [],
+      detectedSignals: [],
+      redFlags: [],
+      missingClinicalData: [],
+      confidence: "Alta",
+      safetyScreened: true
+    };
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => geminiResponse(JSON.stringify(output))
+    } as Response);
+
+    const result = await runDentalAgentTurn({
+      latestPatientMessage: "quiero una revision general",
+      history: [],
+      state
+    });
+
+    expect(result.state.escalated).toBe(false);
+    expect(result.state.ready).toBe(true);
+  });
 });
