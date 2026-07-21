@@ -1,4 +1,10 @@
-import { hasConcreteAvailability, hasFullName, normalize, type DentalAgentState } from "@/lib/agent/dental-senior-agent";
+import {
+  hasConcreteAvailability,
+  hasFullName,
+  mentionsPaymentCredentials,
+  normalize,
+  type DentalAgentState
+} from "@/lib/agent/dental-senior-agent";
 import { formatReplyForChat } from "@/lib/chat-bubbles";
 
 // Fase 5 (HOJA-RUTA-100.MD): no confiar solo en el LLM. Toda respuesta de la
@@ -11,6 +17,13 @@ export function preparePatientReply(
   localReply: string,
   latestPatientMessage: string
 ): string {
+  // Menor de edad sin tutor, solicitud de borrado de datos, o un numero de
+  // tarjeta/cuenta pegado en el chat: casos legales/de seguridad demasiado
+  // sensibles para confiar en que el LLM improvise. Siempre gana el guion
+  // local, que ya tiene la respuesta correcta para estos tres casos.
+  if (state.requiresGuardian || state.dataErasureRequested || mentionsPaymentCredentials(latestPatientMessage)) {
+    return formatReplyForChat(localReply);
+  }
   if (!state.intent && isSimpleGreeting(latestPatientMessage)) {
     return formatReplyForChat("Hola.\n\nPara poder orientarte, cuentame que necesitas o que te preocupa.");
   }

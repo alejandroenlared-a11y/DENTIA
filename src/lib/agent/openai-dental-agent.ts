@@ -92,7 +92,9 @@ export const dentalAgentStateSchema = z.object({
   redFlags: z.array(z.string()),
   missingClinicalData: z.array(z.string()),
   confidence: z.enum(confidenceValues),
-  safetyScreened: z.boolean()
+  safetyScreened: z.boolean(),
+  requiresGuardian: z.boolean().default(false),
+  dataErasureRequested: z.boolean().default(false)
 });
 
 const dentalChatMessageSchema = z.object({

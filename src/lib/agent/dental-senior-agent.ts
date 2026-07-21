@@ -38,6 +38,8 @@ export type DentalAgentState = {
   missingClinicalData: string[];
   confidence: "Baja" | "Media" | "Alta";
   safetyScreened: boolean;
+  requiresGuardian: boolean;
+  dataErasureRequested: boolean;
 };
 
 export type DentalAgentTurn = {
@@ -79,7 +81,9 @@ export const initialDentalAgentState: DentalAgentState = {
   redFlags: [],
   missingClinicalData: [],
   confidence: "Baja",
-  safetyScreened: false
+  safetyScreened: false,
+  requiresGuardian: false,
+  dataErasureRequested: false
 };
 
 export const intentProfiles: Record<DentalIntentId, IntentProfile> = {
@@ -326,10 +330,15 @@ export function runDentalSeniorTurn(current: DentalAgentState, rawText: string):
   // Si la pregunta pendiente era el nombre, aceptar una respuesta que sea
   // solo el nombre ("Alejandro Marti"), sin exigir "soy" o "me llamo"; una
   // pregunta de identidad no cuenta como nombre aunque sea una frase corta.
+  // La frase de traspaso a un tutor ("soy la madre, seguimos...") competia
+  // con extractName y capturaba "la madre" como nombre del paciente: se
+  // recorta antes de buscar el nombre real que venga despues en el mismo
+  // mensaje.
+  const textForName = GUARDIAN_TAKEOVER_PATTERN.test(normalized) ? text.replace(GUARDIAN_TAKEOVER_PATTERN, " ") : text;
   const incomingName =
-    extractName(text) ||
-    extractNameNextToPhone(text) ||
-    (wasAskedForName(current) && !asksIdentity ? extractBareName(text) : "");
+    extractName(textForName) ||
+    extractNameNextToPhone(textForName) ||
+    (wasAskedForName(current) && !asksIdentity ? extractBareName(textForName) : "");
   const name =
     isCorrecting && incomingName
       ? incomingName
@@ -353,6 +362,17 @@ export function runDentalSeniorTurn(current: DentalAgentState, rawText: string):
       : detectSafetyScreen(normalized, redFlags));
   const triageLevel = getTriageLevel(intent, redFlags, detectedSignals);
   const missingClinicalData = getMissingClinicalData(intent, detectedSignals, safetyScreened);
+  // Bug real detectado en pruebas de estres: un menor que dice su edad y pide
+  // cita "sin mis padres" recibia el mismo guion de consentimiento/reserva que
+  // un adulto. Una vez detectado, se pide tutor en todos los turnos
+  // siguientes hasta que un adulto responsable tome la conversacion.
+  const guardianTookOver = GUARDIAN_TAKEOVER_PATTERN.test(normalized);
+  const requiresGuardian = guardianTookOver ? false : current.requiresGuardian || detectsMinorSelfReport(normalized);
+  // Igual de real: "borra mis datos"/"retiro el consentimiento" no tenia
+  // ningun manejo, Clara seguia charlando como si nada. Se escala a un
+  // humano (unico que puede verificar identidad y ejecutar el borrado) y se
+  // deja de proponer citas o pedir mas datos en esta conversacion.
+  const dataErasureRequested = current.dataErasureRequested || detectsDataErasureRequest(normalized);
 
   let nextState = completeDentalState({
     ...current,
@@ -371,7 +391,13 @@ export function runDentalSeniorTurn(current: DentalAgentState, rawText: string):
     detectedSignals,
     triageLevel,
     triageLabel: triageLabel(triageLevel),
-    escalated: triageLevel === "EMERGENCY" || triageLevel === "URGENT_24H" || Boolean(profile && profile.defaultTriage === "URGENT_24H" && redFlags.length > 0),
+    escalated:
+      triageLevel === "EMERGENCY" ||
+      triageLevel === "URGENT_24H" ||
+      Boolean(profile && profile.defaultTriage === "URGENT_24H" && redFlags.length > 0) ||
+      dataErasureRequested,
+    requiresGuardian,
+    dataErasureRequested,
     confidence: getConfidence(intent, detectedSignals, redFlags),
     missingClinicalData,
     safetyScreened,
@@ -456,6 +482,10 @@ const PRICE_FORWARD_INTENTS: DentalIntentId[] = ["implant_price", "whitening", "
 const BUDGET_PENDING_INTENT = "PRESUPUESTO_PENDIENTE";
 
 function buildDentalReply(state: DentalAgentState, previous: DentalAgentState, latestPatientText: string) {
+  const paymentSafetyReply = buildPaymentSafetyReply(latestPatientText);
+  if (paymentSafetyReply) {
+    return paymentSafetyReply;
+  }
   const healthCardReply = buildHealthCardReply(latestPatientText);
   if (healthCardReply) {
     return healthCardReply;
@@ -479,6 +509,14 @@ function buildDentalReply(state: DentalAgentState, previous: DentalAgentState, l
   const postCareReply = buildPostCareReply(latestPatientText);
   if (postCareReply) {
     return postCareReply;
+  }
+  const dataErasureReply = buildDataErasureReply(state);
+  if (dataErasureReply) {
+    return dataErasureReply;
+  }
+  const guardianRequiredReply = buildGuardianRequiredReply(state);
+  if (guardianRequiredReply) {
+    return guardianRequiredReply;
   }
   const courtesyReply = buildCourtesyReply(latestPatientText);
   if (courtesyReply && !state.intent) {
@@ -877,6 +915,83 @@ function detectSuitabilityAnswer(normalized: string): string {
   return "";
 }
 
+// Bug real (P1, pruebas de estres): un paciente que declara ser menor de
+// edad y pide gestionar la cita "sin mis padres" recibia el mismo guion de
+// consentimiento y reserva que un adulto. Deteccion conservadora: solo
+// dispara con una declaracion explicita de edad o de minoria de edad, no con
+// menciones de duracion ("llevo 15 anos con este dolor" no matchea porque no
+// usa "tengo").
+const MINOR_AGE_PATTERN = /\btengo\s+(\d{1,2})\s*(anos|años)\b/;
+const MINOR_SELF_DECLARATION_PATTERN = /\bsoy\s+menor\s+de\s+edad\b/;
+
+function detectsMinorSelfReport(normalized: string): boolean {
+  if (MINOR_SELF_DECLARATION_PATTERN.test(normalized)) {
+    return true;
+  }
+  const match = normalized.match(MINOR_AGE_PATTERN);
+  if (!match) {
+    return false;
+  }
+  const age = Number(match[1]);
+  return age > 0 && age < 18;
+}
+
+const GUARDIAN_TAKEOVER_PATTERN = /\b(soy\s+(el|la)\s+(padre|madre|tutor|tutora)|habla\s+(el|la)\s+(padre|madre|tutor|tutora))\b/;
+
+function buildGuardianRequiredReply(state: DentalAgentState): string {
+  if (!state.requiresGuardian) {
+    return "";
+  }
+  return "Para menores de edad necesitamos el consentimiento y los datos de contacto de un padre, madre o tutor legal antes de seguir.\n\nPuede escribirnos el o ella, o nos dejas su nombre y un telefono para que lo gestionemos nosotros?";
+}
+
+// Bug real (P2, pruebas de estres): "borra mis datos"/"retiro el
+// consentimiento" no tenia ningun manejo; Clara seguia proponiendo citas como
+// si nada. Un bot no puede verificar identidad para ejecutar un borrado real,
+// asi que se escala a un humano en vez de fingir que ya esta hecho.
+const DATA_ERASURE_PATTERNS = [
+  /borra(r)?\s+(todos\s+)?mis\s+datos/,
+  /elimina(r)?\s+(todos\s+)?mis\s+datos/,
+  /retiro\s+(el\s+)?consentimiento/,
+  /derecho\s+al\s+olvido/,
+  /borrame\s+de\s+(vuestro|su|el)?\s*sistema/
+];
+
+function detectsDataErasureRequest(normalized: string): boolean {
+  return DATA_ERASURE_PATTERNS.some(pattern => pattern.test(normalized));
+}
+
+function buildDataErasureReply(state: DentalAgentState): string {
+  if (!state.dataErasureRequested) {
+    return "";
+  }
+  return "Entendido, lo dejo marcado como prioritario para que el equipo verifique tu identidad y gestione la baja o el borrado de tus datos.\n\nNo seguimos con la reserva mientras tanto; si cambias de idea, nos lo dices.";
+}
+
+// Bug real (P3, pruebas de estres): un paciente pegaba un numero de tarjeta
+// completo en el chat y Clara seguia con el guion de precio/cita como si
+// nada, sin avisar de que eso no deberia mandarse por WhatsApp.
+const PAYMENT_KEYWORDS_PATTERN = /(numero de tarjeta|tarjeta de credito|tarjeta de debito|numero de cuenta|cuenta bancaria|\biban\b|codigo de seguridad de la tarjeta|\bcvv\b)/;
+
+export function mentionsPaymentCredentials(rawText: string): boolean {
+  const normalized = normalize(rawText);
+  if (PAYMENT_KEYWORDS_PATTERN.test(normalized)) {
+    return true;
+  }
+  const candidates = rawText.match(/\b[\d][\d -]{11,20}[\d]\b/g) ?? [];
+  return candidates.some(candidate => {
+    const digits = candidate.replace(/\D/g, "");
+    return digits.length >= 13 && digits.length <= 19;
+  });
+}
+
+function buildPaymentSafetyReply(rawText: string): string {
+  if (!mentionsPaymentCredentials(rawText)) {
+    return "";
+  }
+  return "Por tu seguridad, no nos mandes por aqui el numero completo de una tarjeta o cuenta: no lo vamos a usar ni a guardar.\n\nEl pago se hace en la clinica o por un enlace seguro que te mandaria el equipo.";
+}
+
 function firstName(fullName: string) {
   return fullName.trim().split(/\s+/)[0] || "";
 }
@@ -999,7 +1114,9 @@ function completeDentalState(state: DentalAgentState): DentalAgentState {
     state.phone &&
     (state.escalated || state.email) &&
     state.location &&
-    hasAppointmentAvailability(state.availability)
+    hasAppointmentAvailability(state.availability) &&
+    !state.requiresGuardian &&
+    !state.dataErasureRequested
   );
   return { ...state, ready };
 }

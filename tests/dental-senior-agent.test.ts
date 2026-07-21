@@ -655,4 +655,59 @@ describe("runDentalSeniorTurn", () => {
     const noFalsePositive = runDentalSeniorTurn(first.state, "acepto, me llamo Juan Perez");
     expect(noFalsePositive.reply).not.toContain("edad no suele ser impedimento");
   });
+
+  it("asks for a guardian instead of collecting consent/booking data from a self-reported minor", () => {
+    // Bug real detectado en pruebas de estres: un menor que dice su edad y
+    // pide gestionar la cita "sin mis padres" recibia el mismo guion de
+    // consentimiento/reserva que un adulto.
+    const minor = runDentalSeniorTurn(initialDentalAgentState, "tengo 15 años, puedo ponerme brackets sin que vengan mis padres?");
+    expect(minor.reply).toContain("padre, madre o tutor legal");
+    expect(minor.reply.toLowerCase()).not.toContain("aceptas que guardemos tus datos");
+    expect(minor.state.requiresGuardian).toBe(true);
+    expect(minor.state.ready).toBe(false);
+
+    // No debe dispararse con menciones de duracion ("llevo X anos con esto"),
+    // solo con una declaracion de edad propia ("tengo X anos").
+    const notAMinor = runDentalSeniorTurn(initialDentalAgentState, "llevo 15 años con este dolor de vez en cuando");
+    expect(notAMinor.state.requiresGuardian).toBe(false);
+
+    // Un padre/madre que retoma la conversacion puede seguir con la cita.
+    const parentTakesOver = runDentalSeniorTurn(
+      minor.state,
+      "hola, soy la madre, seguimos con la cita: acepto, soy Maria Lopez, 612345678, maria@x.com, Murcia, viernes tarde"
+    );
+    expect(parentTakesOver.state.requiresGuardian).toBe(false);
+    expect(parentTakesOver.state.name).toBe("Maria Lopez");
+  });
+
+  it("escalates to a human and stops the booking flow on a data erasure / consent withdrawal request", () => {
+    // Bug real detectado en pruebas de estres: "borra mis datos"/"retiro el
+    // consentimiento" no tenia ningun manejo, Clara seguia como si nada.
+    const booked = runDentalSeniorTurn(
+      initialDentalAgentState,
+      "Me falta una muela y quiero implante. Acepto que guarde mis datos. Soy Ana Molina, telefono 612999111, email ana@example.com. Prefiero Murcia el viernes por la tarde."
+    );
+    expect(booked.state.ready).toBe(true);
+
+    const erasure = runDentalSeniorTurn(booked.state, "en realidad borra todos mis datos, retiro el consentimiento y no quiero seguir");
+    expect(erasure.reply).not.toContain("pre-reserva lista");
+    expect(erasure.state.dataErasureRequested).toBe(true);
+    expect(erasure.state.escalated).toBe(true);
+    expect(erasure.state.ready).toBe(false);
+  });
+
+  it("warns instead of proceeding when a payment card number is pasted into the chat", () => {
+    // Bug real detectado en pruebas de estres: un numero de tarjeta completo
+    // pegado en el chat se ignoraba, Clara seguia con el guion de precio/cita.
+    const cardPasted = runDentalSeniorTurn(
+      initialDentalAgentState,
+      "te paso el numero de mi tarjeta de credito para pagar el implante ya, es 4111 1111 1111 1111"
+    );
+    expect(cardPasted.reply).toContain("no nos mandes");
+    expect(cardPasted.reply).not.toContain("1.200 EUR");
+
+    // Un telefono normal de 9 digitos no debe disparar el aviso.
+    const normalPhone = runDentalSeniorTurn(initialDentalAgentState, "quiero implante, acepto, soy Ana Ruiz, 612345678, ana@x.com, Murcia, viernes tarde");
+    expect(normalPhone.reply).not.toContain("no nos mandes");
+  });
 });
