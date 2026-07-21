@@ -144,24 +144,50 @@ export async function processInboundMessage(
     return { conversationId: conversation.id, reply: pendingChoiceReply, escalated: false };
   }
 
-  const pendingBookingReply = existing
+  const pendingBookingResult = existing
     ? await resolvePendingBookingChoice(tenant.id, conversation.id, payload.body)
     : null;
-  if (pendingBookingReply) {
+  if (pendingBookingResult) {
     await prisma.message.create({
       data: {
         conversationId: conversation.id,
         direction: MessageDirection.OUTBOUND,
         senderName: tenant.assistantName,
-        body: pendingBookingReply,
-        metadata: { intent: "AGENDA_BOOKING_CONFIRMED" }
+        body: pendingBookingResult.reply,
+        metadata: {
+          intent: "AGENDA_BOOKING_CONFIRMED",
+          pendingRebookingConfirmation: pendingBookingResult.pendingRebookingConfirmation ?? null
+        }
       }
     });
     await prisma.conversation.update({
       where: { id: conversation.id },
       data: { intent: "AGENDA_BOOKING_CONFIRMED", unread: true, result: "Cita elegida por paciente" }
     });
-    return { conversationId: conversation.id, reply: pendingBookingReply, escalated: false };
+    return { conversationId: conversation.id, reply: pendingBookingResult.reply, escalated: false };
+  }
+
+  const pendingRebookingResult = existing
+    ? await resolvePendingRebookingConfirmation(tenant.id, conversation.id, payload.body)
+    : null;
+  if (pendingRebookingResult) {
+    await prisma.message.create({
+      data: {
+        conversationId: conversation.id,
+        direction: MessageDirection.OUTBOUND,
+        senderName: tenant.assistantName,
+        body: pendingRebookingResult.reply,
+        metadata: {
+          intent: "AGENDA_REBOOKING_CONFIRMATION",
+          pendingReschedule: pendingRebookingResult.pendingReschedule ?? null
+        }
+      }
+    });
+    await prisma.conversation.update({
+      where: { id: conversation.id },
+      data: { intent: "AGENDA_REBOOKING_CONFIRMATION", unread: true, result: "Atendido por IA" }
+    });
+    return { conversationId: conversation.id, reply: pendingRebookingResult.reply, escalated: false };
   }
 
   const schedulingRequest = detectSchedulingRequest(payload.body);
@@ -224,13 +250,19 @@ export async function processInboundMessage(
   const requestedOptionsPeriod = getRequestedAvailabilityOptionsPeriod(payload.body);
   const lastOutbound = [...recent].reverse().find(message => message.direction === MessageDirection.OUTBOUND);
   const hasOpenPendingBooking = Boolean(parsePendingBooking(asRecord(lastOutbound?.metadata).pendingBooking)?.options.length);
+  // Si ya existe una cita real creada por la IA, el flujo de propuesta de
+  // huecos NUNCA vuelve a dispararse solo (p.ej. tras "perfecto, gracias" o
+  // "no quiero cambiarla"): cambiar de fecha pasa por detectSchedulingRequest
+  // + resolvePendingRebookingConfirmation, no por aqui.
+  const existingAiAppointment = await findActiveAiAppointment(tenant.id, patient.id);
   const shouldOfferDefaultAvailabilityOptions =
     !requestedOptionsPeriod &&
     canOfferAvailabilityOptions(dentalTurn.state) &&
-    !hasOpenPendingBooking;
+    !hasOpenPendingBooking &&
+    !existingAiAppointment;
   const availabilityOptionsPeriod = requestedOptionsPeriod || (shouldOfferDefaultAvailabilityOptions ? "manana" : "");
   const availabilityOptionsProposal =
-    availabilityOptionsPeriod && canOfferAvailabilityOptions(dentalTurn.state)
+    availabilityOptionsPeriod && canOfferAvailabilityOptions(dentalTurn.state) && !existingAiAppointment
       ? await buildBookingProposal({
           tenantId: tenant.id,
           patientId: patient.id,
@@ -246,7 +278,7 @@ export async function processInboundMessage(
         })
       : null;
   const bookingProposal =
-    !availabilityOptionsProposal && !escalated && dentalTurn.state.ready && !previousState.ready
+    !availabilityOptionsProposal && !escalated && dentalTurn.state.ready && !previousState.ready && !existingAiAppointment
       ? await buildBookingProposal({
           tenantId: tenant.id,
           patientId: patient.id,
@@ -471,6 +503,24 @@ type BookingProposal = { reply: string; pendingBooking: PendingBookingMetadata }
 
 type PersistOutcome = { created: boolean; startsAt: Date | null; providerName: string | null };
 
+// Fuente unica de verdad para "ya existe una cita creada por la IA en curso".
+// Usada para no crear/proponer una segunda cita (persistDentalOutcome), para
+// avisar en vez de reservar de nuevo (resolvePendingBookingChoice) y para
+// bloquear la re-propuesta espontanea de huecos en el flujo principal.
+async function findActiveAiAppointment(tenantId: string, patientId: string) {
+  return prisma.appointment.findFirst({
+    where: {
+      tenantId,
+      patientId,
+      createdByAi: true,
+      startsAt: { gte: new Date() },
+      status: { in: [AppointmentStatus.REQUESTED, AppointmentStatus.PROPOSED, AppointmentStatus.CONFIRMED] }
+    },
+    orderBy: { createdAt: "desc" },
+    include: { provider: true }
+  });
+}
+
 async function persistDentalOutcome(input: {
   tenantId: string;
   patientId: string;
@@ -519,17 +569,7 @@ async function persistDentalOutcome(input: {
     return { created: false, startsAt: null, providerName: null };
   }
 
-  const existingAppointment = await prisma.appointment.findFirst({
-    where: {
-      tenantId,
-      patientId,
-      createdByAi: true,
-      startsAt: { gte: new Date() },
-      status: { in: [AppointmentStatus.REQUESTED, AppointmentStatus.PROPOSED, AppointmentStatus.CONFIRMED] }
-    },
-    orderBy: { createdAt: "desc" },
-    include: { provider: true }
-  });
+  const existingAppointment = await findActiveAiAppointment(tenantId, patientId);
   if (existingAppointment) {
     return { created: false, startsAt: existingAppointment.startsAt, providerName: existingAppointment.provider?.name ?? null };
   }
@@ -736,6 +776,13 @@ async function handleSchedulingRequest(input: {
     return { reply: `Listo, he cancelado tu cita del ${formatSlotForStaff(appointment.startsAt)}. Si quieres reservar otro hueco, dimelo cuando quieras.` };
   }
 
+  return buildRescheduleOptionsReply(tenantId, appointment);
+}
+
+async function buildRescheduleOptionsReply(
+  tenantId: string,
+  appointment: { id: string; providerId: string | null; durationMinutes: number }
+): Promise<SchedulingResult> {
   if (!appointment.providerId) {
     return { reply: "Tu cita no tiene profesional asignado todavia, asi que no puedo reprogramarla automaticamente. He avisado a recepcion para que te contacte." };
   }
@@ -788,11 +835,13 @@ async function resolvePendingSchedulingChoice(
   }
 }
 
+type BookingChoiceResult = { reply: string; pendingRebookingConfirmation?: { appointmentId: string } };
+
 async function resolvePendingBookingChoice(
   tenantId: string,
   conversationId: string,
   body: string
-): Promise<string | null> {
+): Promise<BookingChoiceResult | null> {
   const lastOutbound = await prisma.message.findFirst({
     where: { conversationId, direction: MessageDirection.OUTBOUND },
     orderBy: { createdAt: "desc" }
@@ -810,32 +859,26 @@ async function resolvePendingBookingChoice(
 
   const startsAt = new Date(pending.options[choiceIndex]);
   if (Number.isNaN(startsAt.getTime())) {
-    return "Ese hueco ya no parece valido. Te busco opciones nuevas si me escribes manana o tarde.";
+    return { reply: "Ese hueco ya no parece valido. Te busco opciones nuevas si me escribes manana o tarde." };
   }
 
   const patient = await prisma.patient.findFirst({ where: { id: pending.patientId, tenantId }, select: { id: true, name: true } });
   if (!patient) {
-    return "No encuentro tu ficha en esta clinica. Te paso con recepcion para revisarlo.";
+    return { reply: "No encuentro tu ficha en esta clinica. Te paso con recepcion para revisarlo." };
   }
 
-  const existingAppointment = await prisma.appointment.findFirst({
-    where: {
-      tenantId,
-      patientId: pending.patientId,
-      createdByAi: true,
-      startsAt: { gte: new Date() },
-      status: { in: [AppointmentStatus.REQUESTED, AppointmentStatus.PROPOSED, AppointmentStatus.CONFIRMED] }
-    },
-    orderBy: { createdAt: "desc" }
-  });
+  const existingAppointment = await findActiveAiAppointment(tenantId, pending.patientId);
   if (existingAppointment) {
-    return `Ya tenias una pre-reserva: ${formatFriendlyDateTime(existingAppointment.startsAt)}. Si quieres cambiarla, dimelo y te doy alternativas.`;
+    return {
+      reply: `Ya tenias una pre-reserva: ${formatFriendlyDateTime(existingAppointment.startsAt)}. Si quieres cambiarla, dimelo y te doy alternativas.`,
+      pendingRebookingConfirmation: { appointmentId: existingAppointment.id }
+    };
   }
 
   if (pending.providerId) {
     const conflict = await hasBookingConflict(tenantId, pending.providerId, startsAt, pending.durationMinutes);
     if (conflict) {
-      return "Ese hueco se acaba de ocupar. Escribeme manana o tarde y te doy tres opciones nuevas.";
+      return { reply: "Ese hueco se acaba de ocupar. Escribeme manana o tarde y te doy tres opciones nuevas." };
     }
   }
 
@@ -877,11 +920,59 @@ async function resolvePendingBookingChoice(
     actor: { type: "ai" }
   });
 
-  return formatPendingBookingConfirmation(startsAt);
+  return { reply: formatPendingBookingConfirmation(startsAt) };
 }
 
 export function formatPendingBookingConfirmation(startsAt: Date) {
   return `Perfecto, te dejo pre-reservada la cita ${formatFriendlyDateTime(startsAt)}.\n\nSi no te encaja, dime cambiar y te doy otras opciones.`;
+}
+
+// Tras "Ya tenias una pre-reserva... si quieres cambiarla, dimelo", el
+// paciente puede rechazar el cambio ("no", "asi esta bien") o confirmarlo
+// ("si, cambiala"). Sin esto, cualquier respuesta caia al flujo general y
+// podia interpretarse como una nueva peticion de cita (ver bug: "no quiero
+// cambiarla" reabria una propuesta de huecos en vez de dejar la cita igual).
+const DECLINE_REBOOKING_PATTERNS = [
+  /^no\b/,
+  /no\s+quiero\s+cambiar/,
+  /asi\s+esta\s+bien/,
+  /esta\s+bien\s+asi/,
+  /dejal[ao]\s+asi/,
+  /no\s+hace\s+falta/,
+  /no\s+gracias/
+];
+const ACCEPT_REBOOKING_PATTERNS = [/^si\b/, /cambia(rla|rlo|la|lo)?/, /quiero\s+cambiar/, /reprograma/];
+
+async function resolvePendingRebookingConfirmation(
+  tenantId: string,
+  conversationId: string,
+  body: string
+): Promise<SchedulingResult | null> {
+  const lastOutbound = await prisma.message.findFirst({
+    where: { conversationId, direction: MessageDirection.OUTBOUND },
+    orderBy: { createdAt: "desc" }
+  });
+  const metadata = asRecord(lastOutbound?.metadata);
+  const pending = metadata.pendingRebookingConfirmation as { appointmentId: string } | null | undefined;
+  if (!pending?.appointmentId) {
+    return null;
+  }
+
+  const normalized = normalize(body);
+  if (DECLINE_REBOOKING_PATTERNS.some(pattern => pattern.test(normalized))) {
+    return { reply: "Perfecto, la dejamos tal cual. Cualquier cosa me dices." };
+  }
+  if (!ACCEPT_REBOOKING_PATTERNS.some(pattern => pattern.test(normalized))) {
+    return null;
+  }
+
+  const appointment = await prisma.appointment.findFirst({
+    where: { id: pending.appointmentId, tenantId }
+  });
+  if (!appointment) {
+    return null;
+  }
+  return buildRescheduleOptionsReply(tenantId, appointment);
 }
 
 function parsePendingBooking(value: unknown): PendingBookingMetadata | null {
