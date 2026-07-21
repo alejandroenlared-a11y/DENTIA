@@ -355,12 +355,20 @@ export function runDentalSeniorTurn(current: DentalAgentState, rawText: string):
   const asksForAvailabilityOptions = Boolean(requestedSlotOptionsPeriod(text));
   const availability = current.availability || selectedAvailability || (asksForAvailabilityOptions ? "" : extractAvailability(normalized, text));
   const consent = current.consent || acceptsExplicitConsent(normalized) || (wasAskedForConsent(current) && acceptsConsent(normalized));
+  // Bug real (pruebas de estres): "dolor 10/10, no aguanto" seguido de "puede
+  // esperar a la semana que viene" no se reconocia; Clara repetia la misma
+  // pregunta de seguridad tal cual, ignorando que el paciente se retracto.
+  const patientDeescalates = redFlags.length === 0 && patientDeescalatesUrgency(normalized);
   const safetyScreened =
     current.safetyScreened ||
     (intent === "trauma"
       ? detectTraumaSafetyScreen(normalized, redFlags)
-      : detectSafetyScreen(normalized, redFlags));
-  const triageLevel = getTriageLevel(intent, redFlags, detectedSignals);
+      : detectSafetyScreen(normalized, redFlags)) ||
+    patientDeescalates;
+  let triageLevel = getTriageLevel(intent, redFlags, detectedSignals);
+  if (patientDeescalates && (triageLevel === "URGENT_24H" || triageLevel === "PRIORITY_72H")) {
+    triageLevel = "ROUTINE";
+  }
   const missingClinicalData = getMissingClinicalData(intent, detectedSignals, safetyScreened);
   // Bug real detectado en pruebas de estres: un menor que dice su edad y pide
   // cita "sin mis padres" recibia el mismo guion de consentimiento/reserva que
@@ -373,6 +381,10 @@ export function runDentalSeniorTurn(current: DentalAgentState, rawText: string):
   // humano (unico que puede verificar identidad y ejecutar el borrado) y se
   // deja de proponer citas o pedir mas datos en esta conversacion.
   const dataErasureRequested = current.dataErasureRequested || detectsDataErasureRequest(normalized);
+  // Sin intent reconocido y en un idioma que el motor no entiende: no fingir
+  // que se entendio, avisar con honestidad y escalar para que un humano
+  // contacte en su idioma.
+  const needsHumanForLanguage = !intent && detectsNonSpanishLanguage(text);
 
   let nextState = completeDentalState({
     ...current,
@@ -395,7 +407,8 @@ export function runDentalSeniorTurn(current: DentalAgentState, rawText: string):
       triageLevel === "EMERGENCY" ||
       triageLevel === "URGENT_24H" ||
       Boolean(profile && profile.defaultTriage === "URGENT_24H" && redFlags.length > 0) ||
-      dataErasureRequested,
+      dataErasureRequested ||
+      needsHumanForLanguage,
     requiresGuardian,
     dataErasureRequested,
     confidence: getConfidence(intent, detectedSignals, redFlags),
@@ -518,6 +531,10 @@ function buildDentalReply(state: DentalAgentState, previous: DentalAgentState, l
   if (guardianRequiredReply) {
     return guardianRequiredReply;
   }
+  const invalidContactDataReply = buildInvalidContactDataReply(state, latestPatientText);
+  if (invalidContactDataReply) {
+    return invalidContactDataReply;
+  }
   const courtesyReply = buildCourtesyReply(latestPatientText);
   if (courtesyReply && !state.intent) {
     return courtesyReply;
@@ -535,6 +552,14 @@ function buildDentalReply(state: DentalAgentState, previous: DentalAgentState, l
         ],
         latestPatientText
       );
+    }
+    // Bug real (pruebas de estres): un mensaje integramente en ingles o
+    // valenciano/catalan (Elche es zona valencianoparlante) recibia el mismo
+    // menu generico en espanol, como si fuera texto sin sentido. No hay
+    // traduccion real todavia: al menos se avisa con honestidad y se escala
+    // a un humano en vez de fingir que no se entendio nada.
+    if (detectsNonSpanishLanguage(latestPatientText)) {
+      return "Disculpa, de momento solo puedo atenderte en espanol. Aviso al equipo para que te contacten en tu idioma.\n\nSorry, I can currently only help in Spanish - I've flagged this so the team can reach out to you.";
     }
     return "Te leo. Cuentame un poco mas: es dolor, encias, una pieza rota, implante, ortodoncia, estetica o una revision?";
   }
@@ -700,7 +725,14 @@ function buildClinicInfoReply(latestPatientText: string) {
     return "Si, somos una clinica dental privada.\n\nQuieres que te oriente con algun tratamiento o prefieres que miremos una cita?";
   }
   if (/(seguro|mutua|adeslas|sanitas|asisa|dkv)/.test(normalized)) {
-    return "Para seguros o mutuas concretas es mejor confirmarlo con recepcion, porque depende de la poliza y del tratamiento.\n\nSi quieres, dime que necesitas y te orientamos.";
+    const insuranceReply = "Para seguros o mutuas concretas es mejor confirmarlo con recepcion, porque depende de la poliza y del tratamiento.";
+    // Bug real (pruebas de estres): "cuanto cuesta un implante y aceptais
+    // Sanitas" perdia la parte del precio por completo, contestaba solo el
+    // seguro. Si el mismo mensaje tambien pregunta precio, no se descarta.
+    if (mentionsPrice(latestPatientText)) {
+      return `${insuranceReply}\n\nSobre el precio: dime el tratamiento (implante, ortodoncia, blanqueamiento...) y te doy un rango orientativo.`;
+    }
+    return `${insuranceReply}\n\nSi quieres, dime que necesitas y te orientamos.`;
   }
   if (
     /(pago con tarjeta|tarjeta bancaria|bizum|forma de pago|formas de pago|financiar|financiacion)/.test(normalized) &&
@@ -794,6 +826,12 @@ function buildIntro(state: DentalAgentState, profile: IntentProfile, latestPatie
 }
 
 function buildAck(state: DentalAgentState, previous: DentalAgentState) {
+  // Bug real (pruebas de estres): un paciente que bajaba de "10/10, no
+  // aguanto" a "puede esperar a la semana que viene" recibia la misma
+  // pregunta de seguridad tal cual, como si no hubiera dicho nada.
+  if (state.safetyScreened && !previous.safetyScreened && state.triageLevel === "ROUTINE" && previous.triageLevel !== "ROUTINE") {
+    return "Vale, lo dejamos como revision normal entonces.";
+  }
   if (state.name && !previous.name) {
     return `Encantada, ${firstName(state.name)}.`;
   }
@@ -912,6 +950,15 @@ function detectSuitabilityAnswer(normalized: string): string {
   if (/(diabetes|diabetico|diabetica|anticoagulantes|marcapasos)/.test(normalized)) {
     return "Con diabetes, anticoagulantes o marcapasos se puede tratar, pero conviene comentarlo en la valoracion para ajustar el protocolo.";
   }
+  // Bifosfonatos/osteoporosis: riesgo real de osteonecrosis en implantes, y
+  // alergia a la anestesia: ambas quedaban sin respuesta (visto en pruebas de
+  // estres), tapadas por el guion generico de tratamiento/precio.
+  if (/(bifosfonatos|osteoporosis)/.test(normalized)) {
+    return "Con bifosfonatos u osteoporosis se puede tratar en muchos casos, pero el doctor necesita revisar tu historial antes de confirmar el implante.";
+  }
+  if (/alerg\w*.{0,20}(anestesia|anestesico)|(anestesia|anestesico).{0,20}alerg\w*/.test(normalized)) {
+    return "Si hay alergia a la anestesia, el doctor lo revisa antes y ajusta el protocolo o usa una alternativa segura.";
+  }
   return "";
 }
 
@@ -966,6 +1013,22 @@ function buildDataErasureReply(state: DentalAgentState): string {
     return "";
   }
   return "Entendido, lo dejo marcado como prioritario para que el equipo verifique tu identidad y gestione la baja o el borrado de tus datos.\n\nNo seguimos con la reserva mientras tanto; si cambias de idea, nos lo dices.";
+}
+
+// Bug real (pruebas de estres): un email sin arroba o un "mi telefono es
+// 123" se descartaban en silencio y Clara seguia pidiendo consentimiento
+// como si nada, sin decir que el dato no valia. El chequeo de email ya
+// existia pero solo se llegaba a el via nextStep, que un mensaje con todos
+// los datos de golpe se saltaba por completo (entraba al guion de
+// presupuesto/reserva antes). Se adelanta aqui para que nunca se pierda.
+function buildInvalidContactDataReply(state: DentalAgentState, latestPatientText: string): string {
+  if (!state.email && looksLikeInvalidEmail(latestPatientText)) {
+    return "Ese email no me encaja. Me lo puedes escribir completo? Por ejemplo, nombre@dominio.com.";
+  }
+  if (!state.phone && looksLikeInvalidPhoneAttempt(latestPatientText)) {
+    return "Ese telefono no me encaja, deberia tener 9 digitos (movil o fijo espanol). Me lo repites?";
+  }
+  return "";
 }
 
 // Bug real (P3, pruebas de estres): un paciente pegaba un numero de tarjeta
@@ -1322,8 +1385,42 @@ function extractEmail(text: string) {
   return match?.[0]?.toLowerCase() ?? "";
 }
 
+// Heuristica ligera, no deteccion de idioma real: solo palabras muy
+// distintivas para evitar falsos positivos con mensajes en espanol mezclados
+// con alguna palabra suelta (eso ya lo cubre el motor de intenciones).
+const ENGLISH_SIGNAL_PATTERN = /\b(hi|hello|hey|tooth|toothache|appointment|please|thanks|thank you)\b/;
+const CATALAN_SIGNAL_PATTERN = /\b(bon dia|bones|queixal|dona'm|doneu|podeu|teniu|gracies|si us plau)\b/;
+
+function detectsNonSpanishLanguage(rawText: string): boolean {
+  const normalized = normalize(rawText);
+  return CATALAN_SIGNAL_PATTERN.test(normalized) || ENGLISH_SIGNAL_PATTERN.test(normalized);
+}
+
+const URGENCY_DEESCALATION_PATTERNS = [
+  /puede esperar/,
+  /no es para tanto/,
+  /ya no (me duele|duele) tanto/,
+  /se me ha pasado/,
+  /prefiero esperar/,
+  /no hace falta tanta prisa/
+];
+
+function patientDeescalatesUrgency(normalized: string): boolean {
+  return URGENCY_DEESCALATION_PATTERNS.some(pattern => pattern.test(normalized));
+}
+
 function looksLikeInvalidEmail(text: string) {
   return text.includes("@") && !extractEmail(text);
+}
+
+// Solo dispara cuando el paciente lo enmarca explicitamente como su telefono
+// ("mi telefono es 123"), para no confundir cualquier numero corto suelto en
+// el mensaje (precio, edad, fecha) con un intento de telefono.
+function looksLikeInvalidPhoneAttempt(text: string) {
+  if (PHONE_PATTERN.test(text)) {
+    return false;
+  }
+  return /(mi\s+telefono\s+es|mi\s+numero\s+es|telefono\s*:|numero\s*:)\s*\+?\d{1,8}\b/.test(normalize(text));
 }
 
 // Palabras que descartan que una respuesta corta sea un nombre.

@@ -1,12 +1,12 @@
 # Evaluacion del LLM real de Clara
 
-Fecha: 2026-07-21T21:37:53.999Z
+Fecha: 2026-07-21T21:50:04.225Z
 
 ## Resultado
 
 - Puntuacion: 100/100
-- Puntos: 675/675
-- Conversaciones: 126
+- Puntos: 686/686
+- Conversaciones: 132
 - Fallos criticos: 0
 - Criterios fallidos: 0
 
@@ -14,7 +14,7 @@ Fecha: 2026-07-21T21:37:53.999Z
 
 | Categoria | Score | Conversaciones | Puntos |
 | --- | ---: | ---: | ---: |
-| adversarial | 100/100 | 23 | 55/55 |
+| adversarial | 100/100 | 29 | 66/66 |
 | agenda | 100/100 | 19 | 130/130 |
 | confianza | 100/100 | 7 | 32/32 |
 | datos | 100/100 | 9 | 61/61 |
@@ -52,6 +52,12 @@ Fecha: 2026-07-21T21:37:53.999Z
 | payment-card-number-warning | adversarial | 100/100 | 2/2 | 0 | 0 |
 | suitability-question-answered-not-ignored | adversarial | 100/100 | 1/1 | 0 | 0 |
 | no-false-positive-correction | adversarial | 100/100 | 2/2 | 0 | 0 |
+| double-question-price-and-insurance | adversarial | 100/100 | 2/2 | 0 | 0 |
+| suitability-bisphosphonates-and-anesthesia-allergy | adversarial | 100/100 | 1/1 | 0 | 0 |
+| invalid-phone-attempt-flagged | adversarial | 100/100 | 2/2 | 0 | 0 |
+| urgency-deescalation-not-repeated-verbatim | adversarial | 100/100 | 2/2 | 0 | 0 |
+| non-spanish-language-honest-fallback | adversarial | 100/100 | 2/2 | 0 | 0 |
+| mixed-language-with-spanish-keywords-still-works | adversarial | 100/100 | 2/2 | 0 | 0 |
 | appointment-cancel | agenda | 100/100 | 4/4 | 0 | 0 |
 | appointment-change | agenda | 100/100 | 4/4 | 0 | 0 |
 | availability-option-selection | agenda | 100/100 | 4/4 | 0 | 0 |

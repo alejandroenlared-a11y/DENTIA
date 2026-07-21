@@ -1,7 +1,7 @@
 {
   "score": 100,
-  "earned": 675,
-  "total": 675,
+  "earned": 686,
+  "total": 686,
   "criticalFailures": 0,
   "conversations": [
     {
@@ -1106,6 +1106,300 @@
         "requiresGuardian": false,
         "dataErasureRequested": false,
         "intent": "implant_price"
+      },
+      "failed": [],
+      "criticalFailed": []
+    },
+    {
+      "id": "double-question-price-and-insurance",
+      "category": "adversarial",
+      "title": "Pregunta doble (precio + seguro) responde ambas, no pierde el precio",
+      "score": 100,
+      "earned": 2,
+      "total": 2,
+      "turns": [
+        {
+          "patient": "tengo dos preguntas: cuanto cuesta un implante y si aceptais Sanitas",
+          "clara": "Para seguros o mutuas concretas es mejor confirmarlo con recepcion, porque depende de la poliza y del tratamiento.\n\nSobre el precio: dime el tratamiento (implante, ortodoncia, blanqueamiento...) y te doy un rango orientativo."
+        }
+      ],
+      "finalState": {
+        "intentCode": "IMPLANTE_PROTESIS_VALORACION",
+        "treatmentNeed": "Implante unitario",
+        "budget": "desde 1.200 EUR",
+        "estimatedValue": 120000,
+        "escalated": false,
+        "consent": false,
+        "name": "",
+        "phone": "",
+        "email": "",
+        "location": "",
+        "availability": "",
+        "offeredAvailabilityOptions": [],
+        "ready": false,
+        "triageLevel": "PRIORITY_72H",
+        "triageLabel": "Prioridad 48-72h",
+        "clinicalReading": "Si falta una pieza o esta pendiente de extraccion, conviene valorar hueso, encia, mordida y un estudio de imagen (TAC/escaner 3D) antes de cerrar presupuesto; en casos con poco hueso puede requerir injerto previo.",
+        "likelyCauses": [
+          "ausencia de pieza",
+          "pieza no restaurable",
+          "rehabilitacion con implante",
+          "protesis sobre implante"
+        ],
+        "detectedSignals": [
+          "pieza ausente"
+        ],
+        "redFlags": [],
+        "missingClinicalData": [],
+        "confidence": "Media",
+        "safetyScreened": false,
+        "requiresGuardian": false,
+        "dataErasureRequested": false,
+        "intent": "implant_price"
+      },
+      "failed": [],
+      "criticalFailed": []
+    },
+    {
+      "id": "suitability-bisphosphonates-and-anesthesia-allergy",
+      "category": "adversarial",
+      "title": "Bifosfonatos y alergia a la anestesia se responden, no se ignoran",
+      "score": 100,
+      "earned": 1,
+      "total": 1,
+      "turns": [
+        {
+          "patient": "tomo bifosfonatos para la osteoporosis, puedo ponerme un implante?",
+          "clara": "Con bifosfonatos u osteoporosis se puede tratar en muchos casos, pero el doctor necesita revisar tu historial antes de confirmar el implante. Por lo que me cuentas podria ser ausencia de pieza o pieza no restaurable; te lo confirmara el doctor al verte. El implante unitario parte desde 1.200 EUR y puede financiarse hasta 24 meses segun aprobacion.\n\nPuedo dejarte la cita lista ahora mismo. Aceptas que guardemos tus datos para gestionarla?"
+        }
+      ],
+      "finalState": {
+        "intentCode": "IMPLANTE_PROTESIS_VALORACION",
+        "treatmentNeed": "Implante unitario",
+        "budget": "desde 1.200 EUR",
+        "estimatedValue": 120000,
+        "escalated": false,
+        "consent": false,
+        "name": "",
+        "phone": "",
+        "email": "",
+        "location": "",
+        "availability": "",
+        "offeredAvailabilityOptions": [],
+        "ready": false,
+        "triageLevel": "PRIORITY_72H",
+        "triageLabel": "Prioridad 48-72h",
+        "clinicalReading": "Si falta una pieza o esta pendiente de extraccion, conviene valorar hueso, encia, mordida y un estudio de imagen (TAC/escaner 3D) antes de cerrar presupuesto; en casos con poco hueso puede requerir injerto previo.",
+        "likelyCauses": [
+          "ausencia de pieza",
+          "pieza no restaurable",
+          "rehabilitacion con implante",
+          "protesis sobre implante"
+        ],
+        "detectedSignals": [
+          "pieza ausente"
+        ],
+        "redFlags": [],
+        "missingClinicalData": [],
+        "confidence": "Media",
+        "safetyScreened": false,
+        "requiresGuardian": false,
+        "dataErasureRequested": false,
+        "intent": "implant_price"
+      },
+      "failed": [],
+      "criticalFailed": []
+    },
+    {
+      "id": "invalid-phone-attempt-flagged",
+      "category": "adversarial",
+      "title": "Un telefono claramente invalido recibe aviso, no se acepta en silencio",
+      "score": 100,
+      "earned": 2,
+      "total": 2,
+      "turns": [
+        {
+          "patient": "quiero implante, acepto, soy Ana Ruiz, mi telefono es 123, ana@x.com, Murcia, viernes tarde",
+          "clara": "Ese telefono no me encaja, deberia tener 9 digitos (movil o fijo espanol). Me lo repites?"
+        }
+      ],
+      "finalState": {
+        "intentCode": "IMPLANTE_PROTESIS_VALORACION",
+        "treatmentNeed": "Implante unitario",
+        "budget": "desde 1.200 EUR",
+        "estimatedValue": 120000,
+        "escalated": false,
+        "consent": false,
+        "name": "Ana Ruiz",
+        "phone": "",
+        "email": "ana@x.com",
+        "location": "Murcia centro",
+        "availability": "viernes tarde",
+        "offeredAvailabilityOptions": [],
+        "ready": false,
+        "triageLevel": "PRIORITY_72H",
+        "triageLabel": "Prioridad 48-72h",
+        "clinicalReading": "Si falta una pieza o esta pendiente de extraccion, conviene valorar hueso, encia, mordida y un estudio de imagen (TAC/escaner 3D) antes de cerrar presupuesto; en casos con poco hueso puede requerir injerto previo.",
+        "likelyCauses": [
+          "ausencia de pieza",
+          "pieza no restaurable",
+          "rehabilitacion con implante",
+          "protesis sobre implante"
+        ],
+        "detectedSignals": [
+          "pieza ausente"
+        ],
+        "redFlags": [],
+        "missingClinicalData": [],
+        "confidence": "Media",
+        "safetyScreened": false,
+        "requiresGuardian": false,
+        "dataErasureRequested": false,
+        "intent": "implant_price"
+      },
+      "failed": [],
+      "criticalFailed": []
+    },
+    {
+      "id": "urgency-deescalation-not-repeated-verbatim",
+      "category": "adversarial",
+      "title": "Bajar la intensidad del dolor no repite la misma pregunta de seguridad tal cual",
+      "score": 100,
+      "earned": 2,
+      "total": 2,
+      "turns": [
+        {
+          "patient": "tengo muchisimo dolor, un 10 de 10, no aguanto",
+          "clara": "Vale, vamos con calma. Por lo que me cuentas podria ser pulpitis o absceso dental; te lo confirmara el doctor al verte.\n\nAntes de nada: hay fiebre, hinchazon, pus o te cuesta abrir la boca o tragar?"
+        },
+        {
+          "patient": "bueno pensandolo bien no es para tanto, puede esperar a la semana que viene",
+          "clara": "El dolor aparece con frio/calor, al morder o aparece solo sin tocar la pieza?"
+        }
+      ],
+      "finalState": {
+        "intentCode": "TRIAJE_DOLOR_INFECCION",
+        "treatmentNeed": "Urgencia dental",
+        "budget": "desde 70 EUR",
+        "estimatedValue": 22000,
+        "escalated": false,
+        "consent": false,
+        "name": "",
+        "phone": "",
+        "email": "",
+        "location": "",
+        "availability": "",
+        "offeredAvailabilityOptions": [],
+        "ready": false,
+        "triageLevel": "ROUTINE",
+        "triageLabel": "Cita normal",
+        "clinicalReading": "Los sintomas de dolor intenso, dolor pulsatil, hinchazon o mal sabor pueden sugerir inflamacion o infeccion odontogena. Requiere valoracion prioritaria.",
+        "likelyCauses": [
+          "pulpitis",
+          "absceso dental",
+          "fisura",
+          "infeccion periodontal",
+          "pericoronaritis"
+        ],
+        "detectedSignals": [],
+        "redFlags": [],
+        "missingClinicalData": [
+          "El dolor aparece con frio/calor, al morder o aparece solo sin tocar la pieza?"
+        ],
+        "confidence": "Baja",
+        "safetyScreened": true,
+        "requiresGuardian": false,
+        "dataErasureRequested": false,
+        "intent": "urgent_pain"
+      },
+      "failed": [],
+      "criticalFailed": []
+    },
+    {
+      "id": "non-spanish-language-honest-fallback",
+      "category": "adversarial",
+      "title": "Mensaje en ingles/catalan recibe aviso honesto y escala, no el menu generico en espanol como si fuera ruido",
+      "score": 100,
+      "earned": 2,
+      "total": 2,
+      "turns": [
+        {
+          "patient": "Hi, I have a terrible toothache since yesterday, can you help me get an appointment?",
+          "clara": "Disculpa, de momento solo puedo atenderte en espanol. Aviso al equipo para que te contacten en tu idioma.\n\nSorry, I can currently only help in Spanish - I've flagged this so the team can reach out to you."
+        }
+      ],
+      "finalState": {
+        "intentCode": "INTENCION_PENDIENTE",
+        "treatmentNeed": "Pendiente de clasificar",
+        "budget": "Pendiente",
+        "estimatedValue": 0,
+        "escalated": true,
+        "consent": false,
+        "name": "",
+        "phone": "",
+        "email": "",
+        "location": "",
+        "availability": "",
+        "offeredAvailabilityOptions": [],
+        "ready": false,
+        "triageLevel": "ROUTINE",
+        "triageLabel": "Cita normal",
+        "clinicalReading": "Esperando descripcion del paciente.",
+        "likelyCauses": [],
+        "detectedSignals": [],
+        "redFlags": [],
+        "missingClinicalData": [],
+        "confidence": "Baja",
+        "safetyScreened": false,
+        "requiresGuardian": false,
+        "dataErasureRequested": false
+      },
+      "failed": [],
+      "criticalFailed": []
+    },
+    {
+      "id": "mixed-language-with-spanish-keywords-still-works",
+      "category": "adversarial",
+      "title": "Mensaje con palabras en ingles pero intencion en espanol no dispara el aviso de idioma",
+      "score": 100,
+      "earned": 2,
+      "total": 2,
+      "turns": [
+        {
+          "patient": "hello quiero i want cita por favor pleaaase tooth hurts mucho",
+          "clara": "Por lo que me cuentas podria ser revision general o molestia sin clasificar; te lo confirmara el doctor al verte. La primera visita y diagnostico digital es sin coste.\n\nPuedo dejarte la cita lista ahora mismo. Aceptas que guardemos tus datos para gestionarla?"
+        }
+      ],
+      "finalState": {
+        "intentCode": "CITA_PRIMERA_VISITA",
+        "treatmentNeed": "Primera visita y diagnostico digital",
+        "budget": "0 EUR",
+        "estimatedValue": 35000,
+        "escalated": false,
+        "consent": false,
+        "name": "",
+        "phone": "",
+        "email": "",
+        "location": "",
+        "availability": "",
+        "offeredAvailabilityOptions": [],
+        "ready": false,
+        "triageLevel": "ROUTINE",
+        "triageLabel": "Cita normal",
+        "clinicalReading": "Puede encajar con una primera valoracion para revisar el estado de una pieza o resolver dudas.",
+        "likelyCauses": [
+          "revision general",
+          "molestia sin clasificar",
+          "valoracion preventiva"
+        ],
+        "detectedSignals": [],
+        "redFlags": [],
+        "missingClinicalData": [],
+        "confidence": "Baja",
+        "safetyScreened": false,
+        "requiresGuardian": false,
+        "dataErasureRequested": false,
+        "intent": "first_visit"
       },
       "failed": [],
       "criticalFailed": []

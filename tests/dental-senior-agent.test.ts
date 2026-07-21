@@ -710,4 +710,60 @@ describe("runDentalSeniorTurn", () => {
     const normalPhone = runDentalSeniorTurn(initialDentalAgentState, "quiero implante, acepto, soy Ana Ruiz, 612345678, ana@x.com, Murcia, viernes tarde");
     expect(normalPhone.reply).not.toContain("no nos mandes");
   });
+
+  it("answers both parts of a double question instead of dropping the price one", () => {
+    // Bug real detectado en pruebas de estres: "cuanto cuesta un implante y
+    // si aceptais Sanitas" perdia la parte del precio por completo.
+    const turn = runDentalSeniorTurn(initialDentalAgentState, "tengo dos preguntas: cuanto cuesta un implante y si aceptais Sanitas");
+    expect(turn.reply.toLowerCase()).toContain("seguros o mutuas");
+    expect(turn.reply.toLowerCase()).toContain("sobre el precio");
+  });
+
+  it("answers bisphosphonates/osteoporosis and anesthesia allergy suitability questions", () => {
+    // Bug real: el detector de idoneidad clinica cubria edad/embarazo/diabetes
+    // pero no bifosfonatos (riesgo real en implantes) ni alergia a anestesia.
+    const bisphosphonates = runDentalSeniorTurn(initialDentalAgentState, "tomo bifosfonatos para la osteoporosis, puedo ponerme un implante?");
+    expect(bisphosphonates.reply).toContain("bifosfonatos u osteoporosis");
+
+    const allergy = runDentalSeniorTurn(initialDentalAgentState, "soy alergica a la anestesia local, me podeis hacer una limpieza igualmente?");
+    expect(allergy.reply).toContain("alergia a la anestesia");
+  });
+
+  it("flags an obviously invalid phone number instead of silently accepting it", () => {
+    // Bug real: "mi telefono es 123" se descartaba en silencio, sin avisar.
+    const invalidPhone = runDentalSeniorTurn(
+      initialDentalAgentState,
+      "quiero implante, acepto, soy Ana Ruiz, mi telefono es 123, ana@x.com, Murcia, viernes tarde"
+    );
+    expect(invalidPhone.reply.toLowerCase()).toContain("ese telefono no me encaja");
+    expect(invalidPhone.state.phone).toBe("");
+  });
+
+  it("does not repeat the identical safety question verbatim after the patient de-escalates urgency", () => {
+    // Bug real: "dolor 10/10, no aguanto" -> "puede esperar a la semana que
+    // viene" recibia la misma pregunta de seguridad tal cual.
+    const urgent = runDentalSeniorTurn(initialDentalAgentState, "me duele mucho la muela");
+    expect(urgent.state.triageLevel).toBe("URGENT_24H");
+    expect(urgent.state.redFlags).toEqual([]);
+
+    const deescalated = runDentalSeniorTurn(urgent.state, "bueno pensandolo bien no es para tanto, puede esperar a la semana que viene");
+    expect(deescalated.reply).not.toContain(urgent.reply.split("\n\n").at(-1));
+    expect(deescalated.state.safetyScreened).toBe(true);
+  });
+
+  it("gives an honest fallback and escalates for a message it cannot understand in Spanish", () => {
+    // Bug real: un mensaje integramente en ingles o valenciano/catalan
+    // recibia el mismo menu generico en espanol como si fuera ruido.
+    const english = runDentalSeniorTurn(initialDentalAgentState, "Hi, I have a terrible toothache since yesterday, can you help me get an appointment?");
+    expect(english.reply.toLowerCase()).toContain("solo puedo atenderte en espanol");
+    expect(english.state.escalated).toBe(true);
+
+    const catalan = runDentalSeniorTurn(initialDentalAgentState, "Bon dia, tinc mal de queixal des d'ahir, em podeu donar hora?");
+    expect(catalan.reply.toLowerCase()).toContain("solo puedo atenderte en espanol");
+
+    // Un mensaje con alguna palabra en ingles pero intencion clara en espanol
+    // no debe disparar el aviso de idioma (ya cubierto por el motor normal).
+    const mixed = runDentalSeniorTurn(initialDentalAgentState, "hello quiero i want cita por favor pleaaase tooth hurts mucho");
+    expect(mixed.reply.toLowerCase()).not.toContain("solo puedo atenderte en espanol");
+  });
 });

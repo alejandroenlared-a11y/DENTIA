@@ -255,5 +255,67 @@
       { "type": "stateEquals", "field": "location", "value": "Murcia centro", "critical": true },
       { "type": "stateEquals", "field": "name", "value": "Ana Molina", "critical": true }
     ]
+  },
+  {
+    "id": "double-question-price-and-insurance",
+    "category": "adversarial",
+    "title": "Pregunta doble (precio + seguro) responde ambas, no pierde el precio",
+    "messages": ["tengo dos preguntas: cuanto cuesta un implante y si aceptais Sanitas"],
+    "criteria": [
+      { "type": "replyIncludes", "value": "seguros o mutuas", "critical": true },
+      { "type": "replyIncludes", "value": "sobre el precio", "critical": true }
+    ]
+  },
+  {
+    "id": "suitability-bisphosphonates-and-anesthesia-allergy",
+    "category": "adversarial",
+    "title": "Bifosfonatos y alergia a la anestesia se responden, no se ignoran",
+    "messages": ["tomo bifosfonatos para la osteoporosis, puedo ponerme un implante?"],
+    "criteria": [
+      { "type": "replyIncludes", "value": "bifosfonatos u osteoporosis", "critical": true }
+    ]
+  },
+  {
+    "id": "invalid-phone-attempt-flagged",
+    "category": "adversarial",
+    "title": "Un telefono claramente invalido recibe aviso, no se acepta en silencio",
+    "messages": ["quiero implante, acepto, soy Ana Ruiz, mi telefono es 123, ana@x.com, Murcia, viernes tarde"],
+    "criteria": [
+      { "type": "replyIncludes", "value": "ese telefono no me encaja", "critical": true },
+      { "type": "stateFalsy", "field": "phone", "critical": true }
+    ]
+  },
+  {
+    "id": "urgency-deescalation-not-repeated-verbatim",
+    "category": "adversarial",
+    "title": "Bajar la intensidad del dolor no repite la misma pregunta de seguridad tal cual",
+    "messages": [
+      "tengo muchisimo dolor, un 10 de 10, no aguanto",
+      "bueno pensandolo bien no es para tanto, puede esperar a la semana que viene"
+    ],
+    "criteria": [
+      { "type": "replyExcludes", "value": "hay fiebre, hinchazon, pus", "critical": true },
+      { "type": "stateEquals", "field": "safetyScreened", "value": true, "critical": true }
+    ]
+  },
+  {
+    "id": "non-spanish-language-honest-fallback",
+    "category": "adversarial",
+    "title": "Mensaje en ingles/catalan recibe aviso honesto y escala, no el menu generico en espanol como si fuera ruido",
+    "messages": ["Hi, I have a terrible toothache since yesterday, can you help me get an appointment?"],
+    "criteria": [
+      { "type": "replyIncludes", "value": "solo puedo atenderte en espanol", "critical": true },
+      { "type": "stateEquals", "field": "escalated", "value": true, "critical": true }
+    ]
+  },
+  {
+    "id": "mixed-language-with-spanish-keywords-still-works",
+    "category": "adversarial",
+    "title": "Mensaje con palabras en ingles pero intencion en espanol no dispara el aviso de idioma",
+    "messages": ["hello quiero i want cita por favor pleaaase tooth hurts mucho"],
+    "criteria": [
+      { "type": "replyExcludes", "value": "solo puedo atenderte en espanol", "critical": true },
+      { "type": "stateEquals", "field": "intent", "value": "first_visit" }
+    ]
   }
 ]
