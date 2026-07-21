@@ -1,0 +1,52 @@
+name: Clara LLM evaluation
+
+# A diferencia de "npm run eval:clara" (motor local, corre en cada push
+# implicitamente via el resto del pipeline), esto ejercita el banco completo
+# de fixtures contra el LLM real (Gemini) via runDentalAgentTurn. No bloquea
+# el merge (continue-on-error): el LLM es no determinista, una frase distinta
+# pero igual de segura no deberia tumbar un PR. El informe queda como
+# artifact para revisarlo.
+on:
+  workflow_dispatch: {}
+  schedule:
+    - cron: "0 6 * * 1" # lunes 06:00 UTC, heartbeat semanal
+  push:
+    branches: [main]
+    paths:
+      - "src/lib/agent/**"
+      - "tests/fixtures/**"
+      - "scripts/evaluate-clara-llm.ts"
+      - "scripts/lib/**"
+
+jobs:
+  eval-clara-llm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Run Clara evaluation against real Gemini
+        id: eval
+        continue-on-error: true
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: ${{ secrets.GEMINI_MODEL }}
+          GEMINI_FALLBACK_MODEL: ${{ secrets.GEMINI_FALLBACK_MODEL }}
+          LLM_PROVIDER: gemini
+        run: npm run eval:clara:llm
+
+      - name: Upload evaluation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: clara-evaluation-llm-report
+          path: |
+            reports/clara-evaluation-llm.md
+            reports/clara-evaluation-llm.json
+          retention-days: 30
