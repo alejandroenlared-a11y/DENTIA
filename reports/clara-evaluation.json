@@ -1518,15 +1518,15 @@
         },
         {
           "patient": "Murcia",
-          "clara": "Te puedo proponer estos huecos en Murcia centro:\n\n1. miércoles, 22/07, 10:00\n\n2. jueves, 23/07, 11:00\n\n3. viernes, 24/07, 10:00\n\nResponde con 1, 2 o 3 y te la dejo pre-reservada."
+          "clara": "Te puedo proponer estos huecos en Murcia centro:\n\n1. jueves, 23/07, 10:00\n\n2. viernes, 24/07, 11:00\n\n3. lunes, 27/07, 10:00\n\nResponde con 1, 2 o 3 y te la dejo pre-reservada."
         },
         {
           "patient": "que huecos tienes por la tarde?",
-          "clara": "Te puedo proponer estos huecos de tarde en Murcia centro:\n\n1. miércoles, 22/07, 17:00\n\n2. jueves, 23/07, 18:00\n\n3. viernes, 24/07, 17:00\n\nResponde con 1, 2 o 3 y te la dejo pre-reservada."
+          "clara": "Te puedo proponer estos huecos de tarde en Murcia centro:\n\n1. jueves, 23/07, 17:00\n\n2. viernes, 24/07, 18:00\n\n3. lunes, 27/07, 17:00\n\nResponde con 1, 2 o 3 y te la dejo pre-reservada."
         },
         {
           "patient": "2",
-          "clara": "Ana, pre-reserva lista: primera visita y diagnostico digital en Murcia centro, franja jueves, 23/07, 18:00.\n\nEl doctor te confirma plan y presupuesto cerrado en la visita."
+          "clara": "Ana, pre-reserva lista: primera visita y diagnostico digital en Murcia centro, franja viernes, 24/07, 18:00.\n\nEl doctor te confirma plan y presupuesto cerrado en la visita."
         }
       ],
       "finalState": {
@@ -1540,7 +1540,7 @@
         "phone": "654718663",
         "email": "ana@example.com",
         "location": "Murcia centro",
-        "availability": "jueves, 23/07, 18:00",
+        "availability": "viernes, 24/07, 18:00",
         "offeredAvailabilityOptions": [],
         "ready": true,
         "triageLevel": "ROUTINE",
@@ -1593,11 +1593,11 @@
         },
         {
           "patient": "Murcia",
-          "clara": "Te puedo proponer estos huecos en Murcia centro:\n\n1. miércoles, 22/07, 10:00\n\n2. jueves, 23/07, 11:00\n\n3. viernes, 24/07, 10:00\n\nResponde con 1, 2 o 3 y te la dejo pre-reservada."
+          "clara": "Te puedo proponer estos huecos en Murcia centro:\n\n1. jueves, 23/07, 10:00\n\n2. viernes, 24/07, 11:00\n\n3. lunes, 27/07, 10:00\n\nResponde con 1, 2 o 3 y te la dejo pre-reservada."
         },
         {
           "patient": "que huecos tienes mañana por la tarde?",
-          "clara": "Te puedo proponer estos huecos de tarde en Murcia centro:\n\n1. miércoles, 22/07, 17:00\n\n2. jueves, 23/07, 18:00\n\n3. viernes, 24/07, 17:00\n\nResponde con 1, 2 o 3 y te la dejo pre-reservada."
+          "clara": "Te puedo proponer estos huecos de tarde en Murcia centro:\n\n1. jueves, 23/07, 17:00\n\n2. viernes, 24/07, 18:00\n\n3. lunes, 27/07, 17:00\n\nResponde con 1, 2 o 3 y te la dejo pre-reservada."
         }
       ],
       "finalState": {
@@ -1613,9 +1613,9 @@
         "location": "Murcia centro",
         "availability": "",
         "offeredAvailabilityOptions": [
-          "miércoles, 22/07, 17:00",
-          "jueves, 23/07, 18:00",
-          "viernes, 24/07, 17:00"
+          "jueves, 23/07, 17:00",
+          "viernes, 24/07, 18:00",
+          "lunes, 27/07, 17:00"
         ],
         "ready": false,
         "triageLevel": "ROUTINE",
@@ -1668,11 +1668,11 @@
         },
         {
           "patient": "Murcia",
-          "clara": "Te puedo proponer estos huecos en Murcia centro:\n\n1. miércoles, 22/07, 10:00\n\n2. jueves, 23/07, 11:00\n\n3. viernes, 24/07, 10:00\n\nResponde con 1, 2 o 3 y te la dejo pre-reservada."
+          "clara": "Te puedo proponer estos huecos en Murcia centro:\n\n1. jueves, 23/07, 10:00\n\n2. viernes, 24/07, 11:00\n\n3. lunes, 27/07, 10:00\n\nResponde con 1, 2 o 3 y te la dejo pre-reservada."
         },
         {
           "patient": "18:00",
-          "clara": "Te puedo proponer estos huecos en Murcia centro:\n\n1. miércoles, 22/07, 10:00\n\n2. jueves, 23/07, 11:00\n\n3. viernes, 24/07, 10:00\n\nResponde con 1, 2 o 3 y te la dejo pre-reservada."
+          "clara": "Te puedo proponer estos huecos en Murcia centro:\n\n1. jueves, 23/07, 10:00\n\n2. viernes, 24/07, 11:00\n\n3. lunes, 27/07, 10:00\n\nResponde con 1, 2 o 3 y te la dejo pre-reservada."
         }
       ],
       "finalState": {
@@ -1688,9 +1688,9 @@
         "location": "Murcia centro",
         "availability": "",
         "offeredAvailabilityOptions": [
-          "miércoles, 22/07, 10:00",
-          "jueves, 23/07, 11:00",
-          "viernes, 24/07, 10:00"
+          "jueves, 23/07, 10:00",
+          "viernes, 24/07, 11:00",
+          "lunes, 27/07, 10:00"
         ],
         "ready": false,
         "triageLevel": "ROUTINE",
@@ -2921,11 +2921,11 @@
         },
         {
           "patient": "Murcia",
-          "clara": "Te puedo proponer estos huecos en Murcia centro:\n\n1. miércoles, 22/07, 10:00\n\n2. jueves, 23/07, 11:00\n\n3. viernes, 24/07, 10:00\n\nResponde con 1, 2 o 3 y te la dejo pre-reservada."
+          "clara": "Te puedo proponer estos huecos en Murcia centro:\n\n1. jueves, 23/07, 10:00\n\n2. viernes, 24/07, 11:00\n\n3. lunes, 27/07, 10:00\n\nResponde con 1, 2 o 3 y te la dejo pre-reservada."
         },
         {
           "patient": "sábado",
-          "clara": "Te puedo proponer estos huecos en Murcia centro:\n\n1. miércoles, 22/07, 10:00\n\n2. jueves, 23/07, 11:00\n\n3. viernes, 24/07, 10:00\n\nResponde con 1, 2 o 3 y te la dejo pre-reservada."
+          "clara": "Te puedo proponer estos huecos en Murcia centro:\n\n1. jueves, 23/07, 10:00\n\n2. viernes, 24/07, 11:00\n\n3. lunes, 27/07, 10:00\n\nResponde con 1, 2 o 3 y te la dejo pre-reservada."
         }
       ],
       "finalState": {
@@ -2941,9 +2941,9 @@
         "location": "Murcia centro",
         "availability": "",
         "offeredAvailabilityOptions": [
-          "miércoles, 22/07, 10:00",
-          "jueves, 23/07, 11:00",
-          "viernes, 24/07, 10:00"
+          "jueves, 23/07, 10:00",
+          "viernes, 24/07, 11:00",
+          "lunes, 27/07, 10:00"
         ],
         "ready": false,
         "triageLevel": "ROUTINE",
@@ -2996,7 +2996,7 @@
         },
         {
           "patient": "Murcia",
-          "clara": "Te puedo proponer estos huecos en Murcia centro:\n\n1. miércoles, 22/07, 10:00\n\n2. jueves, 23/07, 11:00\n\n3. viernes, 24/07, 10:00\n\nResponde con 1, 2 o 3 y te la dejo pre-reservada."
+          "clara": "Te puedo proponer estos huecos en Murcia centro:\n\n1. jueves, 23/07, 10:00\n\n2. viernes, 24/07, 11:00\n\n3. lunes, 27/07, 10:00\n\nResponde con 1, 2 o 3 y te la dejo pre-reservada."
         },
         {
           "patient": "lunes por la mañana",
@@ -3016,9 +3016,9 @@
         "location": "Murcia centro",
         "availability": "lunes manana",
         "offeredAvailabilityOptions": [
-          "miércoles, 22/07, 10:00",
-          "jueves, 23/07, 11:00",
-          "viernes, 24/07, 10:00"
+          "jueves, 23/07, 10:00",
+          "viernes, 24/07, 11:00",
+          "lunes, 27/07, 10:00"
         ],
         "ready": true,
         "triageLevel": "ROUTINE",
@@ -3374,7 +3374,7 @@
         },
         {
           "patient": "Murcia",
-          "clara": "Te puedo proponer estos huecos en Murcia centro:\n\n1. miércoles, 22/07, 10:00\n\n2. jueves, 23/07, 11:00\n\n3. viernes, 24/07, 10:00\n\nResponde con 1, 2 o 3 y te la dejo pre-reservada."
+          "clara": "Te puedo proponer estos huecos en Murcia centro:\n\n1. jueves, 23/07, 10:00\n\n2. viernes, 24/07, 11:00\n\n3. lunes, 27/07, 10:00\n\nResponde con 1, 2 o 3 y te la dejo pre-reservada."
         },
         {
           "patient": "20/07 a las 10:30",
@@ -3394,9 +3394,9 @@
         "location": "Murcia centro",
         "availability": "20/07 10:30",
         "offeredAvailabilityOptions": [
-          "miércoles, 22/07, 10:00",
-          "jueves, 23/07, 11:00",
-          "viernes, 24/07, 10:00"
+          "jueves, 23/07, 10:00",
+          "viernes, 24/07, 11:00",
+          "lunes, 27/07, 10:00"
         ],
         "ready": true,
         "triageLevel": "ROUTINE",
@@ -3450,7 +3450,7 @@
         },
         {
           "patient": "Elche",
-          "clara": "Te puedo proponer estos huecos en Elche - Altabix:\n\n1. miércoles, 22/07, 10:00\n\n2. jueves, 23/07, 11:00\n\n3. viernes, 24/07, 10:00\n\nResponde con 1, 2 o 3 y te la dejo pre-reservada."
+          "clara": "Te puedo proponer estos huecos en Elche - Altabix:\n\n1. jueves, 23/07, 10:00\n\n2. viernes, 24/07, 11:00\n\n3. lunes, 27/07, 10:00\n\nResponde con 1, 2 o 3 y te la dejo pre-reservada."
         },
         {
           "patient": "viernes a las 17:30",
@@ -3474,9 +3474,9 @@
         "location": "Elche - Altabix",
         "availability": "viernes 17:30",
         "offeredAvailabilityOptions": [
-          "miércoles, 22/07, 10:00",
-          "jueves, 23/07, 11:00",
-          "viernes, 24/07, 10:00"
+          "jueves, 23/07, 10:00",
+          "viernes, 24/07, 11:00",
+          "lunes, 27/07, 10:00"
         ],
         "ready": true,
         "triageLevel": "ESTHETIC",
@@ -3978,7 +3978,7 @@
         },
         {
           "patient": "Elche",
-          "clara": "Te puedo proponer estos huecos en Elche - Altabix:\n\n1. miércoles, 22/07, 10:00\n\n2. jueves, 23/07, 11:00\n\n3. viernes, 24/07, 10:00\n\nResponde con 1, 2 o 3 y te la dejo pre-reservada."
+          "clara": "Te puedo proponer estos huecos en Elche - Altabix:\n\n1. jueves, 23/07, 10:00\n\n2. viernes, 24/07, 11:00\n\n3. lunes, 27/07, 10:00\n\nResponde con 1, 2 o 3 y te la dejo pre-reservada."
         },
         {
           "patient": "viernes tarde",
@@ -3998,9 +3998,9 @@
         "location": "Elche - Altabix",
         "availability": "viernes tarde",
         "offeredAvailabilityOptions": [
-          "miércoles, 22/07, 10:00",
-          "jueves, 23/07, 11:00",
-          "viernes, 24/07, 10:00"
+          "jueves, 23/07, 10:00",
+          "viernes, 24/07, 11:00",
+          "lunes, 27/07, 10:00"
         ],
         "ready": true,
         "triageLevel": "ROUTINE",
@@ -4053,7 +4053,7 @@
         },
         {
           "patient": "Murcia",
-          "clara": "Te puedo proponer estos huecos en Murcia centro:\n\n1. miércoles, 22/07, 10:00\n\n2. jueves, 23/07, 11:00\n\n3. viernes, 24/07, 10:00\n\nResponde con 1, 2 o 3 y te la dejo pre-reservada."
+          "clara": "Te puedo proponer estos huecos en Murcia centro:\n\n1. jueves, 23/07, 10:00\n\n2. viernes, 24/07, 11:00\n\n3. lunes, 27/07, 10:00\n\nResponde con 1, 2 o 3 y te la dejo pre-reservada."
         },
         {
           "patient": "jueves por la tarde",
@@ -4073,9 +4073,9 @@
         "location": "Murcia centro",
         "availability": "jueves tarde",
         "offeredAvailabilityOptions": [
-          "miércoles, 22/07, 10:00",
-          "jueves, 23/07, 11:00",
-          "viernes, 24/07, 10:00"
+          "jueves, 23/07, 10:00",
+          "viernes, 24/07, 11:00",
+          "lunes, 27/07, 10:00"
         ],
         "ready": true,
         "triageLevel": "ROUTINE",
@@ -4128,7 +4128,7 @@
         },
         {
           "patient": "Murcia",
-          "clara": "Te puedo proponer estos huecos en Murcia centro:\n\n1. miércoles, 22/07, 10:00\n\n2. jueves, 23/07, 11:00\n\n3. viernes, 24/07, 10:00\n\nResponde con 1, 2 o 3 y te la dejo pre-reservada."
+          "clara": "Te puedo proponer estos huecos en Murcia centro:\n\n1. jueves, 23/07, 10:00\n\n2. viernes, 24/07, 11:00\n\n3. lunes, 27/07, 10:00\n\nResponde con 1, 2 o 3 y te la dejo pre-reservada."
         },
         {
           "patient": "martes a las 10:00",
@@ -4148,9 +4148,9 @@
         "location": "Murcia centro",
         "availability": "martes 10:00",
         "offeredAvailabilityOptions": [
-          "miércoles, 22/07, 10:00",
-          "jueves, 23/07, 11:00",
-          "viernes, 24/07, 10:00"
+          "jueves, 23/07, 10:00",
+          "viernes, 24/07, 11:00",
+          "lunes, 27/07, 10:00"
         ],
         "ready": true,
         "triageLevel": "ROUTINE",
@@ -4203,7 +4203,7 @@
         },
         {
           "patient": "Elche",
-          "clara": "Te puedo proponer estos huecos en Elche - Altabix:\n\n1. miércoles, 22/07, 10:00\n\n2. jueves, 23/07, 11:00\n\n3. viernes, 24/07, 10:00\n\nResponde con 1, 2 o 3 y te la dejo pre-reservada."
+          "clara": "Te puedo proponer estos huecos en Elche - Altabix:\n\n1. jueves, 23/07, 10:00\n\n2. viernes, 24/07, 11:00\n\n3. lunes, 27/07, 10:00\n\nResponde con 1, 2 o 3 y te la dejo pre-reservada."
         },
         {
           "patient": "viernes por la mañana",
@@ -4223,9 +4223,9 @@
         "location": "Elche - Altabix",
         "availability": "viernes manana",
         "offeredAvailabilityOptions": [
-          "miércoles, 22/07, 10:00",
-          "jueves, 23/07, 11:00",
-          "viernes, 24/07, 10:00"
+          "jueves, 23/07, 10:00",
+          "viernes, 24/07, 11:00",
+          "lunes, 27/07, 10:00"
         ],
         "ready": true,
         "triageLevel": "ROUTINE",
@@ -4455,11 +4455,11 @@
         },
         {
           "patient": "Murcia",
-          "clara": "Te puedo proponer estos huecos en Murcia centro:\n\n1. miércoles, 22/07, 10:00\n\n2. jueves, 23/07, 11:00\n\n3. viernes, 24/07, 10:00\n\nResponde con 1, 2 o 3 y te la dejo pre-reservada."
+          "clara": "Te puedo proponer estos huecos en Murcia centro:\n\n1. jueves, 23/07, 10:00\n\n2. viernes, 24/07, 11:00\n\n3. lunes, 27/07, 10:00\n\nResponde con 1, 2 o 3 y te la dejo pre-reservada."
         },
         {
           "patient": "que dias tienes por la tarde??",
-          "clara": "Te puedo proponer estos huecos de tarde en Murcia centro:\n\n1. miércoles, 22/07, 17:00\n\n2. jueves, 23/07, 18:00\n\n3. viernes, 24/07, 17:00\n\nResponde con 1, 2 o 3 y te la dejo pre-reservada."
+          "clara": "Te puedo proponer estos huecos de tarde en Murcia centro:\n\n1. jueves, 23/07, 17:00\n\n2. viernes, 24/07, 18:00\n\n3. lunes, 27/07, 17:00\n\nResponde con 1, 2 o 3 y te la dejo pre-reservada."
         }
       ],
       "finalState": {
@@ -4475,9 +4475,9 @@
         "location": "Murcia centro",
         "availability": "",
         "offeredAvailabilityOptions": [
-          "miércoles, 22/07, 17:00",
-          "jueves, 23/07, 18:00",
-          "viernes, 24/07, 17:00"
+          "jueves, 23/07, 17:00",
+          "viernes, 24/07, 18:00",
+          "lunes, 27/07, 17:00"
         ],
         "ready": false,
         "triageLevel": "PRIORITY_72H",
@@ -4533,7 +4533,7 @@
         },
         {
           "patient": "Murcia",
-          "clara": "Te puedo proponer estos huecos en Murcia centro:\n\n1. miércoles, 22/07, 10:00\n\n2. jueves, 23/07, 11:00\n\n3. viernes, 24/07, 10:00\n\nResponde con 1, 2 o 3 y te la dejo pre-reservada."
+          "clara": "Te puedo proponer estos huecos en Murcia centro:\n\n1. jueves, 23/07, 10:00\n\n2. viernes, 24/07, 11:00\n\n3. lunes, 27/07, 10:00\n\nResponde con 1, 2 o 3 y te la dejo pre-reservada."
         }
       ],
       "finalState": {
@@ -4549,9 +4549,9 @@
         "location": "Murcia centro",
         "availability": "",
         "offeredAvailabilityOptions": [
-          "miércoles, 22/07, 10:00",
-          "jueves, 23/07, 11:00",
-          "viernes, 24/07, 10:00"
+          "jueves, 23/07, 10:00",
+          "viernes, 24/07, 11:00",
+          "lunes, 27/07, 10:00"
         ],
         "ready": false,
         "triageLevel": "PRIORITY_72H",
@@ -6028,7 +6028,7 @@
         },
         {
           "patient": "Elche",
-          "clara": "Te puedo proponer estos huecos en Elche - Altabix:\n\n1. miércoles, 22/07, 10:00\n\n2. jueves, 23/07, 11:00\n\n3. viernes, 24/07, 10:00\n\nResponde con 1, 2 o 3 y te la dejo pre-reservada."
+          "clara": "Te puedo proponer estos huecos en Elche - Altabix:\n\n1. jueves, 23/07, 10:00\n\n2. viernes, 24/07, 11:00\n\n3. lunes, 27/07, 10:00\n\nResponde con 1, 2 o 3 y te la dejo pre-reservada."
         }
       ],
       "finalState": {
@@ -6044,9 +6044,9 @@
         "location": "Elche - Altabix",
         "availability": "",
         "offeredAvailabilityOptions": [
-          "miércoles, 22/07, 10:00",
-          "jueves, 23/07, 11:00",
-          "viernes, 24/07, 10:00"
+          "jueves, 23/07, 10:00",
+          "viernes, 24/07, 11:00",
+          "lunes, 27/07, 10:00"
         ],
         "ready": false,
         "triageLevel": "PRIORITY_72H",
@@ -6102,7 +6102,7 @@
         },
         {
           "patient": "Murcia",
-          "clara": "Te puedo proponer estos huecos en Murcia centro:\n\n1. miércoles, 22/07, 10:00\n\n2. jueves, 23/07, 11:00\n\n3. viernes, 24/07, 10:00\n\nResponde con 1, 2 o 3 y te la dejo pre-reservada."
+          "clara": "Te puedo proponer estos huecos en Murcia centro:\n\n1. jueves, 23/07, 10:00\n\n2. viernes, 24/07, 11:00\n\n3. lunes, 27/07, 10:00\n\nResponde con 1, 2 o 3 y te la dejo pre-reservada."
         },
         {
           "patient": "mañana por la tarde",
@@ -6122,9 +6122,9 @@
         "location": "Murcia centro",
         "availability": "manana tarde",
         "offeredAvailabilityOptions": [
-          "miércoles, 22/07, 10:00",
-          "jueves, 23/07, 11:00",
-          "viernes, 24/07, 10:00"
+          "jueves, 23/07, 10:00",
+          "viernes, 24/07, 11:00",
+          "lunes, 27/07, 10:00"
         ],
         "ready": true,
         "triageLevel": "PRIORITY_72H",

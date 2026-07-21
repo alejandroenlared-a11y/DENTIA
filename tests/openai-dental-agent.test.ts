@@ -1276,4 +1276,59 @@ describe("runDentalAgentTurn", () => {
     expect(result.reply).not.toContain("\"reply\"");
     expect(result.reply).not.toContain("{");
   });
+
+  it("keeps escalated true and ready false when Gemini's own judgement disagrees with a local-forced escalation (GDPR erasure)", async () => {
+    process.env.LLM_PROVIDER = "gemini";
+    process.env.GEMINI_API_KEY = "gemini-test-key";
+    process.env.GEMINI_MODEL = "gemini-test-model";
+
+    const state = {
+      ...initialDentalAgentState,
+      consent: true,
+      name: "Ana Molina",
+      phone: "612999111",
+      email: "ana@example.com",
+      location: "Murcia centro",
+      availability: "viernes tarde"
+    };
+
+    const output = {
+      reply: "Entendido, seguimos con la reserva.",
+      intent: "implant_price",
+      intentCode: "IMPLANTE_PRECIO",
+      treatmentNeed: "Implante",
+      budget: "Pendiente",
+      estimatedValue: 0,
+      escalated: false,
+      consent: true,
+      name: "Ana Molina",
+      phone: "612999111",
+      location: "Murcia centro",
+      availability: "viernes tarde",
+      triageLevel: "ROUTINE",
+      triageLabel: "Rutina",
+      clinicalReading: "Sin hallazgos.",
+      likelyCauses: [],
+      detectedSignals: [],
+      redFlags: [],
+      missingClinicalData: [],
+      confidence: "Alta",
+      safetyScreened: true
+    };
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => geminiResponse(JSON.stringify(output))
+    } as Response);
+
+    const result = await runDentalAgentTurn({
+      latestPatientMessage: "en realidad borra todos mis datos, retiro el consentimiento y no quiero seguir",
+      history: [],
+      state
+    });
+
+    expect(result.state.dataErasureRequested).toBe(true);
+    expect(result.state.escalated).toBe(true);
+    expect(result.state.ready).toBe(false);
+  });
 });

@@ -764,7 +764,11 @@ function mergeAiState(localState: DentalAgentState, aiOutput: DentalAgentAiOutpu
     localState.intent === "trauma" && ["urgent_pain", "endodontics", "caries_restoration"].includes(aiIntent ?? "")
       ? "trauma"
       : aiIntent;
-  const escalated = aiOutput.triageLevel === "EMERGENCY" || aiOutput.triageLevel === "URGENT_24H" || aiOutput.escalated;
+  const escalated =
+    localState.escalated ||
+    aiOutput.triageLevel === "EMERGENCY" ||
+    aiOutput.triageLevel === "URGENT_24H" ||
+    aiOutput.escalated;
   const state: DentalAgentState = {
     ...localState,
     intent,
@@ -803,7 +807,9 @@ function computeReady(state: DentalAgentState) {
     (state.escalated || state.email) &&
     state.location &&
     state.availability &&
-    hasConcreteAvailability(state.availability)
+    hasConcreteAvailability(state.availability) &&
+    !state.requiresGuardian &&
+    !state.dataErasureRequested
   );
 }
 
