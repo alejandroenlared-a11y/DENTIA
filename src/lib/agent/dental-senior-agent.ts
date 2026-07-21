@@ -552,7 +552,13 @@ function buildDentalReply(state: DentalAgentState, previous: DentalAgentState, l
   // Si la conversacion nacio pidiendo presupuesto, dar el rango de precio en
   // cuanto se conoce el tratamiento aunque este mensaje ya no lo mencione.
   const cameFromBudget = previous.intentCode === BUDGET_PENDING_INTENT;
-  const intro = isNewIntent ? buildIntro(state, profile, latestPatientText, cameFromBudget) : buildAck(state, previous);
+  // Con el intent ya fijado, los turnos siguientes solo pasaban por buildAck
+  // (casi siempre vacio) + nextStep (pide el siguiente dato fijo). Una
+  // pregunta de idoneidad clinica en ese turno (edad, embarazo...) quedaba
+  // sin responder (visto en QA con la pregunta de la edad para ortodoncia).
+  const intro = isNewIntent
+    ? buildIntro(state, profile, latestPatientText, cameFromBudget)
+    : [detectSuitabilityAnswer(normalize(latestPatientText)), buildAck(state, previous)].filter(Boolean).join(" ");
   const question = intro.trim().endsWith("?") ? "" : nextStep(state, latestPatientText);
   const reply = [intro, question].filter(Boolean).join("\n\n").trim();
   return reply || "Cuentame un poco mas para orientarte bien.";
@@ -699,6 +705,7 @@ const NON_SYMPTOM_SIGNALS = new Set(["pieza ausente", "estetica", "ortodoncia", 
 
 function buildIntro(state: DentalAgentState, profile: IntentProfile, latestPatientText: string, cameFromBudget = false) {
   const normalized = normalize(latestPatientText);
+  const suitabilityAnswer = detectSuitabilityAnswer(normalized);
   if (/(miedo|panico|ansiedad).{0,30}(dentista|clinica|doctor)/.test(normalized)) {
     return "Lo entiendo, a muchas personas les pasa. Lo anotamos para que el equipo lo tenga en cuenta y te expliquen todo con calma.";
   }
@@ -721,15 +728,19 @@ function buildIntro(state: DentalAgentState, profile: IntentProfile, latestPatie
   const hasSymptoms = state.detectedSignals.some(signal => !NON_SYMPTOM_SIGNALS.has(signal));
   if ((cameFromBudget || asksPriceNow) && !expressesPain && !hasSymptoms && !state.escalated) {
     if (state.intent === "cosmetic_dentistry") {
-      return "Tenemos varias opciones de estetica dental.\n\nBlanqueamiento, carillas, composite estetico y Digital Smile Design.\n\nCual te interesa mas?";
+      const prefix = suitabilityAnswer ? `${suitabilityAnswer}\n\n` : "";
+      return `${prefix}Tenemos varias opciones de estetica dental.\n\nBlanqueamiento, carillas, composite estetico y Digital Smile Design.\n\nCual te interesa mas?`;
     }
     if (state.intent === "orthodontics") {
-      return `Claro, te oriento. ${profile.priceNote} La valoracion inicial es sin coste y ahi te dicen duracion, opciones y financiacion.`;
+      const opener = suitabilityAnswer || "Claro, te oriento.";
+      return `${opener} ${profile.priceNote} La valoracion inicial es sin coste y ahi te dicen duracion, opciones y financiacion.`;
     }
     if (state.intent === "reactivation") {
-      return `Claro. ${profile.priceNote} Si al verte hubiera encia inflamada o mucha acumulacion, te avisamos antes de hacer nada.`;
+      const opener = suitabilityAnswer || "Claro.";
+      return `${opener} ${profile.priceNote} Si al verte hubiera encia inflamada o mucha acumulacion, te avisamos antes de hacer nada.`;
     }
-    return `Buena eleccion. ${profile.priceNote} El doctor te confirma el presupuesto cerrado en la valoracion, que es sin coste.`;
+    const opener = suitabilityAnswer || "Buena eleccion.";
+    return `${opener} ${profile.priceNote} El doctor te confirma el presupuesto cerrado en la valoracion, que es sin coste.`;
   }
 
   const causes = profile.likelyCauses.slice(0, 2).join(" o ");
@@ -740,7 +751,8 @@ function buildIntro(state: DentalAgentState, profile: IntentProfile, latestPatie
   ) {
     return "Que una muela se mueva conviene revisarlo pronto para valorar la encia y el soporte de la pieza.";
   }
-  return `${empathy}Por lo que me cuentas podria ser ${causes}; te lo confirmara el doctor al verte.${alarm}${price}`;
+  const suitabilityPrefix = suitabilityAnswer ? `${suitabilityAnswer} ` : empathy;
+  return `${suitabilityPrefix}Por lo que me cuentas podria ser ${causes}; te lo confirmara el doctor al verte.${alarm}${price}`;
 }
 
 function buildAck(state: DentalAgentState, previous: DentalAgentState) {
@@ -845,6 +857,24 @@ function wantsPrice(intent: DentalIntentId | undefined, latestPatientText: strin
     return true;
   }
   return mentionsPrice(latestPatientText);
+}
+
+// Preguntas de idoneidad clinica frecuentes (edad, embarazo, condiciones
+// medicas) que llegan mezcladas con el mensaje que fija el intent. Sin esto,
+// el guion de presupuesto/tratamiento las pisaba por completo (visto en QA:
+// "tengo 60 anos, es un problema para la ortodoncia?" recibia solo el precio,
+// sin responder a la pregunta real).
+function detectSuitabilityAnswer(normalized: string): string {
+  if (/(\d{1,3}\s*anos|edad)/.test(normalized) && /(problema|impedimento|puedo|puede|limite|tarde)/.test(normalized)) {
+    return "La edad no suele ser impedimento; lo que importa es el estado de encias y hueso, que se valora en la revision.";
+  }
+  if (/(embarazo|embarazada|estoy embarazada)/.test(normalized)) {
+    return "En el embarazo se puede tratar con precauciones; el doctor ajusta el plan segun el trimestre.";
+  }
+  if (/(diabetes|diabetico|diabetica|anticoagulantes|marcapasos)/.test(normalized)) {
+    return "Con diabetes, anticoagulantes o marcapasos se puede tratar, pero conviene comentarlo en la valoracion para ajustar el protocolo.";
+  }
+  return "";
 }
 
 function firstName(fullName: string) {

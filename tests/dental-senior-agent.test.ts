@@ -639,4 +639,20 @@ describe("runDentalSeniorTurn", () => {
     const reallyFine = runDentalSeniorTurn(initialDentalAgentState, "Puedo respirar bien, tranquilo");
     expect(reallyFine.state.redFlags).not.toContain("dificultad para respirar");
   });
+
+  it("answers a clinical suitability question instead of overriding it with the price script", () => {
+    // Bug real detectado en QA: con el intent ya fijado, el segundo turno
+    // solo pasaba por buildAck + nextStep (pide el siguiente dato), asi que
+    // una pregunta de idoneidad clinica (edad, embarazo...) quedaba sin
+    // respuesta, tapada por el guion de presupuesto/siguiente paso.
+    const first = runDentalSeniorTurn(initialDentalAgentState, "quiero presupuesto para ortodoncia invisible");
+    const second = runDentalSeniorTurn(first.state, "tengo 60 años, es eso un problema para poder ponerme la ortodoncia?");
+    expect(second.reply).toContain("La edad no suele ser impedimento");
+
+    const pregnancy = runDentalSeniorTurn(first.state, "estoy embarazada, puedo hacerme la ortodoncia igualmente?");
+    expect(pregnancy.reply).toContain("En el embarazo se puede tratar");
+
+    const noFalsePositive = runDentalSeniorTurn(first.state, "acepto, me llamo Juan Perez");
+    expect(noFalsePositive.reply).not.toContain("edad no suele ser impedimento");
+  });
 });

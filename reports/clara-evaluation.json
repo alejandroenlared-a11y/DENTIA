@@ -1,7 +1,7 @@
 {
   "score": 100,
-  "earned": 662,
-  "total": 662,
+  "earned": 663,
+  "total": 663,
   "criticalFailures": 0,
   "conversations": [
     {
@@ -754,6 +754,58 @@
         "confidence": "Media",
         "safetyScreened": false,
         "intent": "implant_price"
+      },
+      "failed": [],
+      "criticalFailed": []
+    },
+    {
+      "id": "suitability-question-answered-not-ignored",
+      "category": "adversarial",
+      "title": "Pregunta de idoneidad clinica (edad) se responde, no se pisa con el guion de precio",
+      "score": 100,
+      "earned": 1,
+      "total": 1,
+      "turns": [
+        {
+          "patient": "quiero presupuesto para ortodoncia invisible",
+          "clara": "Claro, te oriento. La ortodoncia parte desde 1.800 EUR en casos sencillos; brackets, Damon u ortodoncia invisible se confirman tras estudio digital. La valoracion inicial es sin coste y ahi te dicen duracion, opciones y financiacion.\n\nSi quieres te preparo una cita. Aceptas que guardemos tus datos para gestionarla?"
+        },
+        {
+          "patient": "tengo 60 años, es eso un problema para poder ponerme la ortodoncia?",
+          "clara": "La edad no suele ser impedimento; lo que importa es el estado de encias y hueso, que se valora en la revision.\n\nPuedo dejarte la cita lista ahora mismo. Aceptas que guardemos tus datos para gestionarla?"
+        }
+      ],
+      "finalState": {
+        "intentCode": "ORTODONCIA_ESTUDIO",
+        "treatmentNeed": "Ortodoncia",
+        "budget": "desde 1.800 EUR",
+        "estimatedValue": 180000,
+        "escalated": false,
+        "consent": false,
+        "name": "",
+        "phone": "",
+        "email": "",
+        "location": "",
+        "availability": "",
+        "offeredAvailabilityOptions": [],
+        "ready": false,
+        "triageLevel": "ROUTINE",
+        "triageLabel": "Cita normal",
+        "clinicalReading": "La ortodoncia requiere estudio digital para confirmar si encajan alineadores invisibles, brackets Damon u otra opcion, duracion aproximada y presupuesto cerrado. En ninos puede valorarse ortopedia funcional para guiar el crecimiento.",
+        "likelyCauses": [
+          "apinamiento",
+          "malposicion dental",
+          "mordida abierta/cruzada",
+          "recidiva tras ortodoncia"
+        ],
+        "detectedSignals": [
+          "ortodoncia"
+        ],
+        "redFlags": [],
+        "missingClinicalData": [],
+        "confidence": "Media",
+        "safetyScreened": false,
+        "intent": "orthodontics"
       },
       "failed": [],
       "criticalFailed": []
@@ -1904,7 +1956,7 @@
       "turns": [
         {
           "patient": "estoy embarazada y me duele una muela",
-          "clara": "Gracias por contarlo. Por lo que me cuentas podria ser pulpitis o absceso dental; te lo confirmara el doctor al verte.\n\nAntes de nada: hay fiebre, hinchazon, pus o te cuesta abrir la boca o tragar?"
+          "clara": "En el embarazo se puede tratar con precauciones; el doctor ajusta el plan segun el trimestre. Por lo que me cuentas podria ser pulpitis o absceso dental; te lo confirmara el doctor al verte.\n\nAntes de nada: hay fiebre, hinchazon, pus o te cuesta abrir la boca o tragar?"
         }
       ],
       "finalState": {

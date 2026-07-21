@@ -1,12 +1,12 @@
 # Evaluacion automatica de Clara
 
-Fecha: 2026-07-21T12:00:59.315Z
+Fecha: 2026-07-21T21:01:45.297Z
 
 ## Resultado
 
 - Puntuacion: 100/100
-- Puntos: 662/662
-- Conversaciones: 121
+- Puntos: 663/663
+- Conversaciones: 122
 - Fallos criticos: 0
 - Criterios fallidos: 0
 
@@ -14,7 +14,7 @@ Fecha: 2026-07-21T12:00:59.315Z
 
 | Categoria | Score | Conversaciones | Puntos |
 | --- | ---: | ---: | ---: |
-| adversarial | 100/100 | 18 | 42/42 |
+| adversarial | 100/100 | 19 | 43/43 |
 | agenda | 100/100 | 19 | 130/130 |
 | confianza | 100/100 | 7 | 32/32 |
 | datos | 100/100 | 9 | 61/61 |
@@ -46,6 +46,7 @@ Fecha: 2026-07-21T12:00:59.315Z
 | vale-as-filler-not-price | adversarial | 100/100 | 3/3 | 0 | 0 |
 | explicit-correction-location | adversarial | 100/100 | 1/1 | 0 | 0 |
 | explicit-correction-name | adversarial | 100/100 | 1/1 | 0 | 0 |
+| suitability-question-answered-not-ignored | adversarial | 100/100 | 1/1 | 0 | 0 |
 | no-false-positive-correction | adversarial | 100/100 | 2/2 | 0 | 0 |
 | appointment-cancel | agenda | 100/100 | 4/4 | 0 | 0 |
 | appointment-change | agenda | 100/100 | 4/4 | 0 | 0 |

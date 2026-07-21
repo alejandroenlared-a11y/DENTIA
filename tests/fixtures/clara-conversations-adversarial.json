@@ -182,6 +182,18 @@
     ]
   },
   {
+    "id": "suitability-question-answered-not-ignored",
+    "category": "adversarial",
+    "title": "Pregunta de idoneidad clinica (edad) se responde, no se pisa con el guion de precio",
+    "messages": [
+      "quiero presupuesto para ortodoncia invisible",
+      "tengo 60 años, es eso un problema para poder ponerme la ortodoncia?"
+    ],
+    "criteria": [
+      { "type": "replyIncludes", "value": "edad no suele ser impedimento", "critical": true }
+    ]
+  },
+  {
     "id": "no-false-positive-correction",
     "category": "adversarial",
     "title": "Mencionar 'vale' sin marcador de correccion no reabre datos ya fijados",
