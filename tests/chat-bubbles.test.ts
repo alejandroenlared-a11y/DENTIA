@@ -19,4 +19,18 @@ describe("chat bubbles", () => {
 
     expect(formatted).toBe("Vale, eso me ayuda.\n\nTe hago una pregunta rapida: tienes fiebre?");
   });
+
+  it("does not split a doctor title (Dr./Dra.) away from the name when wrapping long replies", () => {
+    // Bug real detectado por el evaluador de Clara contra el LLM: el split
+    // de frases usaba el punto de "Dra." como fin de frase y separaba el
+    // titulo del nombre en burbujas distintas.
+    const reply =
+      "Claro. El equipo trabaja por especialidades: Dr. Ernesto Ruiz Chumilla: Periodoncia, implantes y cirugia oral. Dra. Esther Estrada Mallada: Ortodoncia. Dra. Laura Herencia Lizaran: Endodoncia y odontopediatria. Dr. Manuel Ruiz Chumilla: Estetica dental y conservadora. Dra. Paula Garcia Garcia: Odontopediatria.";
+
+    const bubbles = splitReplyIntoBubbles(reply);
+
+    expect(bubbles.some(bubble => bubble.trim() === "Dra.")).toBe(false);
+    expect(bubbles.some(bubble => bubble.includes("Dra. Laura Herencia Lizaran"))).toBe(true);
+    expect(bubbles.some(bubble => bubble.includes("Dr. Ernesto Ruiz Chumilla"))).toBe(true);
+  });
 });

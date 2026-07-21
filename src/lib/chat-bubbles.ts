@@ -25,15 +25,36 @@ export function formatReplyForChat(reply: string): string {
   return splitReplyIntoBubbles(reply).join("\n\n");
 }
 
+// Titulos abreviados que terminan en punto pero no cierran frase: sin este
+// merge, "Dra. Laura Herencia" se partia en burbujas "Dra." + "Laura
+// Herencia" (bug real detectado por el evaluador de Clara contra el LLM,
+// visto en la lista de doctores/especialidades).
+const TITLE_ABBREVIATION = /\b(dr|dra|sr|sra)\.$/i;
+
+function splitIntoSentences(text: string): string[] {
+  const rawParts = text
+    .split(/(?<=[.!?])\s+/)
+    .map(part => part.trim())
+    .filter(Boolean);
+
+  const sentences: string[] = [];
+  for (const part of rawParts) {
+    const previous = sentences.at(-1);
+    if (previous && TITLE_ABBREVIATION.test(previous)) {
+      sentences[sentences.length - 1] = `${previous} ${part}`;
+    } else {
+      sentences.push(part);
+    }
+  }
+  return sentences;
+}
+
 function splitLongBubble(text: string): string[] {
   if (text.length <= MAX_BUBBLE_CHARS) {
     return [text];
   }
 
-  const sentences = text
-    .split(/(?<=[.!?])\s+/)
-    .map(sentence => sentence.trim())
-    .filter(Boolean);
+  const sentences = splitIntoSentences(text);
 
   if (sentences.length > 1) {
     return packChunks(sentences);
