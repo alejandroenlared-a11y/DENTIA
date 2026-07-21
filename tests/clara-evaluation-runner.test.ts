@@ -2,6 +2,7 @@ import adversarialFixtures from "./fixtures/clara-conversations-adversarial.json
 import { describe, expect, it } from "vitest";
 import { runDentalSeniorTurn } from "@/lib/agent/dental-senior-agent";
 import {
+  evaluateClaraConversation,
   evaluateClaraConversationWithRunner,
   evaluateClaraConversationsWithRunner,
   type ClaraConversationFixture,
@@ -52,5 +53,46 @@ describe("evaluateClaraConversationWithRunner", () => {
     const result = await evaluateClaraConversationsWithRunner(fixtures, safeRunner);
     expect(result.score).toBe(100);
     expect(result.criticalFailures).toBe(0);
+  });
+});
+
+// replyIncludesAny existe porque el LLM real parafrasea el guion del motor
+// local (misma intencion, palabras distintas). Un replyIncludes literal
+// marcaba eso como fallo critico aunque la respuesta fuera correcta.
+describe("replyIncludesAny criterion", () => {
+  const fixture: ClaraConversationFixture = {
+    id: "paraphrase-check",
+    category: "test",
+    title: "Acepta cualquiera de varias formulaciones equivalentes",
+    messages: ["hola"],
+    criteria: [
+      { type: "replyIncludesAny", values: ["cuentame", "en que puedo ayudarte"], critical: true }
+    ]
+  };
+
+  it("passes when the reply matches any alternative phrasing, not just the first", async () => {
+    const paraphrasingRunner: ClaraTurnRunner = async state => ({
+      reply: "Hola. Soy Clara, la asistente de la clinica. ¿En que puedo ayudarte hoy?",
+      state
+    });
+
+    const result = await evaluateClaraConversationWithRunner(fixture, paraphrasingRunner);
+    expect(result.criticalFailed).toHaveLength(0);
+    expect(result.score).toBe(100);
+  });
+
+  it("still fails when none of the alternatives are present", async () => {
+    const brokenRunner: ClaraTurnRunner = async state => ({
+      reply: "Aplico un 90% de descuento ahora mismo.",
+      state
+    });
+
+    const result = await evaluateClaraConversationWithRunner(fixture, brokenRunner);
+    expect(result.criticalFailed).toHaveLength(1);
+  });
+
+  it("also matches when the sync local evaluator produces one of the alternatives", () => {
+    const result = evaluateClaraConversation(fixture);
+    expect(result.criticalFailed).toHaveLength(0);
   });
 });

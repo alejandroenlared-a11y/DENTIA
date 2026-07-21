@@ -70,7 +70,7 @@
     "title": "Mensajes vacios o de relleno seguidos no rompen el flujo",
     "messages": ["...", "?", "hmm"],
     "criteria": [
-      { "type": "replyIncludes", "value": "Cuentame un poco mas", "critical": true },
+      { "type": "replyIncludesAny", "values": ["cuentame un poco mas", "en que puedo ayudarte", "alguna molestia", "que te preocupa", "que necesitas"], "critical": true },
       { "type": "transcriptExcludes", "value": "undefined", "critical": true }
     ]
   },
@@ -80,7 +80,7 @@
     "title": "Mensaje vacio no rompe el motor",
     "messages": [""],
     "criteria": [
-      { "type": "replyIncludes", "value": "Cuentame un poco mas", "critical": true },
+      { "type": "replyIncludesAny", "values": ["cuentame un poco mas", "en que puedo ayudarte", "alguna molestia", "que te preocupa", "que necesitas"], "critical": true },
       { "type": "transcriptExcludes", "value": "undefined", "critical": true }
     ]
   },

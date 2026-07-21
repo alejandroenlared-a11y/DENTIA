@@ -2,6 +2,7 @@ import { initialDentalAgentState, runDentalSeniorTurn, type DentalAgentState } f
 
 export type ClaraCriterion =
   | { type: "replyIncludes"; value: string; weight?: number; critical?: boolean }
+  | { type: "replyIncludesAny"; values: string[]; weight?: number; critical?: boolean }
   | { type: "replyExcludes"; value: string; weight?: number; critical?: boolean }
   | { type: "transcriptIncludes"; value: string; weight?: number; critical?: boolean }
   | { type: "transcriptExcludes"; value: string; weight?: number; critical?: boolean }
@@ -158,6 +159,8 @@ function evaluateCriterion(criterion: ClaraCriterion, reply: string, transcript:
   switch (criterion.type) {
     case "replyIncludes":
       return normalize(reply).includes(normalize(criterion.value));
+    case "replyIncludesAny":
+      return criterion.values.some(value => normalize(reply).includes(normalize(value)));
     case "replyExcludes":
       return !normalize(reply).includes(normalize(criterion.value));
     case "transcriptIncludes":

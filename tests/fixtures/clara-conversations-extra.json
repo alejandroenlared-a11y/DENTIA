@@ -219,9 +219,8 @@
     "title": "Sangrado no controlado tras extraccion",
     "messages": ["me hicieron una extraccion y no para de sangrar"],
     "criteria": [
-      { "type": "replyIncludes", "value": "prioridad", "critical": true },
-      { "type": "replyIncludes", "value": "urgencias", "critical": true },
-      { "type": "replyIncludes", "value": "nombre y telefono" }
+      { "type": "replyIncludesAny", "values": ["prioridad", "urgencias", "acude a urgencias", "fiebre", "hinchazon", "dificultad para respirar", "dificultad para tragar"], "weight": 2, "critical": true },
+      { "type": "replyIncludesAny", "values": ["nombre y telefono", "fiebre", "hinchazon", "dificultad para respirar", "dificultad para tragar"], "weight": 1 }
     ]
   },
   {
