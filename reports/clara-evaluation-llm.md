@@ -1,6 +1,6 @@
-# Evaluacion automatica de Clara
+# Evaluacion del LLM real de Clara
 
-Fecha: 2026-07-21T21:18:55.694Z
+Fecha: 2026-07-21T21:18:15.706Z
 
 ## Resultado
 

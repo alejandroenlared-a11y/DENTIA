@@ -44,18 +44,20 @@ export type ClaraEvaluationResult = {
   conversations: ClaraConversationResult[];
 };
 
+// Permite conducir el mismo banco de fixtures y el mismo criterio de
+// puntuacion contra un motor distinto al local determinista (p.ej. el LLM
+// real via runDentalAgentTurn). historySoFar es el estado previo de la
+// conversacion (sin el turno actual), igual que arma index.ts en produccion.
+export type ClaraTurnResult = { reply: string; state: DentalAgentState };
+export type ClaraTurnRunner = (
+  state: DentalAgentState,
+  message: string,
+  historySoFar: ClaraTurnLog[]
+) => Promise<ClaraTurnResult>;
+
 export function evaluateClaraConversations(fixtures: ClaraConversationFixture[]): ClaraEvaluationResult {
   const conversations = fixtures.map(evaluateClaraConversation);
-  const earned = conversations.reduce((sum, conversation) => sum + conversation.earned, 0);
-  const total = conversations.reduce((sum, conversation) => sum + conversation.total, 0);
-
-  return {
-    score: total > 0 ? Math.round((earned / total) * 100) : 0,
-    earned,
-    total,
-    criticalFailures: conversations.reduce((sum, conversation) => sum + conversation.criticalFailed.length, 0),
-    conversations
-  };
+  return aggregateResults(conversations);
 }
 
 export function evaluateClaraConversation(fixture: ClaraConversationFixture): ClaraConversationResult {
@@ -68,6 +70,54 @@ export function evaluateClaraConversation(fixture: ClaraConversationFixture): Cl
     turns.push({ patient: message, clara: turn.reply });
   }
 
+  return scoreConversation(fixture, turns, state);
+}
+
+export async function evaluateClaraConversationsWithRunner(
+  fixtures: ClaraConversationFixture[],
+  runTurn: ClaraTurnRunner
+): Promise<ClaraEvaluationResult> {
+  const conversations: ClaraConversationResult[] = [];
+  for (const fixture of fixtures) {
+    conversations.push(await evaluateClaraConversationWithRunner(fixture, runTurn));
+  }
+  return aggregateResults(conversations);
+}
+
+export async function evaluateClaraConversationWithRunner(
+  fixture: ClaraConversationFixture,
+  runTurn: ClaraTurnRunner
+): Promise<ClaraConversationResult> {
+  let state: DentalAgentState = initialDentalAgentState;
+  const turns: ClaraTurnLog[] = [];
+
+  for (const message of fixture.messages) {
+    const turn = await runTurn(state, message, turns);
+    state = turn.state;
+    turns.push({ patient: message, clara: turn.reply });
+  }
+
+  return scoreConversation(fixture, turns, state);
+}
+
+function aggregateResults(conversations: ClaraConversationResult[]): ClaraEvaluationResult {
+  const earned = conversations.reduce((sum, conversation) => sum + conversation.earned, 0);
+  const total = conversations.reduce((sum, conversation) => sum + conversation.total, 0);
+
+  return {
+    score: total > 0 ? Math.round((earned / total) * 100) : 0,
+    earned,
+    total,
+    criticalFailures: conversations.reduce((sum, conversation) => sum + conversation.criticalFailed.length, 0),
+    conversations
+  };
+}
+
+function scoreConversation(
+  fixture: ClaraConversationFixture,
+  turns: ClaraTurnLog[],
+  state: DentalAgentState
+): ClaraConversationResult {
   const finalReply = turns.at(-1)?.clara ?? "";
   const transcript = turns.map(turn => `${turn.patient}\n${turn.clara}`).join("\n");
   const failed: ClaraConversationResult["failed"] = [];
