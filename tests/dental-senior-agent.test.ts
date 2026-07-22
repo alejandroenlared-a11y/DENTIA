@@ -34,11 +34,11 @@ describe("runDentalSeniorTurn", () => {
     const turn = runDentalSeniorTurn(initialDentalAgentState, "que doctores y especialidades teneis?");
 
     expect(turn.reply).toContain("Dr. Ernesto Ruiz Chumilla");
-    expect(turn.reply).toContain("Periodoncia, implantes y cirugia oral");
+    expect(turn.reply).toContain("Periodoncia, implantes y cirugía oral");
     expect(turn.reply).toContain("Dra. Esther Estrada Mallada");
     expect(turn.reply).toContain("Ortodoncia");
     expect(turn.reply).toContain("Dra. Laura Herencia Lizaran");
-    expect(turn.reply).toContain("Endodoncia y odontopediatria");
+    expect(turn.reply).toContain("Endodoncia y odontopediatría");
     expect(turn.reply).toContain("cita con algun doctor en concreto");
     expect(turn.reply.toLowerCase()).toContain("urgencia");
     expect(turn.reply.toLowerCase()).not.toContain("dolor, encias");
@@ -96,7 +96,7 @@ describe("runDentalSeniorTurn", () => {
     expect(turn.state.detectedSignals).toContain("movilidad dental");
     expect(turn.state.ready).toBe(false);
     expect(turn.reply.toLowerCase()).toContain("conviene revisarlo pronto");
-    expect(turn.reply).toContain("Te duele, notas inflamacion, sangrado o ha sido por un golpe?");
+    expect(turn.reply).toContain("Te duele, notas inflamación, sangrado o ha sido por un golpe?");
     expect(turn.reply.toLowerCase()).not.toContain("gingivitis");
     expect(turn.reply.toLowerCase()).not.toContain("periodontitis");
     expect(turn.reply.toLowerCase()).not.toContain("aceptas que guardemos");
@@ -342,14 +342,14 @@ describe("runDentalSeniorTurn", () => {
     const second = runDentalSeniorTurn(first.state, "Estetica, que opciones tienes?");
 
     expect(second.state.intent).toBe("cosmetic_dentistry");
-    expect(second.state.treatmentNeed).toBe("Estetica dental");
+    expect(second.state.treatmentNeed).toBe("Estética dental");
     expect(second.reply.toLowerCase()).toContain("blanqueamiento");
     expect(second.reply.toLowerCase()).toContain("carillas");
     expect(second.reply.toLowerCase()).toContain("digital smile design");
     expect(second.reply.toLowerCase()).toContain("cual te interesa mas");
     expect(second.reply.toLowerCase()).not.toContain("no es solo");
     expect(second.reply.toLowerCase()).not.toContain("aceptas que guardemos");
-    expect(second.state.budget).toBe("valoracion sin coste");
+    expect(second.state.budget).toBe("valoración sin coste");
   });
 
   it("keeps whitening as its own treatment when the patient asks specifically for it", () => {
@@ -425,7 +425,28 @@ describe("runDentalSeniorTurn", () => {
     const named = runDentalSeniorTurn(consented.state, "Alejandro Marti");
     expect(named.state.name).toBe("Alejandro Marti");
     expect(named.reply).not.toContain("Como te llamas");
-    expect(named.reply.toLowerCase()).toContain("telefono");
+    expect(named.reply.toLowerCase()).toContain("teléfono");
+  });
+
+  it("does not ask the cold/heat/bite differential once fever and trouble swallowing already triggered a safety screen", () => {
+    // Bug real (produccion): tras escalar a EMERGENCY y pedir consentimiento
+    // para priorizar, Clara seguia preguntando el diferencial clinico
+    // (frio/calor/morder) en vez de pasar a pedir nombre, contradiciendo el
+    // "acude a urgencias ya" que acababa de decir.
+    const emergency = runDentalSeniorTurn(
+      initialDentalAgentState,
+      "Tengo fiebre y me cuesta tragar y el dolor un 6"
+    );
+    expect(emergency.state.triageLevel).toBe("EMERGENCY");
+    expect(emergency.state.safetyScreened).toBe(true);
+    expect(emergency.state.missingClinicalData).toEqual([]);
+    expect(emergency.reply.toLowerCase()).not.toContain("frio/calor");
+    expect(emergency.reply).toContain("urgencias");
+
+    const consented = runDentalSeniorTurn(emergency.state, "Si");
+    expect(consented.state.consent).toBe(true);
+    expect(consented.reply.toLowerCase()).not.toContain("frio/calor");
+    expect(consented.reply.toLowerCase()).toContain("como te llamas");
   });
 
   it("captures name and phone from a single bare reply", () => {
@@ -454,7 +475,7 @@ describe("runDentalSeniorTurn", () => {
 
     const emailed = runDentalSeniorTurn(named.state, "alejandro@example.com");
     expect(emailed.state.email).toBe("alejandro@example.com");
-    expect(emailed.reply).toContain("Y un telefono de contacto");
+    expect(emailed.reply).toContain("Y un teléfono de contacto");
     expect(emailed.reply.toLowerCase()).not.toContain("murcia");
     expect(emailed.reply.toLowerCase()).not.toContain("disponibilidad");
 
@@ -735,7 +756,7 @@ describe("runDentalSeniorTurn", () => {
       initialDentalAgentState,
       "quiero implante, acepto, soy Ana Ruiz, mi telefono es 123, ana@x.com, Murcia, viernes tarde"
     );
-    expect(invalidPhone.reply.toLowerCase()).toContain("ese telefono no me encaja");
+    expect(invalidPhone.reply.toLowerCase()).toContain("ese teléfono no me encaja");
     expect(invalidPhone.state.phone).toBe("");
   });
 
@@ -752,18 +773,18 @@ describe("runDentalSeniorTurn", () => {
   });
 
   it("gives an honest fallback and escalates for a message it cannot understand in Spanish", () => {
-    // Bug real: un mensaje integramente en ingles o valenciano/catalan
-    // recibia el mismo menu generico en espanol como si fuera ruido.
+    // Bug real: un mensaje integramente en inglés o valenciano/catalán
+    // recibia el mismo menu generico en español como si fuera ruido.
     const english = runDentalSeniorTurn(initialDentalAgentState, "Hi, I have a terrible toothache since yesterday, can you help me get an appointment?");
-    expect(english.reply.toLowerCase()).toContain("solo puedo atenderte en espanol");
+    expect(english.reply.toLowerCase()).toContain("solo puedo atenderte en español");
     expect(english.state.escalated).toBe(true);
 
     const catalan = runDentalSeniorTurn(initialDentalAgentState, "Bon dia, tinc mal de queixal des d'ahir, em podeu donar hora?");
-    expect(catalan.reply.toLowerCase()).toContain("solo puedo atenderte en espanol");
+    expect(catalan.reply.toLowerCase()).toContain("solo puedo atenderte en español");
 
     // Un mensaje con alguna palabra en ingles pero intencion clara en espanol
     // no debe disparar el aviso de idioma (ya cubierto por el motor normal).
     const mixed = runDentalSeniorTurn(initialDentalAgentState, "hello quiero i want cita por favor pleaaase tooth hurts mucho");
-    expect(mixed.reply.toLowerCase()).not.toContain("solo puedo atenderte en espanol");
+    expect(mixed.reply.toLowerCase()).not.toContain("solo puedo atenderte en español");
   });
 });
