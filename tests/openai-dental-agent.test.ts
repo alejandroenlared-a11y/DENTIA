@@ -1211,7 +1211,11 @@ describe("runDentalAgentTurn", () => {
 
     expect(result.runtime).toBe("gemini");
     expect(result.model).toContain("texto libre");
-    expect(result.reply).toContain("Murcia");
+    // El guardrail de seguridad (missingClinicalData/alarma general) pisa el
+    // texto libre de Gemini con el guion local: aun con todos los datos de
+    // contacto ya dados, primero toca descartar fiebre/hinchazon/pus antes de
+    // ofrecer huecos, asi que "Murcia" todavia no aparece en este turno.
+    expect(result.reply).toContain("Antes de nada");
     expect(result.state.intent).toBe("caries_restoration");
   });
 

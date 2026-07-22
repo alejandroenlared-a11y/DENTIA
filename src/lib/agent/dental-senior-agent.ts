@@ -877,6 +877,15 @@ function nextStep(state: DentalAgentState, latestPatientText: string) {
   if (!state.escalated && state.missingClinicalData[0]) {
     return state.missingClinicalData[0];
   }
+  // Bug real (produccion): "me duele una muela" (urgent_pain) + "al morder"
+  // reclasifica a caries_restoration. Ese intent no exige la alarma general
+  // arriba (para no repetirla antes de la diferencial frio/calor/morder en
+  // un primer mensaje de caries simple), pero una vez resuelta la diferencial
+  // (missingClinicalData ya vacio) sigue haciendo falta descartar
+  // absceso/infeccion antes de pasar a diagnostico + consentimiento.
+  if (state.intent === "caries_restoration" && state.redFlags.length === 0 && !state.safetyScreened) {
+    return "Antes de nada: hay fiebre, hinchazon, pus o te cuesta abrir la boca o tragar?";
+  }
   if (!state.consent) {
     return state.escalated
       ? "Quiero que recepción te llame con prioridad. Aceptas que guardemos tus datos para gestionarlo?"

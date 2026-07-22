@@ -458,6 +458,19 @@ describe("runDentalSeniorTurn", () => {
     expect(turn.state.missingClinicalData.length).toBeLessThanOrEqual(1);
   });
 
+  it("still asks the general alarm safety-screen question when a pain intent narrows to caries_restoration", () => {
+    // Bug real (produccion): "me duele una muela" (urgent_pain) + "al morder"
+    // reclasifica a caries_restoration, que no estaba en la lista de intents
+    // que exigen la pregunta general de alarma (fiebre/hinchazon/pus). Sin
+    // missingClinicalData pendiente tampoco, el motor local saltaba directo
+    // de diagnostico a pedir consentimiento sin descartar absceso/infeccion.
+    const first = runDentalSeniorTurn(initialDentalAgentState, "me duele una muela");
+    const second = runDentalSeniorTurn(first.state, "al morder");
+    expect(second.state.intent).toBe("caries_restoration");
+    expect(second.state.safetyScreened).toBe(false);
+    expect(second.reply.toLowerCase()).toContain("fiebre");
+  });
+
   it("captures name and phone from a single bare reply", () => {
     const first = runDentalSeniorTurn(
       initialDentalAgentState,
