@@ -75,6 +75,83 @@ export function Field({
   );
 }
 
+export function Select({
+  label,
+  name,
+  defaultValue = "",
+  required = false,
+  placeholder,
+  options,
+  disabled = false
+}: {
+  label: string;
+  name: string;
+  defaultValue?: string;
+  required?: boolean;
+  placeholder?: string;
+  options: Array<{ value: string; label: string }>;
+  disabled?: boolean;
+}) {
+  return (
+    <label className="field">
+      <span>{label}{required ? <em className="required-mark">*</em> : null}</span>
+      <select name={name} defaultValue={defaultValue} required={required} disabled={disabled}>
+        {placeholder ? <option value="">{placeholder}</option> : null}
+        {options.map(option => (
+          <option value={option.value} key={option.value}>{option.label}</option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+export function ConsentCheckbox({
+  name,
+  title,
+  description,
+  defaultChecked = false
+}: {
+  name: string;
+  title: string;
+  description: string;
+  defaultChecked?: boolean;
+}) {
+  return (
+    <label className="consent-row">
+      <input type="checkbox" name={name} defaultChecked={defaultChecked} />
+      <span>
+        <strong>{title}</strong>
+        <small>{description}</small>
+      </span>
+    </label>
+  );
+}
+
+export function FormSection({
+  icon,
+  title,
+  children,
+  toggle
+}: {
+  icon: IconName;
+  title: string;
+  children: React.ReactNode;
+  toggle?: React.ReactNode;
+}) {
+  return (
+    <section className="form-section">
+      <header className="form-section-head">
+        <div className="form-section-title">
+          <Icon name={icon} />
+          <h3>{title}</h3>
+        </div>
+        {toggle}
+      </header>
+      <div className="form-grid two">{children}</div>
+    </section>
+  );
+}
+
 export function TextArea({ label, name, defaultValue = "", hint }: { label: string; name: string; defaultValue?: string; hint?: string }) {
   return (
     <label className="field" style={{ gridColumn: "1 / -1" }}>

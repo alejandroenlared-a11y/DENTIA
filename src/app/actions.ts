@@ -77,49 +77,92 @@ function succeed(view: string, ok: string, extra: NoticeParams = {}): never {
   backTo(view, { ...extra, ok });
 }
 
-export async function createPatientAction(formData: FormData) {
+async function createPatientRecord(formData: FormData) {
   const parsed = patientInputSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) {
     backTo("patients", { error: firstErrorMessage(parsed.error) });
   }
 
   const { user, tenant } = await getCurrentContext();
+  const guardianEnabled = Boolean(parsed.data.guardianName || parsed.data.guardianIdDocument);
+  const patient = await prisma.patient.create({
+    data: {
+      tenantId: tenant.id,
+      primaryLocation: parsed.data.primaryLocation,
+      name: parsed.data.name,
+      lastName: parsed.data.lastName || null,
+      sex: parsed.data.sex || null,
+      birthDate: parsed.data.birthDate ? new Date(parsed.data.birthDate) : null,
+      idDocument: parsed.data.idDocument || null,
+      phone: parsed.data.phone,
+      email: parsed.data.email || null,
+      addressStreet: parsed.data.addressStreet || null,
+      addressPostalCode: parsed.data.addressPostalCode || null,
+      addressCity: parsed.data.addressCity || null,
+      addressProvince: parsed.data.addressProvince || null,
+      guardianName: guardianEnabled ? parsed.data.guardianName || null : null,
+      guardianRelationship: guardianEnabled ? parsed.data.guardianRelationship || null : null,
+      guardianIdDocument: guardianEnabled ? parsed.data.guardianIdDocument || null : null,
+      fiscalName: parsed.data.fiscalName || null,
+      taxId: parsed.data.taxId || null,
+      fiscalAddress: parsed.data.fiscalAddress || null,
+      referredByProvider: parsed.data.referredByProvider || null,
+      status: PatientStatus.NEW_LEAD,
+      source: parsed.data.source,
+      preferredChannel: ConversationChannel.WHATSAPP,
+      treatmentNeed: parsed.data.treatmentNeed,
+      estimatedValue: parsed.data.estimatedValue * 100
+    }
+  });
+
+  await prisma.consent.create({
+    data: {
+      tenantId: tenant.id,
+      patientId: patient.id,
+      kind: ConsentKind.DATA_PROCESSING,
+      granted: parsed.data.consentDataProcessing,
+      grantedAt: parsed.data.consentDataProcessing ? new Date() : null,
+      source: "manual"
+    }
+  });
+  await prisma.consent.create({
+    data: {
+      tenantId: tenant.id,
+      patientId: patient.id,
+      kind: ConsentKind.MARKETING,
+      granted: parsed.data.consentMarketing,
+      grantedAt: parsed.data.consentMarketing ? new Date() : null,
+      source: "manual"
+    }
+  });
+
+  await audit(tenant.id, user.id, "patient.created", "Patient", patient.id);
+  return patient;
+}
+
+export async function createPatientAction(formData: FormData) {
   try {
-    const patient = await prisma.patient.create({
-      data: {
-        tenantId: tenant.id,
-        primaryLocation: parsed.data.primaryLocation,
-        name: parsed.data.name,
-        phone: parsed.data.phone,
-        email: parsed.data.email || null,
-        fiscalName: parsed.data.fiscalName || null,
-        taxId: parsed.data.taxId || null,
-        fiscalAddress: parsed.data.fiscalAddress || null,
-        status: PatientStatus.NEW_LEAD,
-        source: parsed.data.source,
-        preferredChannel: ConversationChannel.WHATSAPP,
-        treatmentNeed: parsed.data.treatmentNeed,
-        estimatedValue: parsed.data.estimatedValue * 100
-      }
-    });
-
-    await prisma.consent.create({
-      data: {
-        tenantId: tenant.id,
-        patientId: patient.id,
-        kind: ConsentKind.DATA_PROCESSING,
-        granted: false,
-        source: "manual"
-      }
-    });
-
-    await audit(tenant.id, user.id, "patient.created", "Patient", patient.id);
+    await createPatientRecord(formData);
   } catch (error) {
     console.error("createPatientAction failed", error);
     backTo("patients", { error: "No se pudo crear el paciente. Telefono duplicado?" });
   }
 
   succeed("patients", "Paciente creado correctamente.");
+}
+
+export async function createPatientAndScheduleAction(formData: FormData) {
+  let patientId: string;
+  try {
+    const patient = await createPatientRecord(formData);
+    patientId = patient.id;
+  } catch (error) {
+    console.error("createPatientAndScheduleAction failed", error);
+    backTo("patients", { error: "No se pudo crear el paciente. Telefono duplicado?" });
+  }
+
+  revalidatePath("/");
+  redirect(`/?view=calendar&patient=${patientId!}#new-appointment`);
 }
 
 export async function toggleConsentAction(formData: FormData) {

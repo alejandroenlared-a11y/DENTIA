@@ -6,6 +6,7 @@ import {
   InvoiceDocumentType,
   InvoiceReceiverType,
   PatientStatus,
+  PatientSex,
   PatientIntakeStatus,
   TaskPriority
 } from "@prisma/client";
@@ -13,18 +14,36 @@ import { z } from "zod";
 
 const requiredString = z.string().trim().min(1, "es obligatorio");
 const clinicLocationSchema = z.enum(["MURCIA", "ELCHE"]).default("MURCIA");
+const checkboxSchema = z
+  .string()
+  .optional()
+  .transform(value => value === "on");
 
 export const patientInputSchema = z.object({
   primaryLocation: clinicLocationSchema,
   name: requiredString,
+  lastName: z.string().trim().optional(),
+  sex: z.nativeEnum(PatientSex).optional().or(z.literal("")),
+  birthDate: z.string().trim().optional(),
+  idDocument: z.string().trim().optional(),
   phone: requiredString,
   email: z.string().trim().email("no es valido").optional().or(z.literal("")),
+  addressStreet: z.string().trim().optional(),
+  addressPostalCode: z.string().trim().optional(),
+  addressCity: z.string().trim().optional(),
+  addressProvince: z.string().trim().optional(),
+  guardianName: z.string().trim().optional(),
+  guardianRelationship: z.string().trim().optional(),
+  guardianIdDocument: z.string().trim().optional(),
   fiscalName: z.string().trim().optional(),
   taxId: z.string().trim().optional(),
   fiscalAddress: z.string().trim().optional(),
+  referredByProvider: z.string().trim().optional(),
   treatmentNeed: z.string().trim().optional(),
   source: z.string().trim().optional(),
-  estimatedValue: z.coerce.number().int("debe ser un numero entero").min(0, "no puede ser negativo").default(0)
+  estimatedValue: z.coerce.number().int("debe ser un numero entero").min(0, "no puede ser negativo").default(0),
+  consentDataProcessing: checkboxSchema,
+  consentMarketing: checkboxSchema
 });
 
 export const patientStatusSchema = z.object({

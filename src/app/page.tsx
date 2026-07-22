@@ -2,11 +2,14 @@ import { Fragment } from "react";
 import Link from "next/link";
 import { AppointmentStatus, CalendarEventType, ConversationChannel, ElectronicInvoiceStatus, PatientIntakeStatus, PatientStatus, TaskPriority } from "@prisma/client";
 import {
+  ConsentCheckbox,
   EmptyState,
   Field,
+  FormSection,
   MiniPipeline,
   PanelHead,
   Pill,
+  Select,
   TextArea,
   Tile,
   ViewHead,
@@ -20,6 +23,7 @@ import {
   createCalendarEventAction,
   createInvoiceAction,
   createPatientAction,
+  createPatientAndScheduleAction,
   createTaskFromConversationAction,
   createTaskFromPatientIntakeAction,
   createTaskAction,
@@ -111,6 +115,7 @@ function renderView(
           weekOffset={options.weekOffset ?? 0}
           monthOffset={options.monthOffset ?? 0}
           mode={options.calendarMode ?? "week"}
+          preselectedPatientId={options.selectedPatientId}
         />
       );
     case "inbox":
@@ -278,12 +283,14 @@ function CalendarView({
   data,
   weekOffset,
   monthOffset,
-  mode
+  mode,
+  preselectedPatientId
 }: {
   data: Awaited<ReturnType<typeof getDashboardData>>;
   weekOffset: number;
   monthOffset: number;
   mode: "week" | "month";
+  preselectedPatientId?: string;
 }) {
   const hours = Array.from({ length: CLINIC_CLOSE_HOUR - CLINIC_OPEN_HOUR }, (_, index) =>
     String(CLINIC_OPEN_HOUR + index).padStart(2, "0")
@@ -451,7 +458,7 @@ function CalendarView({
           )}
         </div>
       </section>
-      <AppointmentForm data={data} />
+      <AppointmentForm data={data} preselectedPatientId={preselectedPatientId} />
       <EventForm data={data} />
     </>
   );
@@ -2645,7 +2652,13 @@ function AgendaCard({ data, compact = false }: { data: Awaited<ReturnType<typeof
   );
 }
 
-function AppointmentForm({ data }: { data: Awaited<ReturnType<typeof getDashboardData>> }) {
+function AppointmentForm({
+  data,
+  preselectedPatientId
+}: {
+  data: Awaited<ReturnType<typeof getDashboardData>>;
+  preselectedPatientId?: string;
+}) {
   const calendarHref = `/?view=calendar&site=${locationSlug(data.activeLocation)}`;
   if (data.patients.length === 0) {
     return (
@@ -2685,7 +2698,7 @@ function AppointmentForm({ data }: { data: Awaited<ReturnType<typeof getDashboar
         </header>
         <form action={createAppointmentAction} className="calendar-drawer-body form-grid">
           <input type="hidden" name="location" value={data.activeLocation} />
-          <label className="field"><span>Paciente</span><select name="patientId" required>{data.patients.map(p => <option value={p.id} key={p.id}>{p.name}</option>)}</select></label>
+          <label className="field"><span>Paciente</span><select name="patientId" required defaultValue={preselectedPatientId ?? data.patients[0]?.id}>{data.patients.map(p => <option value={p.id} key={p.id}>{p.name}</option>)}</select></label>
           <label className="field"><span>Tratamiento</span><select name="treatmentId">{data.treatments.map(t => <option value={t.id} key={t.id}>{t.name}</option>)}</select></label>
           <input type="hidden" name="providerId" value={data.providers[0]?.id ?? ""} />
           <input type="hidden" name="operatoryId" value={data.operatories[0]?.id ?? ""} />
@@ -2708,23 +2721,101 @@ function AppointmentForm({ data }: { data: Awaited<ReturnType<typeof getDashboar
   );
 }
 
+const PATIENT_SEX_OPTIONS = [
+  { value: "FEMALE", label: "Mujer" },
+  { value: "MALE", label: "Hombre" },
+  { value: "OTHER", label: "Otro" }
+];
+
+const PATIENT_SOURCE_OPTIONS = [
+  { value: "WhatsApp", label: "WhatsApp" },
+  { value: "Llamada", label: "Llamada telefonica" },
+  { value: "Publicidad Online", label: "Publicidad Online" },
+  { value: "Recomendacion", label: "Recomendacion" },
+  { value: "Web", label: "Web" },
+  { value: "Presencial", label: "Presencial" }
+];
+
 function PatientForm({ activeLocation }: { activeLocation: Awaited<ReturnType<typeof getDashboardData>>["activeLocation"] }) {
+  const cancelHref = `/?view=patients&site=${locationSlug(activeLocation)}`;
   return (
-    <section id="new-patient" className="card pad form-card">
-      <h2>Nuevo paciente</h2>
-      <form action={createPatientAction} className="form-grid two">
-        <input type="hidden" name="primaryLocation" value={activeLocation} />
-        <Field label="Nombre" name="name" required />
-        <Field label="Telefono" name="phone" required />
-        <Field label="Email" name="email" type="email" />
-        <Field label="Nombre fiscal" name="fiscalName" />
-        <Field label="NIF/CIF" name="taxId" />
-        <Field label="Direccion fiscal" name="fiscalAddress" />
-        <Field label="Necesidad" name="treatmentNeed" defaultValue="Revision dental" />
-        <Field label="Fuente" name="source" defaultValue="WhatsApp" />
-        <Field label="Valor estimado EUR" name="estimatedValue" type="number" defaultValue="350" />
-        <CancelCreateLink href={`/?view=patients&site=${locationSlug(activeLocation)}`}>Cancelar</CancelCreateLink>
-        <button className="button primary" type="submit">Crear paciente</button>
+    <section id="new-patient" className="card pad form-card patient-intake-form">
+      <h2>Alta completa de paciente</h2>
+      <form action={createPatientAction}>
+        <FormSection icon="users" title="Identificacion del Paciente">
+          <Field label="Nombre" name="name" required />
+          <Field label="Apellidos" name="lastName" />
+          <Select label="Sexo" name="sex" placeholder="Seleccionar..." options={PATIENT_SEX_OPTIONS} />
+          <Field label="Fecha de nacimiento" name="birthDate" type="date" />
+          <Field label="DNI / NIE / Pasaporte" name="idDocument" />
+        </FormSection>
+
+        <FormSection icon="phone" title="Informacion de Contacto">
+          <Field label="Telefono movil" name="phone" required />
+          <Field label="Correo electronico" name="email" type="email" />
+          <TextArea label="Direccion completa" name="addressStreet" hint="Calle, numero, piso, puerta..." />
+          <Field label="Codigo postal" name="addressPostalCode" />
+          <Field label="Localidad" name="addressCity" />
+          <Field label="Provincia" name="addressProvince" />
+        </FormSection>
+
+        <FormSection
+          icon="team"
+          title="Responsable Legal (solo menores)"
+          toggle={
+            <label className="section-toggle">
+              <input type="checkbox" name="guardianEnabled" defaultChecked />
+              <span>Habilitar seccion</span>
+            </label>
+          }
+        >
+          <Field label="Nombre completo responsable" name="guardianName" />
+          <Field label="Parentesco" name="guardianRelationship" />
+          <Field label="DNI responsable" name="guardianIdDocument" />
+        </FormSection>
+
+        <FormSection icon="settings" title="Datos Administrativos">
+          <input type="hidden" name="primaryLocation" value={activeLocation} />
+          <Select
+            label="Sede asignada"
+            name="primaryLocationLabel"
+            defaultValue={activeLocation}
+            options={[
+              { value: "MURCIA", label: "Murcia" },
+              { value: "ELCHE", label: "Elche" }
+            ]}
+            disabled
+          />
+          <Select label="Origen del paciente" name="source" defaultValue="WhatsApp" options={PATIENT_SOURCE_OPTIONS} />
+          <Field label="Referidor (profesional)" name="referredByProvider" />
+        </FormSection>
+
+        <section className="form-section">
+          <header className="form-section-head">
+            <div className="form-section-title">
+              <Icon name="shieldCheck" />
+              <h3>Consentimientos y Legal</h3>
+            </div>
+          </header>
+          <div className="consent-list">
+            <ConsentCheckbox
+              name="consentDataProcessing"
+              title="Proteccion de Datos (LOPD/GDPR)"
+              description="El paciente ha sido informado y acepta el tratamiento de sus datos personales con fines clinicos y administrativos."
+            />
+            <ConsentCheckbox
+              name="consentMarketing"
+              title="Comunicaciones Comerciales (Marketing)"
+              description="Autoriza el envio de recordatorios de citas, promociones y boletines informativos via Email/SMS."
+            />
+          </div>
+        </section>
+
+        <footer className="patient-intake-foot">
+          <CancelCreateLink href={cancelHref}>Cancelar</CancelCreateLink>
+          <button className="button" type="submit">Guardar</button>
+          <button className="button primary" type="submit" formAction={createPatientAndScheduleAction}>Guardar y crear cita</button>
+        </footer>
       </form>
     </section>
   );

@@ -23,6 +23,12 @@ enum PatientStatus {
   URGENT
 }
 
+enum PatientSex {
+  MALE
+  FEMALE
+  OTHER
+}
+
 enum PatientIntakeStatus {
   CAPTURED
   LINKED
@@ -244,24 +250,36 @@ model Session {
 }
 
 model Patient {
-  id               String               @id @default(cuid())
-  tenantId         String
-  primaryLocation  ClinicLocation        @default(MURCIA)
-  name             String
-  phone            String
-  email            String?
-  fiscalName       String?
-  taxId            String?
-  fiscalAddress    String?
-  status           PatientStatus        @default(NEW_LEAD)
-  source           String?
-  preferredChannel ConversationChannel?
-  treatmentNeed    String?
-  estimatedValue   Int                  @default(0)
-  lastVisitAt      DateTime?
-  notes            String?
-  createdAt        DateTime             @default(now())
-  updatedAt        DateTime             @updatedAt
+  id                   String               @id @default(cuid())
+  tenantId             String
+  primaryLocation      ClinicLocation       @default(MURCIA)
+  name                 String
+  lastName             String?
+  sex                  PatientSex?
+  birthDate            DateTime?
+  idDocument           String?
+  phone                String
+  email                String?
+  addressStreet        String?
+  addressPostalCode    String?
+  addressCity          String?
+  addressProvince      String?
+  guardianName         String?
+  guardianRelationship String?
+  guardianIdDocument   String?
+  fiscalName           String?
+  taxId                String?
+  fiscalAddress        String?
+  referredByProvider   String?
+  status               PatientStatus        @default(NEW_LEAD)
+  source               String?
+  preferredChannel     ConversationChannel?
+  treatmentNeed        String?
+  estimatedValue       Int                  @default(0)
+  lastVisitAt          DateTime?
+  notes                String?
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
 
   tenant        Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   appointments  Appointment[]
@@ -335,7 +353,7 @@ model Treatment {
 model Appointment {
   id              String               @id @default(cuid())
   tenantId        String
-  location        ClinicLocation        @default(MURCIA)
+  location        ClinicLocation       @default(MURCIA)
   patientId       String
   treatmentId     String?
   providerId      String?
@@ -370,7 +388,7 @@ enum CalendarEventType {
 model CalendarEvent {
   id              String            @id @default(cuid())
   tenantId        String
-  location        ClinicLocation     @default(MURCIA)
+  location        ClinicLocation    @default(MURCIA)
   providerId      String?
   operatoryId     String?
   title           String

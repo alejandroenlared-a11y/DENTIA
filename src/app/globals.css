@@ -19,6 +19,96 @@ a {
   padding-top: 14px;
 }
 
+.patient-intake-form .form-section {
+  margin-bottom: 18px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.patient-intake-form .form-section:last-of-type {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.form-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.form-section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.form-section-title svg {
+  width: 16px;
+  height: 16px;
+  color: var(--primary);
+}
+
+.form-section-title h3 {
+  font-size: 13px;
+  font-weight: 800;
+  margin: 0;
+}
+
+.section-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.consent-list {
+  display: grid;
+  gap: 10px;
+}
+
+.consent-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  background: var(--surface-soft);
+}
+
+.consent-row input {
+  margin-top: 3px;
+}
+
+.consent-row span {
+  display: grid;
+  gap: 2px;
+}
+
+.consent-row strong {
+  font-size: 12px;
+}
+
+.consent-row small {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 15px;
+}
+
+.patient-intake-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
 .notice {
   display: flex;
   align-items: center;

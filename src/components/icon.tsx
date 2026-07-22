@@ -24,6 +24,7 @@ import {
   Radio,
   Search,
   Settings,
+  ShieldCheck,
   SmilePlus,
   Sparkles,
   Stethoscope,
@@ -64,7 +65,8 @@ const icons = {
   archive: Archive,
   building: Building2,
   radio: Radio,
-  file: FileText
+  file: FileText,
+  shieldCheck: ShieldCheck
 } satisfies Record<string, LucideIcon>;
 
 export type IconName = keyof typeof icons;
