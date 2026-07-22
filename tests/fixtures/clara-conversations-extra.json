@@ -439,7 +439,7 @@
     "title": "Tras cita normal confirmada no promete llamada de recepcion",
     "messages": ["quiero cita para blanqueamiento", "si", "Sara Ruiz Moreno", "654718663", "sara@example.com", "Elche", "viernes a las 17:30", "vale gracias"],
     "criteria": [
-      { "type": "replyIncludes", "value": "Todo listo", "critical": true },
+      { "type": "replyIncludes", "value": "Gracias a ti", "critical": true },
       { "type": "transcriptExcludes", "value": "te llamamos", "critical": true },
       { "type": "transcriptExcludes", "value": "te llamara recepcion", "critical": true },
       { "type": "stateTruthy", "field": "ready", "critical": true }

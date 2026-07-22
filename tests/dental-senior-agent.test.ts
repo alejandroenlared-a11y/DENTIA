@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   buildDentalSummary,
   initialDentalAgentState,
-  runDentalSeniorTurn
+  runDentalSeniorTurn,
+  type DentalAgentState
 } from "@/lib/agent/dental-senior-agent";
 
 describe("runDentalSeniorTurn", () => {
@@ -468,6 +469,28 @@ describe("runDentalSeniorTurn", () => {
     // violando "una pregunta, una respuesta".
     const turn = runDentalSeniorTurn(initialDentalAgentState, "Me duele una muela");
     expect(turn.state.missingClinicalData.length).toBeLessThanOrEqual(1);
+  });
+
+  it("thanks the patient distinctly instead of repeating the same closing after a booking is confirmed", () => {
+    // Bug real (produccion): tras "perfecto" (que ya cerro con "Aqui sigo si
+    // necesitas algo mas..."), el paciente dijo "gracias" y pickVariant hasheo
+    // al MISMO texto otra vez, mandando el mismo cierre dos veces seguidas.
+    const readyState: DentalAgentState = {
+      ...initialDentalAgentState,
+      intent: "prosthetics",
+      intentCode: "PROTESIS_CORONA_DESCEMENTADA",
+      treatmentNeed: "Corona / prótesis fija",
+      consent: true,
+      name: "Alex Test",
+      phone: "611222333",
+      email: "alex@example.com",
+      location: "Elche - Altabix",
+      availability: "viernes, 24/07, 10:45",
+      ready: true
+    };
+    const turn = runDentalSeniorTurn(readyState, "gracias");
+    expect(turn.reply).toContain("Gracias a ti");
+    expect(turn.reply).not.toContain("Aquí sigo");
   });
 
   it("still asks the general alarm safety-screen question when a pain intent narrows to caries_restoration", () => {

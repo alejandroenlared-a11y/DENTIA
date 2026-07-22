@@ -592,6 +592,15 @@ function buildDentalReply(state: DentalAgentState, previous: DentalAgentState, l
     // La reserva ya se comunico en el turno anterior: cerrar con naturalidad
     // en vez de repetir el mismo mensaje de confirmación.
     if (previous.ready && !isNewIntent) {
+      // Bug real (produccion): "perfecto" y luego "gracias" cayeron en el
+      // mismo hash de pickVariant y Clara envio el mismo cierre ("Aquí sigo
+      // si necesitas algo mas...") dos veces seguidas. Un "gracias" suelto
+      // tras la reserva ya lista es un cierre de conversacion, no otra
+      // confirmacion mas: responde con un agradecimiento distinto y no
+      // vuelve a ofrecer nada.
+      if (/^(gracias|muchas gracias|ok gracias|vale gracias)[!.? ]*$/.test(normalize(latestPatientText).trim())) {
+        return `Gracias a ti${first ? `, ${first}` : ""}. Nos vemos pronto.`;
+      }
       return pickVariant(
         [
           `Todo listo${first ? `, ${first}` : ""}. Si necesitas cambiar algo de la cita, dimelo por aquí.`,
