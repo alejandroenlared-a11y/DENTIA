@@ -45,7 +45,7 @@ export function WhatsAppDemoChat({
       id: crypto.randomUUID(),
       from: "assistant",
       text: assistantEnabled
-        ? `Hola, soy ${assistantName}, recepcionista IA de ${clinicName}. Puedes contarme que necesitas y te oriento para cita, presupuesto o urgencia.`
+        ? `Hola, soy ${assistantName}, recepcionista IA de ${clinicName}. Puedes contarme qué necesitas y te oriento para cita, presupuesto o urgencia.`
         : `Hola, ahora mismo el asistente esta pausado. Deja tu mensaje y recepcion lo revisara.`,
       time: new Intl.DateTimeFormat("es-ES", { hour: "2-digit", minute: "2-digit" }).format(new Date())
     }

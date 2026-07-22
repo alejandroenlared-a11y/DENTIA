@@ -727,7 +727,7 @@ describe("runDentalAgentTurn", () => {
     });
 
     expect(result.runtime).toBe("gemini");
-    expect(result.reply).toBe("Hola.\n\nPara poder orientarte, cuentame que necesitas o que te preocupa.");
+    expect(result.reply).toBe("Hola.\n\nPara poder orientarte, cuentame qué necesitas o qué te preocupa.");
     expect(result.reply.toLowerCase()).not.toContain("soy clara");
     expect(result.reply.toLowerCase()).not.toContain("inteligencia artificial");
   });

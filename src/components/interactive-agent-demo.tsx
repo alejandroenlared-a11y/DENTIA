@@ -32,7 +32,7 @@ const starterMessages: ChatMessage[] = [
     id: "assistant-start",
     role: "assistant",
     body:
-      "Hola, soy Clara, recepcionista IA de Clinica Dental Murcia-Elche. Cuentame que notas: dolor, sensibilidad, encias, pieza rota, implante, ortodoncia o estetica. Te hare unas preguntas para priorizarte, orientar el presupuesto y preparar una cita si encaja."
+      "Hola, soy Clara, recepcionista IA de Clinica Dental Murcia-Elche. Cuentame qué notas: dolor, sensibilidad, encias, pieza rota, implante, ortodoncia o estetica. Te hare unas preguntas para priorizarte, orientar el presupuesto y preparar una cita si encaja."
   }
 ];
 

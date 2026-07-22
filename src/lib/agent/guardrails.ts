@@ -25,7 +25,7 @@ export function preparePatientReply(
     return formatReplyForChat(localReply);
   }
   if (!state.intent && isSimpleGreeting(latestPatientMessage)) {
-    return formatReplyForChat("Hola.\n\nPara poder orientarte, cuentame que necesitas o que te preocupa.");
+    return formatReplyForChat("Hola.\n\nPara poder orientarte, cuentame qué necesitas o qué te preocupa.");
   }
   if (asksClinicAddress(latestPatientMessage) && asksGenericSymptomMenu(aiReply)) {
     return formatReplyForChat(localReply);

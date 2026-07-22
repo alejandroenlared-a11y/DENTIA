@@ -630,7 +630,7 @@ function buildDentalReply(state: DentalAgentState, previous: DentalAgentState, l
 function buildCourtesyReply(latestPatientText: string) {
   const normalized = normalize(latestPatientText).trim();
   if (/^(hola|buenas|buenos dias|buenas tardes|buenas noches)[!.? ]*$/.test(normalized)) {
-    return "Hola.\n\nCuentame que necesitas y te oriento.";
+    return "Hola.\n\nCuentame qué necesitas y te oriento.";
   }
   if (/^(gracias|muchas gracias|ok gracias|vale gracias)[!.? ]*$/.test(normalized)) {
     return "A ti. Si necesitas algo mas, aquí estoy.";
@@ -732,7 +732,7 @@ function buildClinicInfoReply(latestPatientText: string) {
     if (mentionsPrice(latestPatientText)) {
       return `${insuranceReply}\n\nSobre el precio: dime el tratamiento (implante, ortodoncia, blanqueamiento...) y te doy un rango orientativo.`;
     }
-    return `${insuranceReply}\n\nSi quieres, dime que necesitas y te orientamos.`;
+    return `${insuranceReply}\n\nSi quieres, dime qué necesitas y te orientamos.`;
   }
   if (
     /(pago con tarjeta|tarjeta bancaria|bizum|forma de pago|formas de pago|financiar|financiacion)/.test(normalized) &&

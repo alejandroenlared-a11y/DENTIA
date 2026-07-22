@@ -31,7 +31,7 @@ export function WidgetChat({ slug, clinicName, assistantName, assistantEnabled }
     {
       from: "assistant",
       text: assistantEnabled
-        ? `Hola, soy ${assistantName}, recepcionista IA de ${clinicName}. Puedes contarme que necesitas y te oriento para cita, presupuesto o urgencia.`
+        ? `Hola, soy ${assistantName}, recepcionista IA de ${clinicName}. Puedes contarme qué necesitas y te oriento para cita, presupuesto o urgencia.`
         : `Hola, ahora mismo el asistente esta pausado. Deja tu mensaje y recepcion lo revisara.`
     }
   ]);
