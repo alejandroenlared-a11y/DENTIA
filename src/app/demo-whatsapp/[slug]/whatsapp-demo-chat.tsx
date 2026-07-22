@@ -66,6 +66,14 @@ export function WhatsAppDemoChat({
   useEffect(() => {
     const root = document.documentElement;
 
+    // position:fixed + teclado movil tiene bugs conocidos en Safari (el
+    // elemento puede desplazarse/recortarse al abrir el teclado). Con el
+    // shell en flujo normal, bloqueamos el scroll de html/body mientras
+    // este chat esta montado para que no haya nada que el navegador pueda
+    // desplazar por su cuenta.
+    root.classList.add("wa-lock-scroll");
+    document.body.classList.add("wa-lock-scroll");
+
     // El shell fija su altura real al visualViewport (no a 100dvh) para que
     // el teclado movil encoja el contenedor entero en vez de estirarlo con
     // padding: asi la cabecera (nombre de Clara) nunca queda empujada fuera
@@ -89,6 +97,8 @@ export function WhatsAppDemoChat({
 
     return () => {
       root.style.removeProperty("--wa-viewport-height");
+      root.classList.remove("wa-lock-scroll");
+      document.body.classList.remove("wa-lock-scroll");
       window.visualViewport?.removeEventListener("resize", syncViewportHeight);
       window.visualViewport?.removeEventListener("scroll", syncViewportHeight);
       window.removeEventListener("resize", syncViewportHeight);

@@ -951,9 +951,20 @@ a {
     font-size: 16px !important;
   }
 
+  /* position:fixed + teclado movil es una combinacion con bugs conocidos en
+     Safari (el elemento fixed puede desplazarse/recortarse al abrir el
+     teclado). En su lugar, el shell vive en flujo normal dentro de
+     html/body ya bloqueados (.wa-lock-scroll) mientras el chat esta
+     montado, y su altura la fija JS via --wa-viewport-height. */
+  html.wa-lock-scroll,
+  body.wa-lock-scroll {
+    height: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+
   .wa-demo-shell {
-    position: fixed;
-    inset: 0;
+    position: relative;
     height: var(--wa-viewport-height, 100dvh);
     min-height: 0;
     overflow: hidden;
