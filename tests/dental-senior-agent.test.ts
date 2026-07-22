@@ -449,6 +449,15 @@ describe("runDentalSeniorTurn", () => {
     expect(consented.reply.toLowerCase()).toContain("como te llamas");
   });
 
+  it("never surfaces more than one pending clinical question at a time", () => {
+    // Bug real (produccion): "me duele una muela" dispara a la vez la
+    // pregunta frio/calor/morder Y la de desde-cuando/intensidad, y el LLM
+    // las hacia ambas en el mismo turno (dos burbujas, dos preguntas),
+    // violando "una pregunta, una respuesta".
+    const turn = runDentalSeniorTurn(initialDentalAgentState, "Me duele una muela");
+    expect(turn.state.missingClinicalData.length).toBeLessThanOrEqual(1);
+  });
+
   it("captures name and phone from a single bare reply", () => {
     const first = runDentalSeniorTurn(
       initialDentalAgentState,

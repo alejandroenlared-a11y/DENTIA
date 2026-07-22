@@ -1263,7 +1263,11 @@ function getMissingClinicalData(intent: DentalIntentId | undefined, signals: str
   if (intent === "implant_price" && !signals.includes("pieza ausente")) {
     missing.push("La pieza ya falta o todavia hay que extraerla?");
   }
-  return missing.slice(0, 2);
+  // Bug real (produccion): con dos condiciones cumplidas a la vez (p.ej.
+  // "me duele una muela" dispara frio/calor Y desde-cuando/intensidad), el
+  // array llegaba con 2 preguntas y el LLM las hacia ambas en el mismo
+  // turno, violando "una pregunta, una respuesta". Nunca mas de una a la vez.
+  return missing.slice(0, 1);
 }
 
 function getConfidence(intent: DentalIntentId | undefined, signals: string[], redFlags: string[]) {
