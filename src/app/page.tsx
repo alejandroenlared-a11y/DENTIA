@@ -175,10 +175,10 @@ function HomeView({ data }: { data: Awaited<ReturnType<typeof getDashboardData>>
             <Icon name="calendar" />
             Nuevo evento
           </Link>
-          <Link className="button" href="/?view=patients#new-patient">
+          <a className="button" href="/?view=patients#new-patient">
             <Icon name="users" />
             Nuevo paciente
-          </Link>
+          </a>
           <Link className="button" href="/?view=treatments#new-treatment">
             <Icon name="tooth" />
             Nuevo tratamiento
@@ -868,10 +868,10 @@ function PatientsView({
           <button className="button" type="submit">Buscar</button>
           {query ? <Link className="button ghost" href="/?view=patients">Limpiar</Link> : null}
         </form>
-        <Link className="button primary" href="/?view=patients#new-patient">
+        <a className="button primary" href="/?view=patients#new-patient">
           <Icon name="plus" />
           Alta paciente
-        </Link>
+        </a>
       </section>
       {data.patients.length === 0 ? (
         <EmptyState
@@ -2621,7 +2621,7 @@ function AppointmentForm({
             <CancelCreateLink className="icon-button" href={calendarHref} ariaLabel="Cerrar">x</CancelCreateLink>
           </header>
           <div className="calendar-drawer-body">
-            <p className="empty-note">Necesitas al menos un paciente para crear citas. <Link href="/?view=patients#new-patient">Crear paciente</Link>.</p>
+            <p className="empty-note">Necesitas al menos un paciente para crear citas. <a href="/?view=patients#new-patient">Crear paciente</a>.</p>
           </div>
         </div>
       </section>
