@@ -27,6 +27,18 @@ export function preparePatientReply(
   if (!state.intent && isSimpleGreeting(latestPatientMessage)) {
     return formatReplyForChat("Hola.\n\nPara poder orientarte, cuentame qué necesitas o qué te preocupa.");
   }
+  // Bug real (produccion): con "me duele una muela y sangra" el motor local
+  // pedia bien la pregunta de seguridad pendiente (missingClinicalData), pero
+  // el LLM la salto y fue directo del diagnostico al consentimiento de
+  // datos. Si hay una pregunta clinica de seguridad pendiente y el reply no
+  // la toca, nunca se deja pasar aunque el resto del texto suene bien.
+  if (
+    !state.safetyScreened &&
+    state.missingClinicalData[0] &&
+    skipsMandatoryClinicalQuestion(aiReply, state.missingClinicalData[0])
+  ) {
+    return formatReplyForChat(localReply);
+  }
   if (asksClinicAddress(latestPatientMessage) && asksGenericSymptomMenu(aiReply)) {
     return formatReplyForChat(localReply);
   }
@@ -97,6 +109,26 @@ export function preparePatientReply(
     }
   }
   return formatReplyForChat(aiReply);
+}
+
+// Las 7 preguntas posibles de getMissingClinicalData (dental-senior-agent.ts)
+// son fijas: en vez de adivinar por regex generica, cada una tiene sus
+// palabras clave propias para detectar si el LLM realmente la formulo (con
+// sus propias palabras) o la salto por completo.
+const CLINICAL_QUESTION_KEYWORDS: Record<string, RegExp> = {
+  "El dolor aparece con frio/calor, al morder o aparece solo sin tocar la pieza?": /(frio|calor|morder|sin tocar)/,
+  "Cuando te diste el golpe y cuanto te duele del 0 al 10? Puedes abrir la boca y tragar bien?": /(golpe|abrir la boca|tragar)/,
+  "Desde cuando ocurre y que intensidad tiene del 0 al 10?": /(desde cuando|intensidad|0 al 10|del 0)/,
+  "El sangrado es leve o abundante, y ha empezado tras un golpe?": /(leve|abundante).*sangrado|sangrado.*(leve|abundante)|golpe/,
+  "Te duele, notas inflamación, sangrado o ha sido por un golpe?": /(inflamacion|sangrado|golpe)/,
+  "Hay sangrado al cepillar, mal aliento, movilidad o encia retraida?": /(cepillar|mal aliento|movilidad|encia retraida)/,
+  "La pieza ya falta o todavia hay que extraerla?": /(ya falta|extraerla|extraer)/
+};
+
+export function skipsMandatoryClinicalQuestion(reply: string, missingQuestion: string): boolean {
+  const keywordPattern = CLINICAL_QUESTION_KEYWORDS[missingQuestion];
+  if (!keywordPattern) return false;
+  return !keywordPattern.test(normalize(reply));
 }
 
 export function asksForPersonalData(reply: string): boolean {

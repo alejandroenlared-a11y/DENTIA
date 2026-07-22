@@ -80,6 +80,26 @@ describe("preparePatientReply", () => {
     );
     expect(result).toContain("respuesta local segura");
   });
+
+  it("overrides a reply that skips the pending safety-screen question and jumps ahead", () => {
+    // Bug real (produccion): "me duele una muela y sangra" generaba
+    // correctamente missingClinicalData (sangrado leve/abundante, golpe?),
+    // pero el LLM diagnosticaba gingivitis/periodontitis y saltaba directo al
+    // siguiente paso, sin preguntar nunca la de seguridad. Consent ya
+    // aceptado en el propio mensaje para que ningun otro guardrail (que
+    // exige !state.consent) enmascare el fallo de este en concreto.
+    const turn = runDentalSeniorTurn(
+      initialDentalAgentState,
+      "me duele una muela y sangra, acepto que guardeis mis datos"
+    );
+    const result = preparePatientReply(
+      "Por lo que me cuentas podria ser gingivitis o periodontitis; te lo confirmara el doctor al verte. Genial, gracias. Y tu nombre y apellidos?",
+      turn.state,
+      turn.reply,
+      "me duele una muela y sangra, acepto que guardeis mis datos"
+    );
+    expect(result).toContain("sangrado es leve o abundante");
+  });
 });
 
 describe("isBookingClosingAcknowledgment", () => {
