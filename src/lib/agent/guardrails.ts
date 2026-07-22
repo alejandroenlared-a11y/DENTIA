@@ -66,6 +66,19 @@ export function preparePatientReply(
   if (!state.ready && promisesSpecificProvider(aiReply)) {
     return formatReplyForChat(localReply);
   }
+  // Bug real (produccion): tras pre-reservar, el paciente respondio "esta
+  // bien gracias" y el LLM volvio a ofrecer huecos nuevos como si nada
+  // estuviera reservado. Con la cita ya lista, cualquier confirmacion del
+  // paciente o intento del LLM de re-ofrecer huecos se descarta a favor del
+  // cierre del motor local.
+  if (
+    state.ready &&
+    hasConcreteAvailability(state.availability) &&
+    isBookingClosingAcknowledgment(latestPatientMessage) &&
+    jumpsToBookingOptions(aiReply)
+  ) {
+    return formatReplyForChat(localReply);
+  }
   if (state.consent && state.name && state.phone) {
     if (!state.email && (asksForLocationAndAvailability(aiReply) || asksLocationOnly(aiReply) || jumpsToBookingOptions(aiReply))) {
       return formatReplyForChat(localReply);
@@ -189,6 +202,18 @@ export function asksLocationOnly(reply: string): boolean {
 export function asksOpenDateQuestion(reply: string): boolean {
   const normalized = normalize(reply);
   return /(que dias|dias u horarios|que horarios|horarios te vienen|cuando te viene|disponibilidad)/.test(normalized);
+}
+
+// Expresiones de cierre/conformidad en español (WhatsApp real: con o sin
+// tildes, con "!"/"." de mas, mayus/minus). Una vez la cita esta lista
+// (state.ready + availability concreta), cualquiera de estas debe cerrar la
+// conversacion, nunca reabrir el agendado.
+const BOOKING_CLOSING_ACKNOWLEDGMENT_PATTERN =
+  /\b(vale|ok|okay|okey|de acuerdo|esta bien|asi esta bien|todo bien|todo correcto|todo ok|todo claro|queda claro|entendido|entendida|perfecto|perfecta|genial|estupendo|guay|gracias|muchas gracias|mil gracias|te lo agradezco|me vale|me vale asi|correcto|exacto|eso es|listo|ya esta|sale|dale|conforme|sin problema|ningun problema|de 10|de diez)\b/;
+
+export function isBookingClosingAcknowledgment(message: string): boolean {
+  const normalized = normalize(message).replace(/[!¡¿?.,\s]+/g, " ").trim();
+  return BOOKING_CLOSING_ACKNOWLEDGMENT_PATTERN.test(normalized);
 }
 
 export function jumpsToBookingOptions(reply: string): boolean {

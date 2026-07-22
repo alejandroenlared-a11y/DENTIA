@@ -3,6 +3,7 @@ import { initialDentalAgentState, runDentalSeniorTurn, type DentalAgentState } f
 import {
   asksForPersonalData,
   asksGenericSymptomMenu,
+  isBookingClosingAcknowledgment,
   isSimpleGreeting,
   jumpsToBookingOptions,
   mentionsHealthCard,
@@ -64,6 +65,52 @@ describe("preparePatientReply", () => {
     const state = readyState();
     const result = preparePatientReply("Perfecto, tu pre-reserva queda anotada.", state, "respuesta local", "gracias");
     expect(result).toContain("pre-reserva queda anotada");
+  });
+
+  it("overrides a re-offer of slots when the patient already acknowledged a confirmed booking", () => {
+    // Bug real (produccion): tras pre-reservar la cita, el paciente respondio
+    // "Esta bien gracias!!" y Gemini volvio a proponer 3 huecos nuevos como
+    // si nada estuviera reservado.
+    const state = readyState();
+    const result = preparePatientReply(
+      "Te propongo estos huecos:\n\n1. jueves, 10:00\n2. viernes, 11:00\n\nResponde con 1 o 2.",
+      state,
+      "respuesta local segura",
+      "Esta bien gracias!!"
+    );
+    expect(result).toContain("respuesta local segura");
+  });
+});
+
+describe("isBookingClosingAcknowledgment", () => {
+  it("matches common Spanish acknowledgment/closing phrases", () => {
+    const phrases = [
+      "vale",
+      "ok",
+      "de acuerdo",
+      "esta bien",
+      "todo bien",
+      "todo correcto",
+      "todo ok",
+      "perfecto",
+      "genial",
+      "gracias",
+      "muchas gracias",
+      "me vale asi",
+      "correcto",
+      "listo",
+      "ya esta",
+      "sin problema"
+    ];
+    for (const phrase of phrases) {
+      expect(isBookingClosingAcknowledgment(phrase)).toBe(true);
+      expect(isBookingClosingAcknowledgment(`${phrase}!!`)).toBe(true);
+    }
+  });
+
+  it("does not match unrelated messages", () => {
+    expect(isBookingClosingAcknowledgment("me duele una muela")).toBe(false);
+    expect(isBookingClosingAcknowledgment("quiero cambiar la cita")).toBe(false);
   });
 });
 
