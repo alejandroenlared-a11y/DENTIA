@@ -370,6 +370,18 @@ describe("runDentalSeniorTurn", () => {
     expect(turn.reply.toLowerCase()).not.toContain("primera visita");
   });
 
+  it("books a routine cleaning without inventing a periodontal diagnosis", () => {
+    // Bug real (produccion): "cita para una limpieza" (sin sintomas ni
+    // dolor) caia en el guion generico de diagnostico ("podria ser
+    // mantenimiento periodontal o sarro; te lo confirmara el doctor"),
+    // inventando una causa clinica para una simple peticion de cita.
+    const turn = runDentalSeniorTurn(initialDentalAgentState, "hola. cita para una limpieza??");
+
+    expect(turn.state.intent).toBe("reactivation");
+    expect(turn.reply.toLowerCase()).not.toContain("podria ser");
+    expect(turn.reply.toLowerCase()).not.toContain("confirmara el doctor");
+  });
+
   it("keeps gum symptoms in periodontics even if the patient mentions cleaning", () => {
     const turn = runDentalSeniorTurn(
       initialDentalAgentState,

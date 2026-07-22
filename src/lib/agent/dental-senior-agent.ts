@@ -796,7 +796,13 @@ function buildIntro(state: DentalAgentState, profile: IntentProfile, latestPatie
   // mensaje "quiero presupuesto para un implante"): sin lectura de síntomas.
   const asksPriceNow = mentionsPrice(latestPatientText);
   const hasSymptoms = state.detectedSignals.some(signal => !NON_SYMPTOM_SIGNALS.has(signal));
-  if ((cameFromBudget || asksPriceNow) && !expressesPain && !hasSymptoms && !state.escalated) {
+  // Bug real (produccion): "cita para una limpieza" (sin sintomas ni dolor)
+  // caia en el guion generico de diagnostico ("podria ser mantenimiento
+  // periodontal o sarro; te lo confirmara el doctor"), inventando una causa
+  // clinica para lo que solo es una peticion administrativa de cita. Una
+  // limpieza/revision de rutina sin sintomas nunca necesita esa hipotesis.
+  const isRoutineReactivationRequest = state.intent === "reactivation" && !expressesPain && !hasSymptoms && !state.escalated;
+  if (((cameFromBudget || asksPriceNow) || isRoutineReactivationRequest) && !expressesPain && !hasSymptoms && !state.escalated) {
     if (state.intent === "cosmetic_dentistry") {
       const prefix = suitabilityAnswer ? `${suitabilityAnswer}\n\n` : "";
       return `${prefix}Tenemos varias opciones de estética dental.\n\nBlanqueamiento, carillas, composite estético y Digital Smile Design.\n\nCual te interesa mas?`;
