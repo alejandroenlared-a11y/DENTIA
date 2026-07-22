@@ -2739,9 +2739,16 @@ const PATIENT_SOURCE_OPTIONS = [
 function PatientForm({ activeLocation }: { activeLocation: Awaited<ReturnType<typeof getDashboardData>>["activeLocation"] }) {
   const cancelHref = `/?view=patients&site=${locationSlug(activeLocation)}`;
   return (
-    <section id="new-patient" className="card pad form-card patient-intake-form">
-      <h2>Alta completa de paciente</h2>
-      <form action={createPatientAction}>
+    <section id="new-patient" className="patient-modal" aria-label="Alta completa de paciente">
+      <CancelCreateLink className="patient-modal-backdrop" href={cancelHref} ariaLabel="Cerrar alta de paciente">
+        <span className="sr-only">Cerrar alta de paciente</span>
+      </CancelCreateLink>
+      <div className="patient-modal-panel">
+        <header className="patient-modal-head">
+          <h2>Alta completa de paciente</h2>
+          <CancelCreateLink className="icon-button" href={cancelHref} ariaLabel="Cerrar">x</CancelCreateLink>
+        </header>
+        <form action={createPatientAction} className="patient-modal-body patient-intake-form">
         <FormSection icon="users" title="Identificacion del Paciente">
           <Field label="Nombre" name="name" required />
           <Field label="Apellidos" name="lastName" />
@@ -2816,7 +2823,8 @@ function PatientForm({ activeLocation }: { activeLocation: Awaited<ReturnType<ty
           <button className="button" type="submit">Guardar</button>
           <button className="button primary" type="submit" formAction={createPatientAndScheduleAction}>Guardar y crear cita</button>
         </footer>
-      </form>
+        </form>
+      </div>
     </section>
   );
 }

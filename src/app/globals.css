@@ -104,9 +104,86 @@ a {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
-  margin-top: 18px;
-  padding-top: 14px;
+  margin: 18px -24px -24px;
+  padding: 14px 24px;
   border-top: 1px solid var(--line);
+  position: sticky;
+  bottom: -1px;
+  background: var(--surface);
+}
+
+.patient-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.patient-modal:target {
+  pointer-events: auto;
+  visibility: visible;
+}
+
+.patient-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  border: 0;
+  padding: 0;
+  background: rgba(15, 23, 42, .5);
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity .2s var(--ease);
+}
+
+.patient-modal:target .patient-modal-backdrop {
+  opacity: 1;
+}
+
+.patient-modal-panel {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: min(920px, calc(100vw - 32px));
+  max-height: min(880px, calc(100vh - 32px));
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: 0 30px 90px rgba(15, 23, 42, .3);
+  transform: translate(-50%, -50%) scale(.96);
+  opacity: 0;
+  transition: transform .22s var(--ease), opacity .22s var(--ease);
+  overflow: hidden;
+}
+
+.patient-modal:target .patient-modal-panel {
+  transform: translate(-50%, -50%) scale(1);
+  opacity: 1;
+}
+
+.patient-modal-head {
+  padding: 18px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  border-bottom: 1px solid var(--line-soft);
+  background: var(--surface-2);
+}
+
+.patient-modal-head h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 20px;
+}
+
+.patient-modal-body {
+  padding: 24px;
+  overflow: auto;
+  align-content: start;
 }
 
 .notice {
