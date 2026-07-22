@@ -1,3 +1,4 @@
+import type { Viewport } from "next";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { WhatsAppDemoChat } from "@/app/demo-whatsapp/[slug]/whatsapp-demo-chat";
@@ -7,6 +8,15 @@ type WhatsAppDemoPageProps = {
 };
 
 export const dynamic = "force-dynamic";
+
+// El teclado movil debe encoger el viewport real (en vez de solo
+// superponerse encima) para que la cabecera y el input nunca queden
+// empujados fuera de pantalla al escribir.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  interactiveWidget: "resizes-content"
+};
 
 export default async function WhatsAppDemoPage({ params }: WhatsAppDemoPageProps) {
   const { slug } = await params;
