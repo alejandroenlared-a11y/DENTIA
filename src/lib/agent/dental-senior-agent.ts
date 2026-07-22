@@ -943,7 +943,7 @@ function nextStep(state: DentalAgentState, latestPatientText: string) {
   return "";
 }
 
-function mentionsPrice(latestPatientText: string) {
+export function mentionsPrice(latestPatientText: string) {
   const normalized = normalize(latestPatientText);
   if (/(precio|cuanto|coste|costar|cuesta|financi|presupuesto)/.test(normalized)) {
     return true;
