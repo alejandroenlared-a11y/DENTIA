@@ -821,19 +821,30 @@ function PatientsView({
         return searchable.includes(normalizedQuery);
       })
     : data.patients;
+
+  const lastAppointmentByPatientId = new Map<string, Date>();
+  for (const appointment of data.appointments) {
+    if (appointment.status === AppointmentStatus.CANCELLED) continue;
+    const current = lastAppointmentByPatientId.get(appointment.patientId);
+    if (!current || appointment.startsAt > current) {
+      lastAppointmentByPatientId.set(appointment.patientId, appointment.startsAt);
+    }
+  }
+  const recentlyAttended = [...data.patients]
+    .sort((a, b) => {
+      const aDate = lastAppointmentByPatientId.get(a.id) ?? a.createdAt;
+      const bDate = lastAppointmentByPatientId.get(b.id) ?? b.createdAt;
+      return bDate.getTime() - aDate.getTime();
+    })
+    .slice(0, 4);
+
+  const listedPatients = normalizedQuery ? filteredPatients : recentlyAttended;
   const selectedPatient =
-    filteredPatients.find(patient => patient.id === selectedPatientId) ??
     data.patients.find(patient => patient.id === selectedPatientId) ??
-    filteredPatients[0] ??
+    listedPatients[0] ??
     data.patients[0];
+
   const activePatients = data.patients.filter(patient => patient.status === PatientStatus.ACTIVE);
-  const fiscalPending = data.patients.filter(patient => !patient.taxId || !patient.fiscalName || !patient.fiscalAddress).length;
-  const contactPending = data.patients.filter(patient => !patient.email).length;
-  const patientsWithFutureAppointment = new Set(
-    data.appointments
-      .filter(appointment => appointment.startsAt >= new Date() && appointment.status !== AppointmentStatus.CANCELLED)
-      .map(appointment => appointment.patientId)
-  );
   const openPipelineCents = data.patients
     .filter(patient => patient.status === PatientStatus.NEW_LEAD || patient.status === PatientStatus.OPEN_BUDGET)
     .reduce((sum, patient) => sum + patient.estimatedValue, 0);
@@ -842,32 +853,10 @@ function PatientsView({
     <>
       <ViewHead title="Pacientes" subtitle="Registro maestro: altas, bajas, modificaciones y ficha 360 del paciente." />
       <section className="patient-registry-hero">
-        <MiniPipeline label="Activos" value={data.patients.filter(patient => patient.status === PatientStatus.ACTIVE).length} accent="accent-green" />
+        <MiniPipeline label="Activos" value={activePatients.length} accent="accent-green" />
         <MiniPipeline label="Nuevos" value={data.patients.filter(patient => patient.status === PatientStatus.NEW_LEAD).length} accent="accent-blue" />
-        <MiniPipeline label="Presupuesto" value={data.patients.filter(patient => patient.status === PatientStatus.OPEN_BUDGET).length} accent="accent-purple" />
-        <MiniPipeline label="Baja/Inactivos" value={data.patients.filter(patient => patient.status === PatientStatus.INACTIVE).length} accent="accent-red" />
-      </section>
-      <section className="patient-command-strip" aria-label="Calidad del registro de pacientes">
-        <div>
-          <span>Ficha saneada</span>
-          <strong>{Math.max(0, data.patients.length - fiscalPending)}</strong>
-          <small>{fiscalPending} con fiscal pendiente</small>
-        </div>
-        <div>
-          <span>Con cita futura</span>
-          <strong>{patientsWithFutureAppointment.size}</strong>
-          <small>{Math.max(0, activePatients.length - patientsWithFutureAppointment.size)} activos sin agenda</small>
-        </div>
-        <div>
-          <span>Contacto incompleto</span>
-          <strong>{contactPending}</strong>
-          <small>Email o canal pendiente</small>
-        </div>
-        <div>
-          <span>Pipeline paciente</span>
-          <strong>{formatMoney(openPipelineCents)}</strong>
-          <small>leads y presupuestos abiertos</small>
-        </div>
+        <MiniPipeline label="Con cita futura" value={new Set([...lastAppointmentByPatientId.keys()].filter(id => (lastAppointmentByPatientId.get(id) ?? new Date(0)) >= new Date())).size} accent="accent-purple" />
+        <MiniPipeline label="Pipeline" value={formatMoney(openPipelineCents)} accent="accent-orange" />
       </section>
       <section className="card pad patient-registry-toolbar">
         <form className="patient-search" action="/">
@@ -892,126 +881,51 @@ function PatientsView({
         />
       ) : (
         <section className="patient-registry-layout">
-          <div className="card table-card patient-master-list">
-            <div className="patient-table-wrap">
-              <table className="data-table patient-table">
-                <thead>
-                  <tr><th>Paciente</th><th>Contacto</th><th>Estado</th><th>Proxima cita</th><th>Tratamiento</th><th>Valor</th><th>Acciones</th></tr>
-                </thead>
-                <tbody>
-                  {filteredPatients.map(patient => {
-                    const patientAppointments = appointmentsByPatientId.get(patient.id) ?? [];
-                    const nextAppointment = patientAppointments
-                      .filter(appointment => appointment.startsAt >= new Date() && appointment.status !== AppointmentStatus.CANCELLED)
-                      .sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime())[0];
-                    return (
-                      <tr key={patient.id} className={selectedPatient?.id === patient.id ? "selected-row" : undefined}>
-                        <td data-label="Paciente">
-                          <strong>{patient.name}</strong>
-                          <br />
-                          <span className="muted-text">{patient.taxId || "Fiscal pendiente"}</span>
-                        </td>
-                        <td data-label="Contacto">{patient.phone}<br /><span className="muted-text">{patient.email || "Email pendiente"}</span></td>
-                        <td data-label="Estado"><Pill tone={patientStatusTone(patient.status)}>{patientStatusLabel(patient.status)}</Pill></td>
-                        <td data-label="Proxima cita">{nextAppointment ? formatDateTime(nextAppointment.startsAt) : "Sin cita futura"}</td>
-                        <td data-label="Tratamiento">{patient.treatmentNeed || "Pendiente"}</td>
-                        <td data-label="Valor">{formatMoney(patient.estimatedValue)}</td>
-                        <td data-label="Acciones">
-                          <div className="table-actions">
-                            <Link className="button ghost" href={`/?view=patients&patient=${patient.id}${query ? `&q=${encodeURIComponent(query)}` : ""}`}>
-                              Abrir ficha
-                            </Link>
-                            {patient.status === PatientStatus.INACTIVE ? (
-                              <PatientStatusButton patientId={patient.id} status={PatientStatus.ACTIVE} label="Activar" />
-                            ) : (
-                              <PatientStatusButton patientId={patient.id} status={PatientStatus.INACTIVE} label="Baja" danger />
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-            {filteredPatients.length === 0 ? (
+          <div className="card pad patient-recent-list">
+            <PanelHead
+              icon="users"
+              title={normalizedQuery ? `Resultados (${filteredPatients.length})` : "Ultimos pacientes atendidos"}
+            />
+            {listedPatients.length === 0 ? (
               <p className="empty-note">No hay pacientes que coincidan con la busqueda.</p>
-            ) : null}
+            ) : (
+              <div className="patient-recent-rows">
+                {listedPatients.map(patient => {
+                  const patientAppointments = appointmentsByPatientId.get(patient.id) ?? [];
+                  const nextAppointment = patientAppointments
+                    .filter(appointment => appointment.startsAt >= new Date() && appointment.status !== AppointmentStatus.CANCELLED)
+                    .sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime())[0];
+                  return (
+                    <Link
+                      key={patient.id}
+                      href={`/?view=patients&patient=${patient.id}${query ? `&q=${encodeURIComponent(query)}` : ""}`}
+                      className={`patient-recent-row${selectedPatient?.id === patient.id ? " selected" : ""}`}
+                    >
+                      <div className="avatar">{getInitials(patient.name)}</div>
+                      <div className="patient-recent-row-main">
+                        <strong>{patient.name}</strong>
+                        <span>{patient.phone}{patient.email ? ` · ${patient.email}` : ""}</span>
+                      </div>
+                      <span className="patient-recent-row-visit">
+                        {nextAppointment ? formatDateTime(nextAppointment.startsAt) : "Sin cita futura"}
+                      </span>
+                      <Pill tone={patientStatusTone(patient.status)}>{patientStatusLabel(patient.status)}</Pill>
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
           </div>
           {selectedPatient ? (
             <PatientRecordPanel
               patient={selectedPatient}
               appointments={appointmentsByPatientId.get(selectedPatient.id) ?? []}
               invoices={invoicesByPatientId.get(selectedPatient.id) ?? []}
+              auditLogsByAppointmentId={appointmentLogsByAppointmentId}
             />
           ) : null}
         </section>
       )}
-      <section className="card pad appointment-history-panel">
-        <PanelHead
-          icon="calendar"
-          title="Historial de citas"
-          subtitle="Altas, modificaciones, cancelaciones y emails registrados en el SaaS."
-        />
-        {data.appointments.length === 0 ? (
-          <p className="empty-note">Todavia no hay citas registradas.</p>
-        ) : (
-          <div className="appointment-history-list">
-            {data.patients.map(patient => {
-              const patientAppointments = (appointmentsByPatientId.get(patient.id) ?? []).sort(
-                (a, b) => b.startsAt.getTime() - a.startsAt.getTime()
-              );
-              if (patientAppointments.length === 0) return null;
-
-              return (
-                <article className="appointment-history-patient" key={patient.id}>
-                  <header>
-                    <div>
-                      <strong>{patient.name}</strong>
-                      <span>{patient.phone}{patient.email ? ` · ${patient.email}` : ""}</span>
-                    </div>
-                    <Pill tone="purple">{patientAppointments.length} cita{patientAppointments.length === 1 ? "" : "s"}</Pill>
-                  </header>
-                  <div className="appointment-history-items">
-                    {patientAppointments.map(appointment => {
-                      const logs = appointmentLogsByAppointmentId.get(appointment.id) ?? [];
-                      return (
-                        <div className="appointment-history-item" key={appointment.id}>
-                          <div className="appointment-history-main">
-                            <div>
-                              <strong>{appointment.title}</strong>
-                              <span>{formatDateTime(appointment.startsAt)} · {appointment.durationMinutes} min</span>
-                              <span>
-                                {appointment.provider?.name ?? "Doctor pendiente"} · {appointment.operatory?.name ?? "Gabinete pendiente"}
-                              </span>
-                            </div>
-                            <div className="appointment-history-status">
-                              <Pill tone={appointmentStatusTone(appointment.status)}>{appointmentStatusLabel(appointment.status)}</Pill>
-                              {appointment.createdByAi ? <Pill tone="blue">Clara</Pill> : <Pill tone="green">Recepcion</Pill>}
-                            </div>
-                          </div>
-                          {logs.length > 0 ? (
-                            <div className="appointment-history-events">
-                              {logs.map(log => (
-                                <div className="appointment-history-event" key={log.id}>
-                                  <span>{formatAppointmentAuditAction(log.action, log.metadata)}</span>
-                                  <time>{formatDateTime(log.createdAt)}</time>
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <p className="empty-note small">Sin eventos de auditoria asociados a esta cita.</p>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-        )}
-      </section>
       <PatientForm activeLocation={data.activeLocation} />
     </>
   );
@@ -1020,90 +934,122 @@ function PatientsView({
 function PatientRecordPanel({
   patient,
   appointments,
-  invoices
+  invoices,
+  auditLogsByAppointmentId
 }: {
   patient: Awaited<ReturnType<typeof getDashboardData>>["patients"][number];
   appointments: Awaited<ReturnType<typeof getDashboardData>>["appointments"];
   invoices: Awaited<ReturnType<typeof getDashboardData>>["invoices"];
+  auditLogsByAppointmentId: Map<string, Awaited<ReturnType<typeof getDashboardData>>["auditLogs"]>;
 }) {
   const sortedAppointments = [...appointments].sort((a, b) => b.startsAt.getTime() - a.startsAt.getTime());
-  const activeAppointments = appointments.filter(appointment => appointment.status !== AppointmentStatus.CANCELLED);
-  const lastAppointment = sortedAppointments[0];
+  const nextAppointment = appointments
+    .filter(appointment => appointment.startsAt >= new Date() && appointment.status !== AppointmentStatus.CANCELLED)
+    .sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime())[0];
+  const lastAppointment = sortedAppointments.find(appointment => appointment.startsAt < new Date());
+  const pendingInvoices = invoices.filter(invoice => invoice.status === "SENT" || invoice.status === "OVERDUE");
+  const balanceCents = pendingInvoices.reduce((sum, invoice) => sum + invoice.amountCents, 0);
+  const paidInvoices = invoices.filter(invoice => invoice.status === "PAID");
 
   return (
     <aside className="card pad patient-record-panel">
       <header className="patient-record-header">
         <div className="avatar large">{getInitials(patient.name)}</div>
-        <div>
-          <p className="eyebrow">Ficha 360</p>
-          <h2>{patient.name}</h2>
+        <div className="patient-record-header-main">
+          <p className="eyebrow">Ficha 360 · HC-{patient.id.slice(-6).toUpperCase()}</p>
+          <h2>{patient.name}{patient.lastName ? ` ${patient.lastName}` : ""}</h2>
           <p>{patient.phone}{patient.email ? ` · ${patient.email}` : ""}</p>
         </div>
-        <Pill tone={patientStatusTone(patient.status)}>{patientStatusLabel(patient.status)}</Pill>
+        <div className="patient-record-header-flags">
+          {patient.allergies ? <Pill tone="red">Alerta: {patient.allergies}</Pill> : null}
+          <Pill tone={patientStatusTone(patient.status)}>{patientStatusLabel(patient.status)}</Pill>
+          {balanceCents > 0 ? (
+            <span className="patient-record-balance negative">Saldo pendiente {formatMoney(balanceCents)}</span>
+          ) : (
+            <span className="patient-record-balance">Saldo al dia</span>
+          )}
+        </div>
       </header>
-      <nav className="patient-record-tabs" aria-label="Secciones de ficha">
-        <span className="active">Resumen</span>
-        <span>Citas</span>
-        <span>Tratamientos</span>
-        <span>Presupuestos</span>
-        <span>Facturas</span>
-        <span>Clinico</span>
-        <span>Documentos</span>
-      </nav>
-      <div className="patient-record-grid">
-        <div><span>Ultima cita</span><strong>{lastAppointment ? formatDateTime(lastAppointment.startsAt) : "Sin citas"}</strong></div>
-        <div><span>Citas activas</span><strong>{activeAppointments.length}</strong></div>
-        <div><span>Valor estimado</span><strong>{formatMoney(patient.estimatedValue)}</strong></div>
-        <div><span>Facturas</span><strong>{invoices.length}</strong></div>
+
+      <div className="patient-record-columns">
+        <div className="patient-record-main">
+          <section className="patient-record-section highlight">
+            <h3>Proxima cita</h3>
+            {nextAppointment ? (
+              <div className="patient-record-next-appointment">
+                <strong>{formatDateTime(nextAppointment.startsAt)} · {nextAppointment.durationMinutes} min</strong>
+                <span>{nextAppointment.title}</span>
+                <span>{nextAppointment.provider?.name ?? "Doctor pendiente"} · {nextAppointment.operatory?.name ?? "Gabinete pendiente"}</span>
+              </div>
+            ) : (
+              <p className="empty-note small">Sin cita futura programada.</p>
+            )}
+          </section>
+
+          <section className="patient-record-section">
+            <h3>Tratamiento activo</h3>
+            <p className="patient-record-treatment">{patient.treatmentNeed || "Sin tratamiento asignado"}</p>
+            <span className="muted-text">Valor estimado: {formatMoney(patient.estimatedValue)}</span>
+          </section>
+
+          <section className="patient-record-section">
+            <h3>Actividad reciente</h3>
+            {sortedAppointments.length ? (
+              <div className="patient-record-list">
+                {sortedAppointments.slice(0, 5).map(appointment => {
+                  const logs = auditLogsByAppointmentId.get(appointment.id) ?? [];
+                  return (
+                    <article key={appointment.id}>
+                      <div className="patient-record-list-row">
+                        <div>
+                          <strong>{appointment.title}</strong>
+                          <span>{formatDateTime(appointment.startsAt)} · {appointment.provider?.name ?? "Doctor pendiente"}</span>
+                        </div>
+                        <Pill tone={appointmentStatusTone(appointment.status)}>{appointmentStatusLabel(appointment.status)}</Pill>
+                      </div>
+                      {logs[0] ? (
+                        <small className="muted-text">{formatAppointmentAuditAction(logs[0].action, logs[0].metadata)} · {formatDateTime(logs[0].createdAt)}</small>
+                      ) : null}
+                    </article>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="empty-note small">Sin actividad clinica registrada.</p>
+            )}
+          </section>
+        </div>
+
+        <div className="patient-record-side">
+          <section className="patient-record-section">
+            <h3>Alergias y medicacion</h3>
+            <dl>
+              <div><dt>Alergias</dt><dd>{patient.allergies || "Pendiente de registrar"}</dd></div>
+              <div><dt>Medicacion actual</dt><dd>{patient.currentMedication || "Pendiente de registrar"}</dd></div>
+            </dl>
+          </section>
+
+          <section className="patient-record-section">
+            <h3>Informacion de contacto</h3>
+            <dl>
+              <div><dt>Direccion</dt><dd>{[patient.addressStreet, patient.addressCity, patient.addressProvince].filter(Boolean).join(", ") || "Pendiente"}</dd></div>
+              <div><dt>Contacto de emergencia</dt><dd>{patient.emergencyContactName ? `${patient.emergencyContactName}${patient.emergencyContactPhone ? ` · ${patient.emergencyContactPhone}` : ""}` : "Pendiente"}</dd></div>
+              <div><dt>Ultima visita</dt><dd>{lastAppointment ? formatDateTime(lastAppointment.startsAt) : "Sin visitas previas"}</dd></div>
+              <div><dt>Fuente</dt><dd>{patient.source || "Pendiente"}</dd></div>
+            </dl>
+          </section>
+
+          <section className="patient-record-section">
+            <h3>Resumen financiero</h3>
+            <dl>
+              <div><dt>Facturado total</dt><dd>{formatMoney(invoices.reduce((sum, invoice) => sum + invoice.amountCents, 0))}</dd></div>
+              <div><dt>Cobrado</dt><dd>{formatMoney(paidInvoices.reduce((sum, invoice) => sum + invoice.amountCents, 0))}</dd></div>
+              <div><dt>Saldo restante</dt><dd className={balanceCents > 0 ? "negative" : undefined}>{formatMoney(balanceCents)}</dd></div>
+            </dl>
+            {invoices.length === 0 ? <p className="empty-note small">Sin facturas asociadas.</p> : null}
+          </section>
+        </div>
       </div>
-      <section className="patient-record-section">
-        <h3>Datos personales</h3>
-        <dl>
-          <div><dt>Nombre fiscal</dt><dd>{patient.fiscalName || "Pendiente"}</dd></div>
-          <div><dt>NIF/CIF</dt><dd>{patient.taxId || "Pendiente"}</dd></div>
-          <div><dt>Direccion fiscal</dt><dd>{patient.fiscalAddress || "Pendiente"}</dd></div>
-          <div><dt>Fuente</dt><dd>{patient.source || "Pendiente"}</dd></div>
-        </dl>
-      </section>
-      <section className="patient-record-section">
-        <h3>Vida clinica</h3>
-        <dl>
-          <div><dt>Tratamiento activo</dt><dd>{patient.treatmentNeed || "Pendiente"}</dd></div>
-          <div><dt>Alergias</dt><dd>Pendiente de registrar</dd></div>
-          <div><dt>Enfermedades</dt><dd>Pendiente de registrar</dd></div>
-          <div><dt>Medicación</dt><dd>Pendiente de registrar</dd></div>
-        </dl>
-      </section>
-      <section className="patient-record-section">
-        <h3>Actividad reciente</h3>
-        {sortedAppointments.length ? (
-          <div className="patient-record-list">
-            {sortedAppointments.slice(0, 4).map(appointment => (
-              <article key={appointment.id}>
-                <strong>{appointment.title}</strong>
-                <span>{formatDateTime(appointment.startsAt)} · {appointment.status}</span>
-              </article>
-            ))}
-          </div>
-        ) : (
-          <p className="empty-note small">Sin actividad clinica registrada.</p>
-        )}
-      </section>
-      <section className="patient-record-section">
-        <h3>Facturacion y documentos</h3>
-        {invoices.length ? (
-          <div className="patient-record-list">
-            {invoices.slice(0, 3).map(invoice => (
-              <article key={invoice.id}>
-                <strong>{invoice.number} · {formatMoney(invoice.amountCents)}</strong>
-                <span>{invoice.treatmentName} · {invoice.status}</span>
-              </article>
-            ))}
-          </div>
-        ) : (
-          <p className="empty-note small">Sin facturas ni documentos asociados.</p>
-        )}
-      </section>
     </aside>
   );
 }
@@ -2779,6 +2725,13 @@ function PatientForm({ activeLocation }: { activeLocation: Awaited<ReturnType<ty
           <Field label="Nombre completo responsable" name="guardianName" />
           <Field label="Parentesco" name="guardianRelationship" />
           <Field label="DNI responsable" name="guardianIdDocument" />
+        </FormSection>
+
+        <FormSection icon="activity" title="Informacion Clinica y Emergencia">
+          <TextArea label="Alergias" name="allergies" hint="Penicilina, latex..." />
+          <TextArea label="Medicacion actual" name="currentMedication" hint="Nombre, dosis, pauta..." />
+          <Field label="Contacto de emergencia" name="emergencyContactName" />
+          <Field label="Telefono de emergencia" name="emergencyContactPhone" />
         </FormSection>
 
         <FormSection icon="settings" title="Datos Administrativos">

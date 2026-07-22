@@ -267,6 +267,10 @@ model Patient {
   guardianName         String?
   guardianRelationship String?
   guardianIdDocument   String?
+  allergies            String?
+  currentMedication    String?
+  emergencyContactName  String?
+  emergencyContactPhone String?
   fiscalName           String?
   taxId                String?
   fiscalAddress        String?

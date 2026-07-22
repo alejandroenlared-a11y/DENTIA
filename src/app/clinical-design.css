@@ -985,8 +985,7 @@ body {
   display: block;
 }
 
-.calendar-command-strip,
-.patient-command-strip {
+.calendar-command-strip {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
@@ -994,7 +993,6 @@ body {
 }
 
 .calendar-command-strip > div,
-.patient-command-strip > div,
 .crm-conversion-panel {
   min-height: 76px;
   padding: 12px;
@@ -1007,7 +1005,6 @@ body {
 }
 
 .calendar-command-strip span,
-.patient-command-strip span,
 .crm-conversion-panel span,
 .crm-action-list span {
   color: var(--muted);
@@ -1018,7 +1015,6 @@ body {
 }
 
 .calendar-command-strip strong,
-.patient-command-strip strong,
 .crm-conversion-panel strong {
   color: var(--ink);
   font-size: 22px;
@@ -1026,7 +1022,6 @@ body {
 }
 
 .calendar-command-strip small,
-.patient-command-strip small,
 .crm-conversion-panel small,
 .crm-action-list small {
   color: var(--muted);
@@ -1924,8 +1919,9 @@ body {
 
 .patient-registry-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
   gap: 14px;
+  align-items: start;
 }
 
 .billing-grid.three {
@@ -1934,117 +1930,9 @@ body {
 
 .conversation-detail,
 .inbox-list,
-.patient-master-list,
+.patient-recent-list,
 .patient-record-panel {
   min-width: 0;
-}
-
-.patient-master-list.table-card {
-  overflow: visible;
-}
-
-.patient-table-wrap {
-  overflow: visible;
-  width: 100%;
-}
-
-.patient-table {
-  table-layout: fixed;
-  min-width: 0;
-}
-
-.patient-table th,
-.patient-table td {
-  padding-inline: 12px;
-  vertical-align: middle;
-  overflow-wrap: anywhere;
-  word-break: normal;
-}
-
-.patient-table td > strong,
-.patient-table td > span,
-.patient-table td {
-  max-width: 100%;
-}
-
-.patient-table th:nth-child(1),
-.patient-table td:nth-child(1) {
-  width: 15%;
-}
-
-.patient-table th:nth-child(2),
-.patient-table td:nth-child(2) {
-  width: 24%;
-}
-
-.patient-table th:nth-child(3),
-.patient-table td:nth-child(3) {
-  width: 12%;
-}
-
-.patient-table th:nth-child(4),
-.patient-table td:nth-child(4) {
-  width: 13%;
-}
-
-.patient-table th:nth-child(5),
-.patient-table td:nth-child(5) {
-  width: 18%;
-}
-
-.patient-table th:nth-child(6),
-.patient-table td:nth-child(6) {
-  width: 8%;
-  white-space: nowrap;
-}
-
-.patient-table th:nth-child(7),
-.patient-table td:nth-child(7) {
-  width: 10%;
-}
-
-.patient-table .table-actions {
-  display: grid;
-  gap: 7px;
-  width: 100%;
-  min-width: 0;
-}
-
-.patient-table .table-actions form,
-.patient-table .table-actions .button {
-  width: 100%;
-  max-width: 100%;
-  min-width: 0;
-  min-height: 34px;
-  padding-inline: 8px;
-  justify-content: center;
-  white-space: normal;
-}
-
-.patient-record-tabs {
-  display: flex;
-  gap: 4px;
-  max-width: 100%;
-  overflow-x: auto;
-  padding-bottom: 4px;
-  scrollbar-width: thin;
-}
-
-.patient-record-tabs span {
-  flex: 0 0 auto;
-  min-height: 28px;
-  padding: 7px 9px;
-  border-radius: var(--radius);
-  color: var(--muted);
-  font-size: 11px;
-  line-height: 14px;
-  font-weight: 800;
-  white-space: nowrap;
-}
-
-.patient-record-tabs span.active {
-  background: #e6f2fa;
-  color: var(--primary);
 }
 
 .mobile-switch {
@@ -2176,7 +2064,6 @@ body {
   .clinical-strip,
   .calendar-command-strip,
   .module-command-strip,
-  .patient-command-strip,
   .patient-registry-hero,
   .patient-intake-summary,
   .pipeline-mini,
@@ -2205,28 +2092,21 @@ body {
     grid-template-columns: 1fr;
   }
 
-  .patient-master-list > div,
   .billing-ledger > div,
   .responsive-table-wrap {
     overflow: visible !important;
   }
 
-  .patient-table,
   .invoice-table,
   .responsive-table {
     min-width: 0;
   }
 
-  .patient-table thead,
   .invoice-table thead,
   .responsive-table thead {
     display: none;
   }
 
-  .patient-table,
-  .patient-table tbody,
-  .patient-table tr,
-  .patient-table td,
   .invoice-table,
   .invoice-table tbody,
   .invoice-table tr,
@@ -2239,20 +2119,17 @@ body {
     width: 100%;
   }
 
-  .patient-table tr,
   .invoice-table tr,
   .responsive-table tr {
     padding: 10px;
     border-bottom: 1px solid var(--line);
   }
 
-  .patient-table tr:last-child,
   .invoice-table tr:last-child,
   .responsive-table tr:last-child {
     border-bottom: 0;
   }
 
-  .patient-table td,
   .invoice-table td,
   .responsive-table td {
     min-height: 0;
@@ -2264,7 +2141,6 @@ body {
     align-items: start;
   }
 
-  .patient-table td::before,
   .invoice-table td::before,
   .responsive-table td::before {
     content: attr(data-label);

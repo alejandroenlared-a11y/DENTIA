@@ -40,7 +40,7 @@ export function Tile({ icon, label, value, note, accent }: { icon: IconName; lab
   );
 }
 
-export function MiniPipeline({ label, value, accent }: { label: string; value: number; accent: string }) {
+export function MiniPipeline({ label, value, accent }: { label: string; value: React.ReactNode; accent: string }) {
   return (
     <div>
       <span>{label}</span>
