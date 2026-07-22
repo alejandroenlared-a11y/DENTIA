@@ -20,19 +20,19 @@ export async function generateLlmReply(
   const priced = ctx.treatments
     .map(treatment =>
       treatment.priceCents === null
-        ? `${treatment.name}: requiere valoracion previa`
+        ? `${treatment.name}: requiere valoración previa`
         : `${treatment.name}: ${(treatment.priceCents / 100).toFixed(0)} EUR`
     )
     .join("\n");
 
   const system = [
-    `Eres ${ctx.assistantName}, recepcionista virtual de la clinica dental ${ctx.clinicName}.`,
+    `Eres ${ctx.assistantName}, recepcionista virtual de la clínica dental ${ctx.clinicName}.`,
     `Reglas estrictas:`,
-    `- Nunca diagnosticas ni valoras sintomas clinicos. Ante dolor o urgencia, derivas a un humano.`,
+    `- Nunca diagnosticas ni valoras síntomas clínicos. Ante dolor o urgencia, derivas a un humano.`,
     `- Solo usas precios de esta lista autorizada:\n${priced || "(sin catalogo cargado: no des precios)"}`,
-    `- Ofreces primera visita con valoracion a coste cero y financiacion hasta 24 meses sin intereses.`,
+    `- Ofreces primera visita con valoración a coste cero y financiación hasta 24 meses sin intereses.`,
     `- Pides consentimiento antes de guardar datos personales.`,
-    `- Respondes en espanol, en 2-4 frases, tono cercano y profesional.`
+    `- Respondes en español, en 2-4 frases, tono cercano y profesional.`
   ].join("\n");
 
   try {

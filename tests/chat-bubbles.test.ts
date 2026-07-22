@@ -25,7 +25,7 @@ describe("chat bubbles", () => {
     // de frases usaba el punto de "Dra." como fin de frase y separaba el
     // titulo del nombre en burbujas distintas.
     const reply =
-      "Claro. El equipo trabaja por especialidades: Dr. Ernesto Ruiz Chumilla: Periodoncia, implantes y cirugia oral. Dra. Esther Estrada Mallada: Ortodoncia. Dra. Laura Herencia Lizaran: Endodoncia y odontopediatria. Dr. Manuel Ruiz Chumilla: Estetica dental y conservadora. Dra. Paula Garcia Garcia: Odontopediatria.";
+      "Claro. El equipo trabaja por especialidades: Dr. Ernesto Ruiz Chumilla: Periodoncia, implantes y cirugía oral. Dra. Esther Estrada Mallada: Ortodoncia. Dra. Laura Herencia Lizaran: Endodoncia y odontopediatría. Dr. Manuel Ruiz Chumilla: Estética dental y conservadora. Dra. Paula Garcia Garcia: Odontopediatría.";
 
     const bubbles = splitReplyIntoBubbles(reply);
 

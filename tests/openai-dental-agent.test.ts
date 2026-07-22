@@ -435,7 +435,7 @@ describe("runDentalAgentTurn", () => {
 
     expect(result.runtime).toBe("gemini");
     expect(result.state.intent).toBe("periodontics");
-    expect(result.reply).toContain("Te duele, notas inflamacion, sangrado o ha sido por un golpe?");
+    expect(result.reply).toContain("Te duele, notas inflamación, sangrado o ha sido por un golpe?");
     expect(result.reply.toLowerCase()).not.toContain("gingivitis");
     expect(result.reply.toLowerCase()).not.toContain("periodontitis");
     expect(result.reply.toLowerCase()).not.toContain("aceptas que guardemos");
