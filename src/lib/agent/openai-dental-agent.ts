@@ -405,7 +405,7 @@ function resolveProvider(): LlmProvider {
   return process.env.LLM_PROVIDER === "gemini" ? "gemini" : "openai";
 }
 
-function buildDentalSystemPrompt(extraContext?: string) {
+export function buildDentalSystemPrompt(extraContext?: string) {
   const treatments = demoKnowledge.treatments
     .map(treatment => `- ${treatment.name}: ${treatment.price}. ${treatment.about} Regla: ${treatment.rule}`)
     .join("\n");
@@ -472,7 +472,17 @@ function buildDentalSystemPrompt(extraContext?: string) {
   ].filter(Boolean).join("\n");
 }
 
-function buildDentalUserInput(history: DentalChatMessage[], latestPatientMessage: string, localState: DentalAgentState) {
+// Fase 4 del refactor de arquitectura: las mismas 4 lineas vivian duplicadas
+// palabra por palabra en buildDentalUserInput (OpenAI) y buildGeminiSystemInstruction
+// (Gemini). Una unica fuente evita que se desincronicen si se ajusta una de las dos.
+const DENTAL_OUTPUT_BASE_INSTRUCTIONS = [
+  "- Si faltan datos de cita, rellena missingClinicalData con preguntas clínicas o administrativas relevantes.",
+  "- ready debe ser true solo si ya hay datos minimos para cita: consentimiento, nombre y apellidos, teléfono, email, sede y disponibilidad concreta con día y hora/franja.",
+  "- Aunque detectes urgencia, no marques ready sin sede y disponibilidad concreta. En emergencia inmediata puedes escalar, pero no confirmes cita sin esos datos.",
+  "- Si missingClinicalData contiene una pregunta clínica, el reply debe hacer esa pregunta antes de pedir consentimiento o datos."
+];
+
+export function buildDentalUserInput(history: DentalChatMessage[], latestPatientMessage: string, localState: DentalAgentState) {
   const compactHistory = history
     .slice(-12)
     .map(message => `${message.role === "assistant" ? "Clara" : "Paciente"}: ${message.body}`)
@@ -488,23 +498,17 @@ function buildDentalUserInput(history: DentalChatMessage[], latestPatientMessage
     JSON.stringify(localState, null, 2),
     "",
     "Instrucciones de salida:",
-    "- Si faltan datos de cita, rellena missingClinicalData con preguntas clínicas o administrativas relevantes.",
-    "- ready debe ser true solo si ya hay datos minimos para cita: consentimiento, nombre y apellidos, teléfono, email, sede y disponibilidad concreta con día y hora/franja.",
-    "- Aunque detectes urgencia, no marques ready sin sede y disponibilidad concreta. En emergencia inmediata puedes escalar, pero no confirmes cita sin esos datos.",
-    "- Si missingClinicalData contiene una pregunta clínica, el reply debe hacer esa pregunta antes de pedir consentimiento o datos.",
+    ...DENTAL_OUTPUT_BASE_INSTRUCTIONS,
     "- Manten reply en español natural y cercano: 1-4 burbujas cortas separadas por doble salto de línea, una sola pregunta y cero listas. No repitas lo ya dicho."
   ].join("\n");
 }
 
-function buildGeminiSystemInstruction(clinicContext?: string) {
+export function buildGeminiSystemInstruction(clinicContext?: string) {
   return [
     buildDentalSystemPrompt(clinicContext),
     "",
     "Instrucciones de salida:",
-    "- Si faltan datos de cita, rellena missingClinicalData con preguntas clínicas o administrativas relevantes.",
-    "- ready debe ser true solo si ya hay datos minimos para cita: consentimiento, nombre y apellidos, teléfono, email, sede y disponibilidad concreta con día y hora/franja.",
-    "- Aunque detectes urgencia, no marques ready sin sede y disponibilidad concreta. En emergencia inmediata puedes escalar, pero no confirmes cita sin esos datos.",
-    "- Si missingClinicalData contiene una pregunta clínica, el reply debe hacer esa pregunta antes de pedir consentimiento o datos.",
+    ...DENTAL_OUTPUT_BASE_INSTRUCTIONS,
     "- Devuelve solo JSON conforme al esquema. El campo reply es el mensaje que vera el paciente: 1-4 burbujas cortas separadas por doble salto de línea."
   ].join("\n");
 }
