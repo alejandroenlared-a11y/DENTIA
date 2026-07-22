@@ -954,8 +954,7 @@ a {
   .wa-demo-shell {
     position: fixed;
     inset: 0;
-    height: 100vh;
-    height: 100dvh;
+    height: var(--wa-viewport-height, 100dvh);
     min-height: 0;
     overflow: hidden;
     background: #efe7d8;
@@ -995,7 +994,6 @@ a {
     border-radius: 0;
     box-shadow: none;
     box-sizing: border-box;
-    padding-bottom: min(var(--wa-keyboard-inset, 0px), 52dvh);
   }
 
   .wa-phone-speaker,

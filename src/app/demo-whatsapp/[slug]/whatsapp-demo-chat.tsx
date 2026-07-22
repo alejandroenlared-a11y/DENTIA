@@ -66,37 +66,34 @@ export function WhatsAppDemoChat({
   useEffect(() => {
     const root = document.documentElement;
 
-    function syncKeyboardInset() {
+    // El shell fija su altura real al visualViewport (no a 100dvh) para que
+    // el teclado movil encoja el contenedor entero en vez de estirarlo con
+    // padding: asi la cabecera (nombre de Clara) nunca queda empujada fuera
+    // de la pantalla al enfocar el input.
+    function syncViewportHeight() {
       const viewport = window.visualViewport;
-      const rawKeyboardInset = viewport
-        ? Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop)
-        : 0;
-      const activeElement = document.activeElement;
-      const isWritingMessage =
-        activeElement instanceof HTMLElement && activeElement.matches(".wa-input-bar input");
-      const keyboardInset = isWritingMessage && rawKeyboardInset > 80 ? rawKeyboardInset : 0;
-
-      root.style.setProperty("--wa-keyboard-inset", `${Math.round(keyboardInset)}px`);
+      const height = viewport ? viewport.height : window.innerHeight;
+      root.style.setProperty("--wa-viewport-height", `${Math.round(height)}px`);
 
       window.setTimeout(() => {
         messagesRef.current?.scrollTo({ top: messagesRef.current.scrollHeight, behavior: "auto" });
       }, 50);
     }
 
-    syncKeyboardInset();
-    window.visualViewport?.addEventListener("resize", syncKeyboardInset);
-    window.visualViewport?.addEventListener("scroll", syncKeyboardInset);
-    window.addEventListener("resize", syncKeyboardInset);
-    window.addEventListener("focusin", syncKeyboardInset);
-    window.addEventListener("focusout", syncKeyboardInset);
+    syncViewportHeight();
+    window.visualViewport?.addEventListener("resize", syncViewportHeight);
+    window.visualViewport?.addEventListener("scroll", syncViewportHeight);
+    window.addEventListener("resize", syncViewportHeight);
+    window.addEventListener("focusin", syncViewportHeight);
+    window.addEventListener("focusout", syncViewportHeight);
 
     return () => {
-      root.style.removeProperty("--wa-keyboard-inset");
-      window.visualViewport?.removeEventListener("resize", syncKeyboardInset);
-      window.visualViewport?.removeEventListener("scroll", syncKeyboardInset);
-      window.removeEventListener("resize", syncKeyboardInset);
-      window.removeEventListener("focusin", syncKeyboardInset);
-      window.removeEventListener("focusout", syncKeyboardInset);
+      root.style.removeProperty("--wa-viewport-height");
+      window.visualViewport?.removeEventListener("resize", syncViewportHeight);
+      window.visualViewport?.removeEventListener("scroll", syncViewportHeight);
+      window.removeEventListener("resize", syncViewportHeight);
+      window.removeEventListener("focusin", syncViewportHeight);
+      window.removeEventListener("focusout", syncViewportHeight);
     };
   }, []);
 
