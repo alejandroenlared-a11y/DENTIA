@@ -4,42 +4,51 @@
 // unico campo). Estos tipos no se usan todavia en runDentalSeniorTurn/preparePatientReply
 // (eso es la fase 2, el reductor) — esta fase solo define el vocabulario y la migracion.
 
-export type ConversationIntent =
-  | "greeting"
-  | "symptom"
-  | "book_appointment"
-  | "reschedule_appointment"
-  | "cancel_appointment"
-  | "ask_price"
-  | "ask_location"
-  | "ask_hours"
-  | "ask_team"
-  | "ask_treatment"
-  | "provide_data"
-  | "select_slot"
-  | "confirm"
-  | "thanks"
-  | "goodbye"
-  | "complaint"
-  | "data_erasure"
-  | "unknown";
+// Arrays de valores en runtime (no solo tipos) porque fase 4 los reusa como
+// z.enum(...) en el schema Zod/JSON que ve la IA (V2). El tipo se deriva del array
+// para que ambos no puedan desincronizarse.
+export const CONVERSATION_INTENT_VALUES = [
+  "greeting",
+  "symptom",
+  "book_appointment",
+  "reschedule_appointment",
+  "cancel_appointment",
+  "ask_price",
+  "ask_location",
+  "ask_hours",
+  "ask_team",
+  "ask_treatment",
+  "provide_data",
+  "select_slot",
+  "confirm",
+  "thanks",
+  "goodbye",
+  "complaint",
+  "data_erasure",
+  "unknown"
+] as const;
 
-export type TreatmentTopic =
-  | "hygiene"
-  | "first_visit"
-  | "implant"
-  | "whitening"
-  | "cosmetic_dentistry"
-  | "orthodontics"
-  | "endodontics"
-  | "restoration"
-  | "periodontics"
-  | "prosthetics"
-  | "wisdom_tooth"
-  | "tmj_bruxism"
-  | "trauma"
-  | "general_dentistry"
-  | "unknown";
+export type ConversationIntent = (typeof CONVERSATION_INTENT_VALUES)[number];
+
+export const TREATMENT_TOPIC_VALUES = [
+  "hygiene",
+  "first_visit",
+  "implant",
+  "whitening",
+  "cosmetic_dentistry",
+  "orthodontics",
+  "endodontics",
+  "restoration",
+  "periodontics",
+  "prosthetics",
+  "wisdom_tooth",
+  "tmj_bruxism",
+  "trauma",
+  "general_dentistry",
+  "unknown"
+] as const;
+
+export type TreatmentTopic = (typeof TREATMENT_TOPIC_VALUES)[number];
 
 export type BookingStatus =
   | "IDLE"

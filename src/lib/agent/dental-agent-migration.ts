@@ -48,6 +48,21 @@ const TREATMENT_TOPIC_BY_INTENT: Record<DentalIntentId, TreatmentTopic> = {
 const TRIAGE_LEVELS = new Set(["EMERGENCY", "URGENT_24H", "PRIORITY_72H", "ROUTINE", "ESTHETIC"]);
 const CONFIDENCE_LEVELS = new Set(["Baja", "Media", "Alta"]);
 
+// Intents cuyo motivo de fondo es agendar/valorar un tratamiento programable, no un
+// sintoma activo (ver PRICE_FORWARD_INTENTS en dental-senior-agent.ts, que ya trata
+// estos mismos intents como "sin triaje clinico, ir directo a agenda"). Antes de dar
+// consentimiento, un mensaje con uno de estos intents es una peticion de cita, no un
+// sintoma: "cita para una limpieza" nunca debe clasificarse como conversationIntent
+// "symptom".
+const BOOKING_MOTIVATED_INTENTS = new Set<DentalIntentId>([
+  "reactivation",
+  "first_visit",
+  "whitening",
+  "cosmetic_dentistry",
+  "orthodontics",
+  "implant_price"
+]);
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
@@ -127,6 +142,7 @@ function mapConversationIntent(state: DentalAgentState): ConversationIntent {
   if (!state.intent) return "unknown";
   if (state.ready) return "confirm";
   if (state.consent) return "provide_data";
+  if (BOOKING_MOTIVATED_INTENTS.has(state.intent)) return "book_appointment";
   return "symptom";
 }
 

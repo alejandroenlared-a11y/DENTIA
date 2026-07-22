@@ -68,6 +68,17 @@ describe("normalizeDentalAgentState", () => {
     expect(result.treatmentTopic).toBe("whitening");
   });
 
+  it("classifies a booking-motivated intent without consent as book_appointment, not symptom", () => {
+    const oldState = {
+      ...initialDentalAgentState,
+      intent: "reactivation"
+    };
+
+    const result = normalizeDentalAgentState(oldState);
+    expect(result.conversationIntent).toBe("book_appointment");
+    expect(result.treatmentTopic).toBe("hygiene");
+  });
+
   it("ignores non-object input instead of throwing", () => {
     expect(() => normalizeDentalAgentState(null)).not.toThrow();
     expect(() => normalizeDentalAgentState("perfecto")).not.toThrow();
