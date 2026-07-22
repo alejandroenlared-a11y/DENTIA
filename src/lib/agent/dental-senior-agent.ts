@@ -883,7 +883,10 @@ function nextStep(state: DentalAgentState, latestPatientText: string) {
   // un primer mensaje de caries simple), pero una vez resuelta la diferencial
   // (missingClinicalData ya vacio) sigue haciendo falta descartar
   // absceso/infeccion antes de pasar a diagnostico + consentimiento.
-  if (state.intent === "caries_restoration" && state.redFlags.length === 0 && !state.safetyScreened) {
+  // (periodontics no necesita este mismo parche: sus missingClinicalData de
+  // sangrado/movilidad estan atados a safetyScreened por diseno y nunca
+  // quedan vacios sin que safetyScreened ya sea true; ver getMissingClinicalData).
+  if (!state.escalated && state.intent === "caries_restoration" && state.redFlags.length === 0 && !state.safetyScreened) {
     return "Antes de nada: hay fiebre, hinchazon, pus o te cuesta abrir la boca o tragar?";
   }
   if (!state.consent) {
