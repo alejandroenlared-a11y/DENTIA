@@ -156,7 +156,8 @@ export async function processInboundMessage(
         body: pendingBookingResult.reply,
         metadata: {
           intent: "AGENDA_BOOKING_CONFIRMED",
-          pendingRebookingConfirmation: pendingBookingResult.pendingRebookingConfirmation ?? null
+          pendingRebookingConfirmation: pendingBookingResult.pendingRebookingConfirmation ?? null,
+          dentalState: pendingBookingResult.dentalState ?? null
         }
       }
     });
@@ -835,7 +836,11 @@ async function resolvePendingSchedulingChoice(
   }
 }
 
-type BookingChoiceResult = { reply: string; pendingRebookingConfirmation?: { appointmentId: string } };
+type BookingChoiceResult = {
+  reply: string;
+  pendingRebookingConfirmation?: { appointmentId: string };
+  dentalState?: DentalAgentState;
+};
 
 async function resolvePendingBookingChoice(
   tenantId: string,
@@ -920,7 +925,33 @@ async function resolvePendingBookingChoice(
     actor: { type: "ai" }
   });
 
-  return { reply: formatPendingBookingConfirmation(startsAt) };
+  // Bug real (produccion): este mensaje de confirmacion no guardaba
+  // dentalState en su metadata. En el siguiente turno ("perfecto"),
+  // extractPreviousDentalState no encontraba un dentalState valido aqui y
+  // retrocedia al mensaje ANTERIOR (el que ofrecio los huecos), con
+  // availability="" y offeredAvailabilityOptions aun llenas. Con ese estado
+  // desfasado, el motor local (y el LLM) volvian a ofrecer los mismos 3
+  // huecos como si nada se hubiera reservado. Al guardar aqui el dentalState
+  // ya actualizado (franja confirmada, ready=true, opciones vaciadas), el
+  // siguiente turno arranca sabiendo que la cita ya esta cerrada.
+  const history = await prisma.message.findMany({
+    where: { conversationId },
+    orderBy: { createdAt: "asc" },
+    take: 20
+  });
+  const previousState = extractPreviousDentalState(history);
+  const dentalState = buildConfirmedBookingState(previousState, startsAt);
+
+  return { reply: formatPendingBookingConfirmation(startsAt), dentalState };
+}
+
+export function buildConfirmedBookingState(previousState: DentalAgentState, startsAt: Date): DentalAgentState {
+  return {
+    ...previousState,
+    availability: formatFriendlyDateTime(startsAt),
+    offeredAvailabilityOptions: [],
+    ready: true
+  };
 }
 
 export function formatPendingBookingConfirmation(startsAt: Date) {
