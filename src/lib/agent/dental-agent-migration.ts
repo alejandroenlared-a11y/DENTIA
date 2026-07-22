@@ -137,7 +137,11 @@ function mapTreatmentTopic(intent: DentalIntentId | undefined): TreatmentTopic {
   return TREATMENT_TOPIC_BY_INTENT[intent] ?? "unknown";
 }
 
-function mapConversationIntent(state: DentalAgentState): ConversationIntent {
+// Exportado para que dental-agent-router.ts la reuse como ULTIMO recurso (fallback)
+// cuando ninguna señal de texto (routeConversationIntent) ni de contexto de reserva
+// (gestion de cita existente, seleccion de hueco) clasifica el turno - nunca como
+// fuente primaria, para no volver a conflar conversationIntent con el intent clinico.
+export function mapConversationIntent(state: DentalAgentState): ConversationIntent {
   if (state.dataErasureRequested) return "data_erasure";
   if (!state.intent) return "unknown";
   if (state.ready) return "confirm";

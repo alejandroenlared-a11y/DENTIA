@@ -715,7 +715,7 @@ function buildAppointmentManagementReply(latestPatientText: string) {
   return "Te ayudo a cambiarla. Para localizar la cita, dime nombre completo, teléfono y que día o franja te vendria mejor.";
 }
 
-function asksAppointmentManagement(normalized: string) {
+export function asksAppointmentManagement(normalized: string) {
   return /(cancelar|cancelo|anular|anulo|cambiar|cambio|mover|reprogramar|modificar).{0,30}\bcita\b|\bcita\b.{0,30}(cancelar|anular|cambiar|mover|reprogramar|modificar)/.test(normalized);
 }
 
@@ -1152,7 +1152,7 @@ function buildGuidedAvailabilityReply(location: string, period: string, offeredO
   return [`Te puedo proponer estos huecos${periodText} en ${location}:`, ...lines, "Responde con 1, 2 o 3 y te la dejo pre-reservada."].join("\n\n");
 }
 
-function extractSelectedAvailabilityOption(current: DentalAgentState, normalized: string) {
+export function extractSelectedAvailabilityOption(current: DentalAgentState, normalized: string) {
   const option = normalized.trim().match(/^[123]$/)?.[0];
   if (!option || current.offeredAvailabilityOptions.length === 0 || current.availability) {
     return "";

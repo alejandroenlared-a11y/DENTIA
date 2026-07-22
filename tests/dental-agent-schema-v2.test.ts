@@ -84,7 +84,9 @@ describe("DENTAL_AGENT_SCHEMA_VERSION=v1 (default)", () => {
     });
 
     expect(result.runtime).toBe("openai");
-    expect(result.conversationIntent).toBe("unknown");
+    // routeDentalConversationTurn (fase 3) es la fuente real: "hola" se clasifica
+    // por el texto como "greeting", no por el intent clinico (que sigue sin fijar).
+    expect(result.conversationIntent).toBe("greeting");
     expect(result.treatmentTopic).toBe("unknown");
   });
 });
@@ -124,6 +126,68 @@ describe("DENTAL_AGENT_SCHEMA_VERSION=v2", () => {
     expect(result.treatmentTopic).not.toBe("trauma");
   });
 
+  it("logs a shadow comparison (deterministic vs AI-proposed) with no patient text or PII, only when V2 supplies both fields", async () => {
+    process.env.DENTAL_AGENT_SCHEMA_VERSION = "v2";
+    delete process.env.LLM_PROVIDER;
+    process.env[OPENAI_KEY_ENV] = "test-key";
+    process.env.OPENAI_MODEL = "gpt-test";
+
+    const infoSpy = vi.spyOn(console, "info").mockImplementation(() => {});
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        output_text: JSON.stringify(
+          validAiPayload({
+            intent: "reactivation",
+            conversationIntent: "confirm",
+            treatmentTopic: "trauma"
+          })
+        )
+      })
+    } as Response);
+
+    await runOpenAiDentalAgentTurn({
+      latestPatientMessage: "Soy Fulanito Perez y me duele muchisimo, es info privada del paciente",
+      history: [],
+      state: initialDentalAgentState
+    });
+
+    expect(infoSpy).toHaveBeenCalledTimes(1);
+    const [label, payload] = infoSpy.mock.calls[0];
+    expect(label).toContain("conversation-classification-shadow");
+    expect(payload).toMatchObject({
+      aiConversationIntent: "confirm",
+      aiTreatmentTopic: "trauma",
+      matches: false
+    });
+    expect(payload).toHaveProperty("deterministicConversationIntent");
+    expect(payload).toHaveProperty("deterministicTreatmentTopic");
+    const serializedPayload = JSON.stringify(payload);
+    expect(serializedPayload).not.toContain("Fulanito");
+    expect(serializedPayload).not.toContain("info privada");
+  });
+
+  it("does not log the shadow comparison under V1 (no AI-proposed fields to compare)", async () => {
+    delete process.env.DENTAL_AGENT_SCHEMA_VERSION;
+    delete process.env.LLM_PROVIDER;
+    process.env[OPENAI_KEY_ENV] = "test-key";
+    process.env.OPENAI_MODEL = "gpt-test";
+
+    const infoSpy = vi.spyOn(console, "info").mockImplementation(() => {});
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => ({ output_text: JSON.stringify(validAiPayload()) })
+    } as Response);
+
+    await runOpenAiDentalAgentTurn({
+      latestPatientMessage: "hola",
+      history: [],
+      state: initialDentalAgentState
+    });
+
+    expect(infoSpy).not.toHaveBeenCalled();
+  });
+
   it("still parses successfully when V2 is requested but the model omits the new fields (falls back to V1 shape)", async () => {
     process.env.DENTAL_AGENT_SCHEMA_VERSION = "v2";
     delete process.env.LLM_PROVIDER;
@@ -142,7 +206,7 @@ describe("DENTAL_AGENT_SCHEMA_VERSION=v2", () => {
     });
 
     expect(result.runtime).toBe("openai");
-    expect(result.conversationIntent).toBe("unknown");
+    expect(result.conversationIntent).toBe("greeting");
   });
 
   it("falls back to the local engine on invalid JSON from OpenAI", async () => {
