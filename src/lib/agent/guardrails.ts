@@ -1,6 +1,7 @@
 import {
   hasConcreteAvailability,
   hasFullName,
+  jumpsToBookingOptions,
   mentionsPaymentCredentials,
   normalize,
   type DentalAgentState
@@ -248,7 +249,8 @@ export function isBookingClosingAcknowledgment(message: string): boolean {
   return BOOKING_CLOSING_ACKNOWLEDGMENT_PATTERN.test(normalized);
 }
 
-export function jumpsToBookingOptions(reply: string): boolean {
-  const normalized = normalize(reply);
-  return /(huecos|opciones|te propongo|pre-reservada|reservada|miercoles|jueves|viernes|lunes|martes)/.test(normalized);
-}
+// Movida a dental-senior-agent.ts (PR #11, fix "la tercera"): el motor local
+// tambien necesita saber si el ultimo mensaje del asistente ofrecio huecos,
+// para resolver ordinales en texto libre con la misma funcion que el router.
+// Se reexporta aqui para no romper los imports existentes desde guardrails.
+export { jumpsToBookingOptions };

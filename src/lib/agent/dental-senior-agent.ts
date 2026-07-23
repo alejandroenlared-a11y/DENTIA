@@ -317,10 +317,14 @@ const IDENTITY_QUESTION_PATTERN =
 const IDENTITY_DISCLOSURE =
   "No, no soy humana, soy la asistente de inteligencia artificial de la clínica. Te ayudo igual que en recepción.";
 
-export function runDentalSeniorTurn(current: DentalAgentState, rawText: string): DentalAgentTurn {
+export function runDentalSeniorTurn(current: DentalAgentState, rawText: string, lastAssistantMessage?: string): DentalAgentTurn {
   const text = rawText.trim();
   const normalized = normalize(text);
   const asksIdentity = IDENTITY_QUESTION_PATTERN.test(normalized);
+  // PR #11 (fix "la tercera"): mismo contexto que usa el router para gatear
+  // ordinales en texto libre - aqui resuelve la seleccion real, no solo la
+  // clasificacion de conversationIntent.
+  const assistantOfferedSlotsLastTurn = Boolean(lastAssistantMessage && jumpsToBookingOptions(lastAssistantMessage));
 
   const messageRedFlags = detectLabels(normalized, redFlagPatterns);
   const messageSignals = detectLabels(normalized, signalPatterns);
@@ -370,7 +374,9 @@ export function runDentalSeniorTurn(current: DentalAgentState, rawText: string):
   const email = isCorrecting && incomingEmail ? incomingEmail : current.email || incomingEmail;
   const incomingLocation = extractLocation(normalized);
   const location = isCorrecting && incomingLocation ? incomingLocation : current.location || incomingLocation;
-  const selectedAvailability = extractSelectedAvailabilityOption(current, normalized);
+  const selectedAvailability = current.availability
+    ? ""
+    : resolveSelectedAvailabilityOption(current.offeredAvailabilityOptions, normalized, assistantOfferedSlotsLastTurn);
   const asksForAvailabilityOptions = Boolean(requestedSlotOptionsPeriod(text));
   const availability = current.availability || selectedAvailability || (asksForAvailabilityOptions ? "" : extractAvailability(normalized, text));
   const consent = current.consent || acceptsExplicitConsent(normalized) || (wasAskedForConsent(current) && acceptsConsent(normalized));
@@ -1282,12 +1288,66 @@ function buildGuidedAvailabilityReply(location: string, period: string, offeredO
   return [`Te puedo proponer estos huecos${periodText} en ${location}:`, ...lines, "Responde con 1, 2 o 3 y te la dejo pre-reservada."].join("\n\n");
 }
 
-export function extractSelectedAvailabilityOption(current: DentalAgentState, normalized: string) {
-  const option = normalized.trim().match(/^[123]$/)?.[0];
-  if (!option || current.offeredAvailabilityOptions.length === 0 || current.availability) {
+// Movida desde guardrails.ts (PR #11, fix "la tercera"): el motor local
+// tambien necesita saber si el ultimo mensaje del asistente ofrecio huecos,
+// para resolver ordinales en texto libre - guardrails.ts sigue reexportando
+// esta misma funcion para no romper sus imports existentes.
+export function jumpsToBookingOptions(reply: string): boolean {
+  const normalized = normalize(reply);
+  return /(huecos|opciones|te propongo|pre-reservada|reservada|miercoles|jueves|viernes|lunes|martes)/.test(normalized);
+}
+
+// Formas de selección que NO requieren que el ultimo mensaje del asistente
+// haya ofrecido huecos: un numero suelto o "opcion N" son inequivocos si ya
+// hay offeredAvailabilityOptions en curso (no se confunden con nada mas).
+const BARE_OPTION_PATTERNS: [RegExp, number][] = [
+  [/^opcion\s*1$/, 0],
+  [/^opcion\s*2$/, 1],
+  [/^opcion\s*3$/, 2],
+  [/^1$/, 0],
+  [/^2$/, 1],
+  [/^3$/, 2]
+];
+
+// Ordinales en texto libre ("la tercera", "tercera", "el tercero"): mucho mas
+// ambiguos fuera de contexto ("la tercera vez que vine..."), asi que solo se
+// resuelven cuando el ultimo mensaje del asistente realmente ofrecio huecos.
+const ORDINAL_OPTION_PATTERNS: [RegExp, number][] = [
+  [/\b(la primera|el primero|primera|primero)\b/, 0],
+  [/\b(la segunda|el segundo|segunda|segundo)\b/, 1],
+  [/\b(la tercera|el tercero|tercera|tercero)\b/, 2]
+];
+
+// Fase 4/PR #11: unica funcion determinista para resolver una seleccion de
+// hueco contra offeredAvailabilityOptions - la usan tanto el motor local
+// (runDentalSeniorTurn, mas abajo) como el router (dental-agent-router.ts),
+// para que nunca puedan divergir en que cuenta como "el paciente eligio el
+// hueco N". assistantOfferedSlotsLastTurn (si Clara realmente ofrecio huecos
+// en su ultimo mensaje) es obligatorio para ordinales en texto libre, no para
+// un numero/opcion N suelto (ya inequivocos por si solos si hay huecos
+// ofrecidos).
+export function resolveSelectedAvailabilityOption(
+  offeredOptions: string[],
+  normalizedText: string,
+  assistantOfferedSlotsLastTurn: boolean
+): string {
+  if (offeredOptions.length === 0) {
     return "";
   }
-  return current.offeredAvailabilityOptions[Number(option) - 1] ?? "";
+  const trimmed = normalizedText.trim();
+  for (const [pattern, index] of BARE_OPTION_PATTERNS) {
+    if (pattern.test(trimmed)) {
+      return offeredOptions[index] ?? "";
+    }
+  }
+  if (assistantOfferedSlotsLastTurn) {
+    for (const [pattern, index] of ORDINAL_OPTION_PATTERNS) {
+      if (pattern.test(trimmed)) {
+        return offeredOptions[index] ?? "";
+      }
+    }
+  }
+  return "";
 }
 
 function fallbackAvailabilityOptions(period: string) {

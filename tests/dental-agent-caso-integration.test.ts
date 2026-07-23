@@ -169,7 +169,7 @@ describe("CASO 6 - ubicacion", () => {
   });
 });
 
-describe("PR #11 Problem 1 - seleccion de hueco via el pipeline real (previousState vs nextState)", () => {
+describe("PR #11 Problem 1 - seleccion real de hueco via el pipeline real (numero, opcion N, ordinal)", () => {
   function slotsOfferedState(overrides: Partial<DentalAgentState> = {}): DentalAgentState {
     return {
       ...initialDentalAgentState,
@@ -188,46 +188,72 @@ describe("PR #11 Problem 1 - seleccion de hueco via el pipeline real (previousSt
   }
   const ASSISTANT_OFFER_MESSAGE =
     "Te puedo proponer estos huecos: 1. jueves, 23/07, 10:00 2. viernes, 24/07, 11:00 3. lunes, 27/07, 10:00";
+  const ASSISTANT_OFFER_HISTORY: DentalChatMessage[] = [{ role: "assistant", body: ASSISTANT_OFFER_MESSAGE }];
+  const NO_OFFER_HISTORY: DentalChatMessage[] = [{ role: "assistant", body: "Perfecto, cuentame que necesitas." }];
 
-  it('"1" selecciona exactamente la primera opcion, nunca se clasifica como confirm', async () => {
+  async function expectSelection(message: string, optionIndex: number, history: DentalChatMessage[] = ASSISTANT_OFFER_HISTORY) {
     const state = slotsOfferedState();
-    const result = await turn("1", state);
+    const result = await turn(message, state, history);
 
     expect(result.conversationIntent).toBe("select_slot");
     expect(result.conversationIntent).not.toBe("confirm");
-    expect(result.state.availability).toBe(state.offeredAvailabilityOptions[0]);
+    expect(result.state.availability).toBe(state.offeredAvailabilityOptions[optionIndex]);
     expect(result.state.offeredAvailabilityOptions).toEqual([]);
     expect(result.bookingStatus).not.toBe("SLOTS_OFFERED");
+    return result;
+  }
+
+  it('"1" selecciona exactamente la primera opcion y llega a PREBOOKED', async () => {
+    const result = await expectSelection("1", 0);
     expect(result.bookingStatus).toBe("PREBOOKED");
   });
 
   it('"2" selecciona exactamente la segunda opcion', async () => {
-    const state = slotsOfferedState();
-    const result = await turn("2", state);
-
-    expect(result.conversationIntent).toBe("select_slot");
-    expect(result.state.availability).toBe(state.offeredAvailabilityOptions[1]);
-    expect(result.state.offeredAvailabilityOptions).toEqual([]);
+    await expectSelection("2", 1);
   });
 
-  it('"la tercera" clasifica select_slot solo cuando el ultimo mensaje de Clara realmente ofrecio huecos', async () => {
-    // Nota: el motor local deterministico (dental-senior-agent.ts) solo
-    // resuelve un numero suelto ("1"/"2"/"3") a una opcion concreta -
-    // extractSelectedAvailabilityOption no interpreta texto libre como "la
-    // tercera", y runDentalSeniorTurn no recibe el ultimo mensaje del
-    // asistente (eso es exclusivo del router, para conversationIntent). Por
-    // eso aqui solo se afirma la clasificacion, no la seleccion real de
-    // hueco - ampliar el motor local para resolver ordinales en texto libre
-    // seria un cambio de alcance mayor, no pedido por los comentarios P2.
+  it('"3" selecciona exactamente la tercera opcion', async () => {
+    await expectSelection("3", 2);
+  });
+
+  it('"la primera" selecciona exactamente la primera opcion', async () => {
+    await expectSelection("la primera", 0);
+  });
+
+  it('"la segunda" selecciona exactamente la segunda opcion', async () => {
+    await expectSelection("la segunda", 1);
+  });
+
+  it('"la tercera" selecciona realmente la tercera opcion (no solo clasifica select_slot)', async () => {
+    const result = await expectSelection("la tercera", 2);
+    expect(result.bookingStatus).toBe("PREBOOKED");
+  });
+
+  it('"la tercera" sin huecos ofrecidos en el mensaje anterior de Clara no selecciona nada', async () => {
     const state = slotsOfferedState();
-    const history: DentalChatMessage[] = [{ role: "assistant", body: ASSISTANT_OFFER_MESSAGE }];
+    const result = await turn("la tercera", state, NO_OFFER_HISTORY);
 
-    const withOffer = await turn("la tercera", state, history);
-    expect(withOffer.conversationIntent).toBe("select_slot");
+    expect(result.conversationIntent).not.toBe("select_slot");
+    expect(result.state.availability).toBe("");
+    expect(result.state.offeredAvailabilityOptions).toEqual(state.offeredAvailabilityOptions);
+  });
 
-    const withoutOfferHistory: DentalChatMessage[] = [{ role: "assistant", body: "Perfecto, cuentame que necesitas." }];
-    const withoutOffer = await turn("la tercera", state, withoutOfferHistory);
-    expect(withoutOffer.conversationIntent).not.toBe("select_slot");
+  it("un numero aislado fuera del flujo de disponibilidad no modifica availability", async () => {
+    const stateWithoutOffer: DentalAgentState = {
+      ...initialDentalAgentState,
+      intent: "prosthetics",
+      consent: true,
+      name: "Ana Lopez",
+      phone: "622111333",
+      email: "ana@example.com",
+      location: "Murcia centro",
+      availability: "",
+      offeredAvailabilityOptions: []
+    };
+    const result = await turn("2", stateWithoutOffer);
+
+    expect(result.conversationIntent).not.toBe("select_slot");
+    expect(result.state.availability).toBe("");
   });
 });
 

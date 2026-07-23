@@ -250,7 +250,7 @@ async function runOpenAiDentalAgentTurnInternal(input: {
   state: DentalAgentState;
   clinicContext?: string;
 }): Promise<DentalAgentApiTurn & { aiSelfReportedFields?: AiSelfReportedConversationFields }> {
-  const localTurn = runDentalSeniorTurn(input.state, input.latestPatientMessage);
+  const localTurn = runDentalSeniorTurn(input.state, input.latestPatientMessage, lastAssistantMessageOf(input.history));
   const apiKey = process.env.OPENAI_API_KEY;
   const model = process.env.OPENAI_MODEL || DEFAULT_OPENAI_MODEL;
   const schemaVersion = resolveDentalAgentSchemaVersion();
@@ -325,7 +325,7 @@ async function runGeminiDentalAgentTurnInternal(input: {
   state: DentalAgentState;
   clinicContext?: string;
 }): Promise<DentalAgentApiTurn & { aiSelfReportedFields?: AiSelfReportedConversationFields }> {
-  const localTurn = runDentalSeniorTurn(input.state, input.latestPatientMessage);
+  const localTurn = runDentalSeniorTurn(input.state, input.latestPatientMessage, lastAssistantMessageOf(input.history));
   const apiKey = process.env.GEMINI_API_KEY;
   const model = process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL;
   const fallbackModel = process.env.GEMINI_FALLBACK_MODEL || DEFAULT_GEMINI_FALLBACK_MODEL;

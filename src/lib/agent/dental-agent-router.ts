@@ -9,14 +9,14 @@ import {
   asksClinicAddress,
   asksTeamOrSpecialties,
   isBookingClosingAcknowledgment,
-  isSimpleGreeting,
-  jumpsToBookingOptions
+  isSimpleGreeting
 } from "@/lib/agent/guardrails";
 import {
   asksAppointmentManagement,
-  extractSelectedAvailabilityOption,
+  jumpsToBookingOptions,
   mentionsPrice,
   normalize,
+  resolveSelectedAvailabilityOption,
   type DentalAgentState
 } from "@/lib/agent/dental-senior-agent";
 import { mapConversationIntent, normalizeDentalAgentState } from "@/lib/agent/dental-agent-migration";
@@ -80,12 +80,6 @@ function deriveConversationStatus(
   return "ACTIVE";
 }
 
-// Ordinal/numero de opcion en texto libre ("la primera", "opcion 2"), para
-// complementar extractSelectedAvailabilityOption (que solo reconoce un "1"/"2"/"3"
-// suelto). Solo se usa si el ULTIMO mensaje del asistente realmente ofrecio huecos
-// (jumpsToBookingOptions) - si no, "la primera vez que vine..." no es una seleccion.
-const ORDINAL_SLOT_PATTERN = /(la primera|la segunda|la tercera|el primero|el segundo|el tercero|opcion\s*[123])/;
-
 /**
  * Fase 4: fuente de verdad REAL para conversationIntent/treatmentTopic en el
  * pipeline (ver attachConversationFields en openai-dental-agent.ts). Sustituye a
@@ -125,6 +119,17 @@ const ORDINAL_SLOT_PATTERN = /(la primera|la segunda|la tercera|el primero|el se
  *     consent/ready ya actualizados por este mismo mensaje).
  * No se reconstruyen artificialmente las opciones tras vaciarlas: se lee el
  * estado de antes, intacto, en vez de intentar deshacer la limpieza.
+ *
+ * Fix real (revision PR #11, "la tercera" no seleccionaba de verdad): antes
+ * un ordinal en texto libre solo servia para clasificar conversationIntent
+ * como select_slot (via ORDINAL_SLOT_PATTERN aqui mismo), pero el motor local
+ * (dental-senior-agent.ts) no sabia resolver ordinales, asi que nunca se
+ * seleccionaba availability de verdad - el paciente quedaba clasificado
+ * correctamente pero sin cita elegida. Fix: resolveSelectedAvailabilityOption
+ * (dental-senior-agent.ts) es ahora la UNICA funcion que resuelve una
+ * seleccion (numero/opcion N/ordinal) contra offeredAvailabilityOptions, y la
+ * usan tanto el motor local (que hace la seleccion real) como este router
+ * (que solo clasifica) - nunca pueden divergir en que cuenta como seleccion.
  */
 export function routeDentalConversationTurn(input: {
   latestPatientText: string;
@@ -163,8 +168,12 @@ function resolveConversationIntent(input: {
   // motor local las consumio al seleccionar) - solo previousState conserva lo
   // que de verdad se ofrecio antes de este mensaje.
   const assistantOfferedSlots = Boolean(input.lastAssistantMessage && jumpsToBookingOptions(input.lastAssistantMessage));
-  const selectedSlot = extractSelectedAvailabilityOption(input.previousState, normalizedText);
-  if (selectedSlot || (assistantOfferedSlots && ORDINAL_SLOT_PATTERN.test(normalizedText))) {
+  const selectedSlot = resolveSelectedAvailabilityOption(
+    input.previousState.offeredAvailabilityOptions,
+    normalizedText,
+    assistantOfferedSlots
+  );
+  if (selectedSlot) {
     return "select_slot";
   }
 
