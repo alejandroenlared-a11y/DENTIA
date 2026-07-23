@@ -1,4 +1,5 @@
 import { demoKnowledge, type DemoScenarioId } from "@/lib/agent/demo-data";
+import type { BookingStatus, ConversationStatus } from "@/lib/agent/dental-agent-types";
 
 export type DentalIntentId =
   | DemoScenarioId
@@ -40,6 +41,21 @@ export type DentalAgentState = {
   safetyScreened: boolean;
   requiresGuardian: boolean;
   dataErasureRequested: boolean;
+  // Fase 4 (correccion): antes solo existian como campos calculados en
+  // DentalAgentApiTurn (dental-agent-router.ts), nunca en el estado que de
+  // verdad viaja/persiste entre turnos (ver dentalAgentStateSchema en
+  // openai-dental-agent.ts). Ahora son parte real de DentalAgentState:
+  // bookingStatus se recalcula cada turno (computeBookingStatus, deriva de
+  // datos ya presentes: consent/nombre/telefono/sede/disponibilidad/ready) y
+  // conversationStatus SOLO lo escribe dental-agent-router.ts (necesita
+  // conversationIntent, que este motor no calcula) - aqui simplemente viaja
+  // sin tocarse turno a turno hasta que el router decide su valor nuevo.
+  bookingStatus: BookingStatus;
+  conversationStatus: ConversationStatus;
+  // Marca que ya se emitio el mensaje especifico de cierre (estado real de la
+  // reserva) al menos una vez, para no repetirlo en agradecimientos
+  // posteriores (ver buildDentalReply, bloque state.ready).
+  closureAcknowledged: boolean;
 };
 
 export type DentalAgentTurn = {
@@ -83,7 +99,10 @@ export const initialDentalAgentState: DentalAgentState = {
   confidence: "Baja",
   safetyScreened: false,
   requiresGuardian: false,
-  dataErasureRequested: false
+  dataErasureRequested: false,
+  bookingStatus: "IDLE",
+  conversationStatus: "ACTIVE",
+  closureAcknowledged: false
 };
 
 export const intentProfiles: Record<DentalIntentId, IntentProfile> = {
@@ -298,10 +317,14 @@ const IDENTITY_QUESTION_PATTERN =
 const IDENTITY_DISCLOSURE =
   "No, no soy humana, soy la asistente de inteligencia artificial de la clínica. Te ayudo igual que en recepción.";
 
-export function runDentalSeniorTurn(current: DentalAgentState, rawText: string): DentalAgentTurn {
+export function runDentalSeniorTurn(current: DentalAgentState, rawText: string, lastAssistantMessage?: string): DentalAgentTurn {
   const text = rawText.trim();
   const normalized = normalize(text);
   const asksIdentity = IDENTITY_QUESTION_PATTERN.test(normalized);
+  // PR #11 (fix "la tercera"): mismo contexto que usa el router para gatear
+  // ordinales en texto libre - aqui resuelve la seleccion real, no solo la
+  // clasificacion de conversationIntent.
+  const assistantOfferedSlotsLastTurn = Boolean(lastAssistantMessage && jumpsToBookingOptions(lastAssistantMessage));
 
   const messageRedFlags = detectLabels(normalized, redFlagPatterns);
   const messageSignals = detectLabels(normalized, signalPatterns);
@@ -351,7 +374,9 @@ export function runDentalSeniorTurn(current: DentalAgentState, rawText: string):
   const email = isCorrecting && incomingEmail ? incomingEmail : current.email || incomingEmail;
   const incomingLocation = extractLocation(normalized);
   const location = isCorrecting && incomingLocation ? incomingLocation : current.location || incomingLocation;
-  const selectedAvailability = extractSelectedAvailabilityOption(current, normalized);
+  const selectedAvailability = current.availability
+    ? ""
+    : resolveSelectedAvailabilityOption(current.offeredAvailabilityOptions, normalized, assistantOfferedSlotsLastTurn);
   const asksForAvailabilityOptions = Boolean(requestedSlotOptionsPeriod(text));
   const availability = current.availability || selectedAvailability || (asksForAvailabilityOptions ? "" : extractAvailability(normalized, text));
   const consent = current.consent || acceptsExplicitConsent(normalized) || (wasAskedForConsent(current) && acceptsConsent(normalized));
@@ -446,6 +471,19 @@ export function runDentalSeniorTurn(current: DentalAgentState, rawText: string):
   if (!intent && wantsPrice(undefined, text)) {
     nextState.intentCode = BUDGET_PENDING_INTENT;
   }
+
+  // bookingStatus se recalcula siempre aqui (unica fuente: computeBookingStatus)
+  // para que quede persistido en el propio estado, no solo como campo calculado
+  // aparte. closureAcknowledged marca si este turno YA fue (o sigue siendo) un
+  // cierre tras una reserva lista, para que buildDentalReply sepa distinguir el
+  // primer cierre (mensaje con el estado real de la reserva) de agradecimientos
+  // posteriores (despedida breve, sin repetir el mismo mensaje).
+  const isClosingExchange = current.ready && current.intent === nextState.intent && nextState.ready;
+  nextState = {
+    ...nextState,
+    bookingStatus: computeBookingStatus(nextState),
+    closureAcknowledged: !nextState.ready ? false : current.closureAcknowledged || isClosingExchange
+  };
 
   const reply = buildDentalReply(nextState, current, text);
   return {
@@ -592,6 +630,18 @@ function buildDentalReply(state: DentalAgentState, previous: DentalAgentState, l
     // La reserva ya se comunico en el turno anterior: cerrar con naturalidad
     // en vez de repetir el mismo mensaje de confirmación.
     if (previous.ready && !isNewIntent) {
+      // Bug real: el primer cierre tras una reserva usaba un mensaje generico
+      // ("Aquí sigo si necesitas algo mas...") que no dejaba claro el estado
+      // REAL de la solicitud (pre-reservada, nunca "confirmada"/"te
+      // esperamos" sin que el backend la haya confirmado de verdad). Este
+      // mensaje especifico solo se da UNA vez (closureAcknowledged aun en
+      // false en el estado anterior); a partir de ahi, un agradecimiento
+      // posterior usa una despedida breve, sin repetirlo.
+      if (!previous.closureAcknowledged) {
+        return state.bookingStatus === "CONFIRMED"
+          ? `Perfecto${first ? `, ${first}` : ""}. Tu cita queda confirmada. Te esperamos en la clínica.`
+          : `Perfecto${first ? `, ${first}` : ""}. La solicitud queda pre-reservada. La clínica te confirmará la cita.`;
+      }
       // Bug real (produccion): "perfecto" y luego "gracias" cayeron en el
       // mismo hash de pickVariant y Clara envio el mismo cierre ("Aquí sigo
       // si necesitas algo mas...") dos veces seguidas. Un "gracias" suelto
@@ -715,7 +765,7 @@ function buildAppointmentManagementReply(latestPatientText: string) {
   return "Te ayudo a cambiarla. Para localizar la cita, dime nombre completo, teléfono y que día o franja te vendria mejor.";
 }
 
-function asksAppointmentManagement(normalized: string) {
+export function asksAppointmentManagement(normalized: string) {
   return /(cancelar|cancelo|anular|anulo|cambiar|cambio|mover|reprogramar|modificar).{0,30}\bcita\b|\bcita\b.{0,30}(cancelar|anular|cambiar|mover|reprogramar|modificar)/.test(normalized);
 }
 
@@ -811,6 +861,14 @@ function buildIntro(state: DentalAgentState, profile: IntentProfile, latestPatie
   // clinica para lo que solo es una peticion administrativa de cita. Una
   // limpieza/revision de rutina sin sintomas nunca necesita esa hipotesis.
   const isRoutineReactivationRequest = state.intent === "reactivation" && !expressesPain && !hasSymptoms && !state.escalated;
+  // Fix real (CASO 1): "cita para una limpieza" sin sintomas NI pregunta de
+  // precio no debe mostrar el precio ni pedir consentimiento todavia - eso
+  // solo corresponde si el paciente pregunta el precio explicitamente
+  // (asksPriceNow, ver mas abajo). Sin precio de por medio, nextStep() ya se
+  // encarga de preguntar la sede a continuacion (ver nextStep).
+  if (isRoutineReactivationRequest && !asksPriceNow && !cameFromBudget) {
+    return suitabilityAnswer || "Claro.";
+  }
   if (((cameFromBudget || asksPriceNow) || isRoutineReactivationRequest) && !expressesPain && !hasSymptoms && !state.escalated) {
     if (state.intent === "cosmetic_dentistry") {
       const prefix = suitabilityAnswer ? `${suitabilityAnswer}\n\n` : "";
@@ -824,6 +882,15 @@ function buildIntro(state: DentalAgentState, profile: IntentProfile, latestPatie
       const opener = suitabilityAnswer || "Claro.";
       return `${opener} ${profile.priceNote} Si al verte hubiera encia inflamada o mucha acumulación, te avisamos antes de hacer nada.`;
     }
+    // Fix real (CASO 5): una consulta de precio de implante no debe pedir
+    // consentimiento ni datos personales todavia - solo el rango de precio,
+    // aclarar que el presupuesto definitivo requiere valoracion, y preguntar
+    // si quiere ayuda para solicitar cita. Termina en "?": nextStep() (que
+    // pediria consentimiento) no se ejecuta este turno.
+    if (state.intent === "implant_price") {
+      const opener = suitabilityAnswer ? `${suitabilityAnswer} ` : "";
+      return `${opener}${profile.priceNote} El presupuesto definitivo se confirma tras la valoración de tu caso.\n\nQuieres que te ayude a solicitar una cita?`;
+    }
     const opener = suitabilityAnswer || "Buena elección.";
     return `${opener} ${profile.priceNote} El doctor te confirma el presupuesto cerrado en la valoración, que es sin coste.`;
   }
@@ -835,6 +902,17 @@ function buildIntro(state: DentalAgentState, profile: IntentProfile, latestPatie
     !state.detectedSignals.some(signal => ["sangrado de encias", "inflamación", "dolor intenso"].includes(signal))
   ) {
     return "Que una muela se mueva conviene revisarlo pronto para valorar la encia y el soporte de la pieza.";
+  }
+  // Bug real: con una pregunta de seguridad/aclaracion todavia pendiente
+  // (missingClinicalData), este guion generico decia "podria ser gingivitis o
+  // periodontitis"/"caries o filtracion de empaste" ANTES de preguntar nada,
+  // inventando un diagnostico sin haber descartado ni un sintoma. La pregunta ya
+  // la hace nextStep() a continuacion: aqui solo va la empatia si aplica, nunca
+  // la hipotesis clinica, hasta que esa pregunta quede contestada.
+  // Si el paciente pregunta el precio explicitamente, respondemos aunque quede
+  // una pregunta de seguridad pendiente: no retenemos informacion que ya pidio.
+  if (pendingSafetyScreenQuestion(state) && !asksPriceNow) {
+    return `${suitabilityAnswer || empathy.trim()}${alarm}`.trim();
   }
   const suitabilityPrefix = suitabilityAnswer ? `${suitabilityAnswer} ` : empathy;
   return `${suitabilityPrefix}Por lo que me cuentas podria ser ${causes}; te lo confirmara el doctor al verte.${alarm}${price}`;
@@ -871,6 +949,20 @@ const CONSENT_ASKS = [
   "Puedo dejarte la cita lista ahora mismo. Aceptas que guardemos tus datos para gestionarla?"
 ];
 
+// Mismas condiciones que nextStep() usa para decidir si el turno hace (o ya esta
+// haciendo) una pregunta de seguridad/diferencial pendiente, expresadas aparte para
+// que buildIntro() pueda comprobarlas sin adelantar una hipotesis clinica antes de
+// esa pregunta (bug real: "podria ser gingivitis o periodontitis"/"caries o
+// filtracion de empaste" aparecian ANTES de la pregunta de seguridad).
+function pendingSafetyScreenQuestion(state: DentalAgentState): boolean {
+  if (state.safetyScreened || state.escalated) return false;
+  if (state.missingClinicalData[0]) return true;
+  if (state.redFlags.length === 0 && ["urgent_pain", "endodontics", "wisdom_tooth", "trauma"].includes(state.intent ?? "")) {
+    return true;
+  }
+  return state.intent === "caries_restoration" && state.redFlags.length === 0;
+}
+
 function nextStep(state: DentalAgentState, latestPatientText: string) {
   if (state.intent === "trauma" && state.redFlags.length === 0 && !state.safetyScreened) {
     const normalized = normalize(latestPatientText);
@@ -903,6 +995,14 @@ function nextStep(state: DentalAgentState, latestPatientText: string) {
   // quedan vacios sin que safetyScreened ya sea true; ver getMissingClinicalData).
   if (!state.escalated && state.intent === "caries_restoration" && state.redFlags.length === 0 && !state.safetyScreened) {
     return "Antes de nada: hay fiebre, hinchazon, pus o te cuesta abrir la boca o tragar?";
+  }
+  // Fix real (CASO 1): una peticion administrativa de cita (limpieza, sin
+  // sintomas) no debe pedir consentimiento como primer dato - la sede no es
+  // un dato personal, asi que se pregunta antes. Una vez la sede este
+  // guardada, el flujo sigue igual (consentimiento, nombre, email, telefono,
+  // disponibilidad).
+  if (!state.escalated && state.intent === "reactivation" && !state.consent && !state.location) {
+    return `Te viene mejor ${demoKnowledge.clinic.locations.join(" o ")}?`;
   }
   if (!state.consent) {
     return state.escalated
@@ -943,7 +1043,7 @@ function nextStep(state: DentalAgentState, latestPatientText: string) {
   return "";
 }
 
-function mentionsPrice(latestPatientText: string) {
+export function mentionsPrice(latestPatientText: string) {
   const normalized = normalize(latestPatientText);
   if (/(precio|cuanto|coste|costar|cuesta|financi|presupuesto)/.test(normalized)) {
     return true;
@@ -1102,6 +1202,42 @@ export function hasConcreteAvailability(availability: string) {
   return hasDay && hasTime;
 }
 
+// Unica fuente de verdad para "estan todos los datos administrativos listos
+// para ofrecer huecos" (consent + nombre completo + telefono + email + sede).
+// Bug real (revision PR #11, "Keep location-only states in data collection"):
+// computeBookingStatus devolvia READY_TO_OFFER_SLOTS solo porque existia
+// state.location, aunque siguieran faltando consentimiento/nombre/email/
+// telefono - el estado persistido decia "listo para ofrecer huecos" cuando el
+// siguiente paso real seguia siendo pedir esos datos. Funcion unica, reusada
+// tambien por canOfferAvailabilityOptions, para que ambos sitios nunca puedan
+// desincronizarse.
+export function hasSlotOfferPrerequisites(state: DentalAgentState): boolean {
+  return Boolean(
+    state.intent &&
+    state.consent &&
+    hasFullName(state.name) &&
+    state.phone &&
+    state.email &&
+    state.location
+  );
+}
+
+// Unica fuente de verdad para derivar bookingStatus a partir de los datos ya
+// presentes en el estado (consent/nombre/telefono/sede/disponibilidad/ready).
+// Reusada tal cual por dental-agent-migration.ts (mapBookingStatus) para que
+// el estado antiguo/compat nunca recalcule esta misma logica por su cuenta -
+// solo aplica CONFIRMED/CANCELLED encima cuando hay una señal real del
+// Appointment (nunca se infiere CONFIRMED de una cadena de disponibilidad).
+export function computeBookingStatus(state: DentalAgentState): BookingStatus {
+  if (state.ready && hasConcreteAvailability(state.availability)) return "PREBOOKED";
+  if (state.availability) return "SLOT_SELECTED";
+  if (state.offeredAvailabilityOptions.length > 0) return "SLOTS_OFFERED";
+  if (hasSlotOfferPrerequisites(state)) return "READY_TO_OFFER_SLOTS";
+  if (state.consent) return "COLLECTING_PATIENT_DATA";
+  if (state.intent) return "COLLECTING_CONSENT";
+  return "IDLE";
+}
+
 const CORRECTION_PATTERNS = [/en realidad/, /me (he )?confund/, /me (he )?equivoc/, /\bcorrijo\b/, /quise decir/];
 
 function isExplicitCorrection(normalized: string): boolean {
@@ -1152,12 +1288,66 @@ function buildGuidedAvailabilityReply(location: string, period: string, offeredO
   return [`Te puedo proponer estos huecos${periodText} en ${location}:`, ...lines, "Responde con 1, 2 o 3 y te la dejo pre-reservada."].join("\n\n");
 }
 
-function extractSelectedAvailabilityOption(current: DentalAgentState, normalized: string) {
-  const option = normalized.trim().match(/^[123]$/)?.[0];
-  if (!option || current.offeredAvailabilityOptions.length === 0 || current.availability) {
+// Movida desde guardrails.ts (PR #11, fix "la tercera"): el motor local
+// tambien necesita saber si el ultimo mensaje del asistente ofrecio huecos,
+// para resolver ordinales en texto libre - guardrails.ts sigue reexportando
+// esta misma funcion para no romper sus imports existentes.
+export function jumpsToBookingOptions(reply: string): boolean {
+  const normalized = normalize(reply);
+  return /(huecos|opciones|te propongo|pre-reservada|reservada|miercoles|jueves|viernes|lunes|martes)/.test(normalized);
+}
+
+// Formas de selección que NO requieren que el ultimo mensaje del asistente
+// haya ofrecido huecos: un numero suelto o "opcion N" son inequivocos si ya
+// hay offeredAvailabilityOptions en curso (no se confunden con nada mas).
+const BARE_OPTION_PATTERNS: [RegExp, number][] = [
+  [/^opcion\s*1$/, 0],
+  [/^opcion\s*2$/, 1],
+  [/^opcion\s*3$/, 2],
+  [/^1$/, 0],
+  [/^2$/, 1],
+  [/^3$/, 2]
+];
+
+// Ordinales en texto libre ("la tercera", "tercera", "el tercero"): mucho mas
+// ambiguos fuera de contexto ("la tercera vez que vine..."), asi que solo se
+// resuelven cuando el ultimo mensaje del asistente realmente ofrecio huecos.
+const ORDINAL_OPTION_PATTERNS: [RegExp, number][] = [
+  [/\b(la primera|el primero|primera|primero)\b/, 0],
+  [/\b(la segunda|el segundo|segunda|segundo)\b/, 1],
+  [/\b(la tercera|el tercero|tercera|tercero)\b/, 2]
+];
+
+// Fase 4/PR #11: unica funcion determinista para resolver una seleccion de
+// hueco contra offeredAvailabilityOptions - la usan tanto el motor local
+// (runDentalSeniorTurn, mas abajo) como el router (dental-agent-router.ts),
+// para que nunca puedan divergir en que cuenta como "el paciente eligio el
+// hueco N". assistantOfferedSlotsLastTurn (si Clara realmente ofrecio huecos
+// en su ultimo mensaje) es obligatorio para ordinales en texto libre, no para
+// un numero/opcion N suelto (ya inequivocos por si solos si hay huecos
+// ofrecidos).
+export function resolveSelectedAvailabilityOption(
+  offeredOptions: string[],
+  normalizedText: string,
+  assistantOfferedSlotsLastTurn: boolean
+): string {
+  if (offeredOptions.length === 0) {
     return "";
   }
-  return current.offeredAvailabilityOptions[Number(option) - 1] ?? "";
+  const trimmed = normalizedText.trim();
+  for (const [pattern, index] of BARE_OPTION_PATTERNS) {
+    if (pattern.test(trimmed)) {
+      return offeredOptions[index] ?? "";
+    }
+  }
+  if (assistantOfferedSlotsLastTurn) {
+    for (const [pattern, index] of ORDINAL_OPTION_PATTERNS) {
+      if (pattern.test(trimmed)) {
+        return offeredOptions[index] ?? "";
+      }
+    }
+  }
+  return "";
 }
 
 function fallbackAvailabilityOptions(period: string) {
@@ -1185,15 +1375,7 @@ function fallbackAvailabilityOptions(period: string) {
 }
 
 function canOfferAvailabilityOptions(state: DentalAgentState) {
-  return Boolean(
-    state.intent &&
-    state.consent &&
-    hasFullName(state.name) &&
-    state.phone &&
-    state.email &&
-    state.location &&
-    !state.availability
-  );
+  return hasSlotOfferPrerequisites(state) && !state.availability;
 }
 
 function completeDentalState(state: DentalAgentState): DentalAgentState {
@@ -1502,6 +1684,15 @@ function wasAskedForConsent(state: DentalAgentState): boolean {
     return false;
   }
   if (!state.escalated && state.missingClinicalData.length > 0) {
+    return false;
+  }
+  // Fix real (CASO 1): una peticion de cita administrativa (limpieza) sin
+  // sintomas ahora pregunta la sede ANTES que el consentimiento (ver
+  // nextStep). Mientras falte la sede, un "vale"/"si" suelto responde a esa
+  // pregunta, no es una aceptacion de guardar datos - sin esto,
+  // acceptsConsent() (que reconoce "vale"/"si" sueltos) marcaria consent=true
+  // por error antes de haber preguntado por los datos.
+  if (state.intent === "reactivation" && !state.location) {
     return false;
   }
   return true;

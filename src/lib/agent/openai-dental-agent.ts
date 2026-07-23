@@ -11,6 +11,15 @@ import {
 } from "@/lib/agent/dental-senior-agent";
 import { preparePatientReply } from "@/lib/agent/guardrails";
 import { fetchWithTimeout, isTimeoutError, resolveTimeoutMs } from "@/lib/http";
+import { routeDentalConversationTurn, type RoutedConversationFields } from "@/lib/agent/dental-agent-router";
+import {
+  CONVERSATION_INTENT_VALUES,
+  TREATMENT_TOPIC_VALUES,
+  type BookingStatus,
+  type ConversationIntent,
+  type ConversationStatus,
+  type TreatmentTopic
+} from "@/lib/agent/dental-agent-types";
 
 const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
 // API real de Google (Generative Language API v1beta). La versión anterior
@@ -51,6 +60,20 @@ const dentalIntentValues = [
 
 const triageValues = ["EMERGENCY", "URGENT_24H", "PRIORITY_72H", "ROUTINE", "ESTHETIC"] as const;
 const confidenceValues = ["Baja", "Media", "Alta"] as const;
+const bookingStatusValues = [
+  "IDLE",
+  "COLLECTING_CONSENT",
+  "COLLECTING_PATIENT_DATA",
+  "READY_TO_OFFER_SLOTS",
+  "SLOTS_OFFERED",
+  "SLOT_SELECTED",
+  "HELD",
+  "PREBOOKED",
+  "CONFIRMED",
+  "RESCHEDULE_REQUESTED",
+  "CANCELLED"
+] as const;
+const conversationStatusValues = ["ACTIVE", "WAITING_PATIENT", "ESCALATED", "CLOSED"] as const;
 
 export type DentalChatMessage = {
   role: "patient" | "assistant";
@@ -67,7 +90,27 @@ export type DentalAgentApiTurn = {
   runtime: DentalAgentRuntime;
   model: string;
   fallbackReason?: string;
+  // Fase 4 (V2): fuente de verdad real es routeDentalConversationTurn (fase 3 +
+  // fallback de fase 1), nunca lo que devuelva la IA - ver attachConversationFields
+  // y DENTAL_AGENT_SCHEMA_VERSION mas abajo. Presente en toda respuesta,
+  // independientemente de la version de schema activa.
+  conversationIntent?: ConversationIntent;
+  treatmentTopic?: TreatmentTopic;
+  bookingStatus?: BookingStatus;
+  conversationStatus?: ConversationStatus;
 };
+
+// V1 (por defecto) es el esquema/prompt actual, sin cambios. V2 anade
+// conversationIntent/treatmentTopic a lo que se le pide a la IA que devuelva.
+// Activar con DENTAL_AGENT_SCHEMA_VERSION=v2 en el entorno; cualquier otro valor
+// (o ausencia de la variable) mantiene V1 exactamente como hoy. Revertir a V1 es
+// instantaneo: basta con quitar o cambiar la variable de entorno, no requiere
+// deploy de codigo distinto.
+export type DentalAgentSchemaVersion = "v1" | "v2";
+
+export function resolveDentalAgentSchemaVersion(): DentalAgentSchemaVersion {
+  return process.env.DENTAL_AGENT_SCHEMA_VERSION === "v2" ? "v2" : "v1";
+}
 
 export const dentalAgentStateSchema = z.object({
   intent: z.enum(dentalIntentValues).exclude(["unknown"]).optional(),
@@ -94,7 +137,12 @@ export const dentalAgentStateSchema = z.object({
   confidence: z.enum(confidenceValues),
   safetyScreened: z.boolean(),
   requiresGuardian: z.boolean().default(false),
-  dataErasureRequested: z.boolean().default(false)
+  dataErasureRequested: z.boolean().default(false),
+  // Compatibilidad con estados antiguos (sin estos 3 campos): defaults
+  // seguros via z.default(), nunca inventan una reserva ni un cierre.
+  bookingStatus: z.enum(bookingStatusValues).default("IDLE"),
+  conversationStatus: z.enum(conversationStatusValues).default("ACTIVE"),
+  closureAcknowledged: z.boolean().default(false)
 });
 
 const dentalChatMessageSchema = z.object({
@@ -108,7 +156,7 @@ export const dentalAgentRequestSchema = z.object({
   state: dentalAgentStateSchema.default(initialDentalAgentState)
 });
 
-const dentalAgentAiOutputSchema = z.object({
+const dentalAgentAiOutputSchemaV1 = z.object({
   reply: z.string().trim().min(1).max(1500),
   intent: z.enum(dentalIntentValues),
   intentCode: z.string().trim().min(1),
@@ -133,7 +181,21 @@ const dentalAgentAiOutputSchema = z.object({
   safetyScreened: z.boolean()
 });
 
-type DentalAgentAiOutput = z.infer<typeof dentalAgentAiOutputSchema>;
+// V2: mismo contrato que V1 mas 2 campos de clasificacion. La IA los rellena, pero
+// el valor que de verdad usa el sistema siempre se recalcula en codigo (ver
+// attachConversationFields) - nunca se propaga lo que decida la IA para estos 2
+// campos, cumpliendo la regla de que ninguna transicion critica (reserva,
+// confirmacion, cancelacion, urgencia, cierre) queda en manos del modelo.
+const dentalAgentAiOutputSchemaV2 = dentalAgentAiOutputSchemaV1.extend({
+  conversationIntent: z.enum(CONVERSATION_INTENT_VALUES),
+  treatmentTopic: z.enum(TREATMENT_TOPIC_VALUES)
+});
+
+function resolveAiOutputSchema(schemaVersion: DentalAgentSchemaVersion) {
+  return schemaVersion === "v2" ? dentalAgentAiOutputSchemaV2 : dentalAgentAiOutputSchemaV1;
+}
+
+type DentalAgentAiOutput = z.infer<typeof dentalAgentAiOutputSchemaV1>;
 
 type OpenAiResponsePayload = {
   output_text?: string;
@@ -178,9 +240,20 @@ export async function runOpenAiDentalAgentTurn(input: {
   state: DentalAgentState;
   clinicContext?: string;
 }): Promise<DentalAgentApiTurn> {
-  const localTurn = runDentalSeniorTurn(input.state, input.latestPatientMessage);
+  const turn = await runOpenAiDentalAgentTurnInternal(input);
+  return attachConversationFields(turn, input.latestPatientMessage, input.state, lastAssistantMessageOf(input.history));
+}
+
+async function runOpenAiDentalAgentTurnInternal(input: {
+  latestPatientMessage: string;
+  history: DentalChatMessage[];
+  state: DentalAgentState;
+  clinicContext?: string;
+}): Promise<DentalAgentApiTurn & { aiSelfReportedFields?: AiSelfReportedConversationFields }> {
+  const localTurn = runDentalSeniorTurn(input.state, input.latestPatientMessage, lastAssistantMessageOf(input.history));
   const apiKey = process.env.OPENAI_API_KEY;
   const model = process.env.OPENAI_MODEL || DEFAULT_OPENAI_MODEL;
+  const schemaVersion = resolveDentalAgentSchemaVersion();
 
   if (!apiKey) {
     return buildLocalFallback(localTurn, model, "OPENAI_API_KEY no configurada", input.latestPatientMessage);
@@ -196,14 +269,14 @@ export async function runOpenAiDentalAgentTurn(input: {
       body: JSON.stringify({
         model,
         instructions: buildDentalSystemPrompt(input.clinicContext),
-        input: buildDentalUserInput(input.history, input.latestPatientMessage, localTurn.state),
+        input: buildDentalUserInput(input.history, input.latestPatientMessage, localTurn.state, schemaVersion),
         max_output_tokens: 1200,
         text: {
           format: {
             type: "json_schema",
             name: "dentia_dental_agent_turn",
             strict: true,
-            schema: dentalAgentJsonSchema
+            schema: resolveJsonSchema(schemaVersion)
           }
         }
       })
@@ -221,9 +294,15 @@ export async function runOpenAiDentalAgentTurn(input: {
       return buildLocalFallback(localTurn, model, payload.error?.message || "OpenAI no devolvio texto", input.latestPatientMessage);
     }
 
-    const aiOutput = parseDentalAgentOutput(rawText);
+    const aiOutput = parseDentalAgentOutput(rawText, schemaVersion);
     const state = mergeAiState(localTurn.state, aiOutput);
-    return { reply: preparePatientReply(aiOutput.reply, state, localTurn.reply, input.latestPatientMessage), state, runtime: "openai", model };
+    return {
+      reply: preparePatientReply(aiOutput.reply, state, localTurn.reply, input.latestPatientMessage),
+      state,
+      runtime: "openai",
+      model,
+      aiSelfReportedFields: extractAiSelfReportedFields(aiOutput)
+    };
   } catch (error) {
     console.error("runOpenAiDentalAgentTurn failed", error);
     return buildLocalFallback(localTurn, model, error instanceof Error ? error.message : "Respuesta IA no valida", input.latestPatientMessage);
@@ -236,22 +315,39 @@ async function runGeminiDentalAgentTurn(input: {
   state: DentalAgentState;
   clinicContext?: string;
 }): Promise<DentalAgentApiTurn> {
-  const localTurn = runDentalSeniorTurn(input.state, input.latestPatientMessage);
+  const turn = await runGeminiDentalAgentTurnInternal(input);
+  return attachConversationFields(turn, input.latestPatientMessage, input.state, lastAssistantMessageOf(input.history));
+}
+
+async function runGeminiDentalAgentTurnInternal(input: {
+  latestPatientMessage: string;
+  history: DentalChatMessage[];
+  state: DentalAgentState;
+  clinicContext?: string;
+}): Promise<DentalAgentApiTurn & { aiSelfReportedFields?: AiSelfReportedConversationFields }> {
+  const localTurn = runDentalSeniorTurn(input.state, input.latestPatientMessage, lastAssistantMessageOf(input.history));
   const apiKey = process.env.GEMINI_API_KEY;
   const model = process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL;
   const fallbackModel = process.env.GEMINI_FALLBACK_MODEL || DEFAULT_GEMINI_FALLBACK_MODEL;
+  const schemaVersion = resolveDentalAgentSchemaVersion();
 
   if (!apiKey) {
     return buildLocalFallback(localTurn, model, "GEMINI_API_KEY no configurada", input.latestPatientMessage);
   }
 
   try {
-    const systemInstruction = buildGeminiSystemInstruction(input.clinicContext);
+    const systemInstruction = buildGeminiSystemInstruction(input.clinicContext, schemaVersion);
     const contents = buildGeminiContents(input.history, input.latestPatientMessage, localTurn.state);
-    const primaryResult = await requestGeminiTurn({ apiKey, model, systemInstruction, contents, timeoutMs: LLM_TIMEOUT_MS });
+    const primaryResult = await requestGeminiTurn({ apiKey, model, systemInstruction, contents, timeoutMs: LLM_TIMEOUT_MS, schemaVersion });
     if (primaryResult.ok) {
       const state = mergeAiState(localTurn.state, primaryResult.output);
-      return { reply: preparePatientReply(primaryResult.output.reply, state, localTurn.reply, input.latestPatientMessage), state, runtime: "gemini", model };
+      return {
+        reply: preparePatientReply(primaryResult.output.reply, state, localTurn.reply, input.latestPatientMessage),
+        state,
+        runtime: "gemini",
+        model,
+        aiSelfReportedFields: extractAiSelfReportedFields(primaryResult.output)
+      };
     }
 
     if (primaryResult.fallbackReason === "Gemini devolvio texto libre") {
@@ -276,14 +372,15 @@ async function runGeminiDentalAgentTurn(input: {
       fallbackModel &&
       fallbackModel !== model
     ) {
-      const secondaryResult = await requestGeminiTurn({ apiKey, model: fallbackModel, systemInstruction, contents, timeoutMs: LLM_FALLBACK_TIMEOUT_MS });
+      const secondaryResult = await requestGeminiTurn({ apiKey, model: fallbackModel, systemInstruction, contents, timeoutMs: LLM_FALLBACK_TIMEOUT_MS, schemaVersion });
       if (secondaryResult.ok) {
         const state = mergeAiState(localTurn.state, secondaryResult.output);
         return {
           reply: preparePatientReply(secondaryResult.output.reply, state, localTurn.reply, input.latestPatientMessage),
           state,
           runtime: "gemini",
-          model: `${fallbackModel} (fallback)`
+          model: `${fallbackModel} (fallback)`,
+          aiSelfReportedFields: extractAiSelfReportedFields(secondaryResult.output)
         };
       }
       if (secondaryResult.fallbackReason === "Gemini devolvio texto libre") {
@@ -328,6 +425,7 @@ async function requestGeminiTurn(input: {
   systemInstruction: string;
   contents: GeminiContentPart[];
   timeoutMs: number;
+  schemaVersion: DentalAgentSchemaVersion;
 }): Promise<
   | { ok: true; output: DentalAgentAiOutput }
   | { ok: false; status?: number; errorText: string; fallbackReason?: string }
@@ -347,7 +445,7 @@ async function requestGeminiTurn(input: {
           temperature: 0.6,
           maxOutputTokens: 1400,
           responseMimeType: "application/json",
-          responseSchema: dentalAgentGeminiSchema
+          responseSchema: resolveGeminiSchema(input.schemaVersion)
         }
       })
     }, input.timeoutMs);
@@ -390,7 +488,7 @@ async function requestGeminiTurn(input: {
   try {
     return {
       ok: true,
-      output: parseDentalAgentOutput(rawText)
+      output: parseDentalAgentOutput(rawText, input.schemaVersion)
     };
   } catch {
     return {
@@ -405,7 +503,7 @@ function resolveProvider(): LlmProvider {
   return process.env.LLM_PROVIDER === "gemini" ? "gemini" : "openai";
 }
 
-function buildDentalSystemPrompt(extraContext?: string) {
+export function buildDentalSystemPrompt(extraContext?: string) {
   const treatments = demoKnowledge.treatments
     .map(treatment => `- ${treatment.name}: ${treatment.price}. ${treatment.about} Regla: ${treatment.rule}`)
     .join("\n");
@@ -472,7 +570,34 @@ function buildDentalSystemPrompt(extraContext?: string) {
   ].filter(Boolean).join("\n");
 }
 
-function buildDentalUserInput(history: DentalChatMessage[], latestPatientMessage: string, localState: DentalAgentState) {
+// Fase 4 del refactor de arquitectura: las mismas 4 lineas vivian duplicadas
+// palabra por palabra en buildDentalUserInput (OpenAI) y buildGeminiSystemInstruction
+// (Gemini). Una unica fuente evita que se desincronicen si se ajusta una de las dos.
+const DENTAL_OUTPUT_BASE_INSTRUCTIONS = [
+  "- Si faltan datos de cita, rellena missingClinicalData con preguntas clínicas o administrativas relevantes.",
+  "- ready debe ser true solo si ya hay datos minimos para cita: consentimiento, nombre y apellidos, teléfono, email, sede y disponibilidad concreta con día y hora/franja.",
+  "- Aunque detectes urgencia, no marques ready sin sede y disponibilidad concreta. En emergencia inmediata puedes escalar, pero no confirmes cita sin esos datos.",
+  "- Si missingClinicalData contiene una pregunta clínica, el reply debe hacer esa pregunta antes de pedir consentimiento o datos."
+];
+
+// Fase 4 (V2): unico addendum de prompt que explica los 2 campos nuevos, insertado
+// solo cuando DENTAL_AGENT_SCHEMA_VERSION=v2. Deja explicito que son solo
+// clasificacion: el sistema sigue decidiendo reservas/confirmaciones/cierres por
+// codigo, nunca a partir de lo que ponga aqui la IA (ver attachConversationFields).
+function buildConversationFieldsPromptAddendum(): string {
+  return [
+    "Campos adicionales (v2) — solo clasificacion, no decides con ellos reservas, confirmaciones, cancelaciones, urgencias ni cierres (eso lo controla el codigo):",
+    `- conversationIntent: acto conversacional del ultimo mensaje del paciente. Valores permitidos: ${CONVERSATION_INTENT_VALUES.join(", ")}.`,
+    `- treatmentTopic: tema clinico o de tratamiento de fondo, si lo hay. Valores permitidos: ${TREATMENT_TOPIC_VALUES.join(", ")}.`
+  ].join("\n");
+}
+
+export function buildDentalUserInput(
+  history: DentalChatMessage[],
+  latestPatientMessage: string,
+  localState: DentalAgentState,
+  schemaVersion: DentalAgentSchemaVersion = "v1"
+) {
   const compactHistory = history
     .slice(-12)
     .map(message => `${message.role === "assistant" ? "Clara" : "Paciente"}: ${message.body}`)
@@ -488,24 +613,20 @@ function buildDentalUserInput(history: DentalChatMessage[], latestPatientMessage
     JSON.stringify(localState, null, 2),
     "",
     "Instrucciones de salida:",
-    "- Si faltan datos de cita, rellena missingClinicalData con preguntas clínicas o administrativas relevantes.",
-    "- ready debe ser true solo si ya hay datos minimos para cita: consentimiento, nombre y apellidos, teléfono, email, sede y disponibilidad concreta con día y hora/franja.",
-    "- Aunque detectes urgencia, no marques ready sin sede y disponibilidad concreta. En emergencia inmediata puedes escalar, pero no confirmes cita sin esos datos.",
-    "- Si missingClinicalData contiene una pregunta clínica, el reply debe hacer esa pregunta antes de pedir consentimiento o datos.",
-    "- Manten reply en español natural y cercano: 1-4 burbujas cortas separadas por doble salto de línea, una sola pregunta y cero listas. No repitas lo ya dicho."
+    ...DENTAL_OUTPUT_BASE_INSTRUCTIONS,
+    "- Manten reply en español natural y cercano: 1-4 burbujas cortas separadas por doble salto de línea, una sola pregunta y cero listas. No repitas lo ya dicho.",
+    ...(schemaVersion === "v2" ? [buildConversationFieldsPromptAddendum()] : [])
   ].join("\n");
 }
 
-function buildGeminiSystemInstruction(clinicContext?: string) {
+export function buildGeminiSystemInstruction(clinicContext?: string, schemaVersion: DentalAgentSchemaVersion = "v1") {
   return [
     buildDentalSystemPrompt(clinicContext),
     "",
     "Instrucciones de salida:",
-    "- Si faltan datos de cita, rellena missingClinicalData con preguntas clínicas o administrativas relevantes.",
-    "- ready debe ser true solo si ya hay datos minimos para cita: consentimiento, nombre y apellidos, teléfono, email, sede y disponibilidad concreta con día y hora/franja.",
-    "- Aunque detectes urgencia, no marques ready sin sede y disponibilidad concreta. En emergencia inmediata puedes escalar, pero no confirmes cita sin esos datos.",
-    "- Si missingClinicalData contiene una pregunta clínica, el reply debe hacer esa pregunta antes de pedir consentimiento o datos.",
-    "- Devuelve solo JSON conforme al esquema. El campo reply es el mensaje que vera el paciente: 1-4 burbujas cortas separadas por doble salto de línea."
+    ...DENTAL_OUTPUT_BASE_INSTRUCTIONS,
+    "- Devuelve solo JSON conforme al esquema. El campo reply es el mensaje que vera el paciente: 1-4 burbujas cortas separadas por doble salto de línea.",
+    ...(schemaVersion === "v2" ? ["", buildConversationFieldsPromptAddendum()] : [])
   ].join("\n");
 }
 
@@ -571,7 +692,7 @@ function toGeminiSchema(schema: unknown): unknown {
   return schema;
 }
 
-const dentalAgentJsonSchema = {
+const dentalAgentJsonSchemaV1 = {
   type: "object",
   additionalProperties: false,
   required: [
@@ -622,7 +743,29 @@ const dentalAgentJsonSchema = {
   }
 } as const;
 
-const dentalAgentGeminiSchema = toGeminiSchema(dentalAgentJsonSchema);
+// V2: mismo esquema que V1 mas conversationIntent/treatmentTopic, requeridos porque
+// el modo strict de OpenAI structured outputs exige que todo lo declarado en
+// properties este tambien en required.
+const dentalAgentJsonSchemaV2 = {
+  ...dentalAgentJsonSchemaV1,
+  required: [...dentalAgentJsonSchemaV1.required, "conversationIntent", "treatmentTopic"],
+  properties: {
+    ...dentalAgentJsonSchemaV1.properties,
+    conversationIntent: { type: "string", enum: CONVERSATION_INTENT_VALUES },
+    treatmentTopic: { type: "string", enum: TREATMENT_TOPIC_VALUES }
+  }
+} as const;
+
+function resolveJsonSchema(schemaVersion: DentalAgentSchemaVersion) {
+  return schemaVersion === "v2" ? dentalAgentJsonSchemaV2 : dentalAgentJsonSchemaV1;
+}
+
+const dentalAgentGeminiSchemaV1 = toGeminiSchema(dentalAgentJsonSchemaV1);
+const dentalAgentGeminiSchemaV2 = toGeminiSchema(dentalAgentJsonSchemaV2);
+
+function resolveGeminiSchema(schemaVersion: DentalAgentSchemaVersion) {
+  return schemaVersion === "v2" ? dentalAgentGeminiSchemaV2 : dentalAgentGeminiSchemaV1;
+}
 
 function extractOpenAiText(payload: OpenAiResponsePayload) {
   if (typeof payload.output_text === "string" && payload.output_text.trim()) {
@@ -643,11 +786,21 @@ function extractGeminiText(payload: GeminiResponsePayload) {
     .trim() || "";
 }
 
-function parseDentalAgentOutput(rawText: string) {
+function parseDentalAgentOutput(rawText: string, schemaVersion: DentalAgentSchemaVersion = "v1"): DentalAgentAiOutput {
   const normalizedText = normalizeJsonText(rawText);
-  const parsed = dentalAgentAiOutputSchema.safeParse(JSON.parse(normalizedText));
+  const json = JSON.parse(normalizedText);
+  const parsed = resolveAiOutputSchema(schemaVersion).safeParse(json);
   if (parsed.success) {
     return parsed.data;
+  }
+  // Compatibilidad V2->V1: si pedimos V2 pero el modelo devolvio la forma V1 (sin
+  // conversationIntent/treatmentTopic), no lo tratamos como fallo - esos 2 campos
+  // siempre se recalculan en codigo de todas formas (attachConversationFields).
+  if (schemaVersion === "v2") {
+    const v1Result = dentalAgentAiOutputSchemaV1.safeParse(json);
+    if (v1Result.success) {
+      return v1Result.data;
+    }
   }
   const issue = parsed.error.issues[0];
   const path = issue?.path?.join(".") || "root";
@@ -757,6 +910,103 @@ function buildLocalFallback(
     runtime: "local",
     model,
     fallbackReason
+  };
+}
+
+function lastAssistantMessageOf(history: DentalChatMessage[]): string | undefined {
+  for (let index = history.length - 1; index >= 0; index -= 1) {
+    if (history[index].role === "assistant") {
+      return history[index].body;
+    }
+  }
+  return undefined;
+}
+
+// Campos que la IA puede devolver en V2, capturados SOLO para el registro en sombra
+// (nunca para decidir nada) - ver logConversationClassificationShadow. En V1, o si el
+// modelo omitio los campos (parseDentalAgentOutput cae a V1), quedan undefined.
+type AiSelfReportedConversationFields = {
+  conversationIntent?: ConversationIntent;
+  treatmentTopic?: TreatmentTopic;
+};
+
+function extractAiSelfReportedFields(aiOutput: DentalAgentAiOutput): AiSelfReportedConversationFields {
+  const withOptionalV2Fields = aiOutput as DentalAgentAiOutput & Partial<AiSelfReportedConversationFields>;
+  return {
+    conversationIntent: withOptionalV2Fields.conversationIntent,
+    treatmentTopic: withOptionalV2Fields.treatmentTopic
+  };
+}
+
+// Solo se activa si V2 esta activo Y la IA realmente devolvio los campos nuevos.
+// Registra unicamente etiquetas de clasificacion (nunca el mensaje del paciente ni
+// otros datos clinicos/personales), para poder evaluar en staging si la IA
+// clasificaria igual que el codigo, sin darle autoridad real sobre nada.
+function logConversationClassificationShadow(
+  deterministic: RoutedConversationFields,
+  aiProposed: AiSelfReportedConversationFields | undefined,
+  schemaVersion: DentalAgentSchemaVersion
+): void {
+  if (schemaVersion !== "v2" || !aiProposed?.conversationIntent || !aiProposed.treatmentTopic) {
+    return;
+  }
+  const matches =
+    aiProposed.conversationIntent === deterministic.conversationIntent &&
+    aiProposed.treatmentTopic === deterministic.treatmentTopic;
+  console.info("[dental-agent] conversation-classification-shadow", {
+    deterministicConversationIntent: deterministic.conversationIntent,
+    deterministicTreatmentTopic: deterministic.treatmentTopic,
+    aiConversationIntent: aiProposed.conversationIntent,
+    aiTreatmentTopic: aiProposed.treatmentTopic,
+    matches
+  });
+}
+
+// Fase 4 (V2): unico punto donde conversationIntent/treatmentTopic entran en la
+// respuesta final, para cualquier runtime (openai/gemini/local) y cualquier version
+// de schema. La fuente de verdad es routeDentalConversationTurn (fase 3: texto del
+// paciente + estado + ultimo mensaje del asistente), nunca lo que devuelva la IA en
+// esos 2 campos aunque V2 se los pida - eso solo se registra en sombra para
+// comparar. Esto cumple que ninguna transicion critica (reserva, confirmacion,
+// cancelacion, urgencia, cierre) quede en manos del modelo.
+function attachConversationFields(
+  turn: DentalAgentApiTurn & { aiSelfReportedFields?: AiSelfReportedConversationFields },
+  latestPatientMessage: string,
+  previousState: DentalAgentState,
+  lastAssistantMessage: string | undefined
+): DentalAgentApiTurn {
+  // Bug real (PR #11): antes solo se pasaba turn.state (ya procesado) al
+  // enrutador, asi que seleccionar un hueco ("1") no se detectaba como
+  // select_slot (el motor local ya habia vaciado offeredAvailabilityOptions).
+  // Ver el comentario largo en dental-agent-router.ts para el porque de cada uso.
+  const routed = routeDentalConversationTurn({
+    latestPatientText: latestPatientMessage,
+    previousState,
+    nextState: turn.state,
+    lastAssistantMessage
+  });
+  logConversationClassificationShadow(routed, turn.aiSelfReportedFields, resolveDentalAgentSchemaVersion());
+  // Correccion de arquitectura: bookingStatus/conversationStatus antes solo se
+  // devolvian aqui como campos sueltos de DentalAgentApiTurn, nunca dentro de
+  // `state` - por lo que nunca llegaban a persistir (el llamador solo guarda
+  // `result.state`, ver extractPreviousDentalState en index.ts). Se escriben
+  // ahora tambien en el propio estado para que viajen de verdad al siguiente
+  // turno, incluyendo la reapertura/cierre real (ver deriveConversationStatus).
+  const state: DentalAgentState = {
+    ...turn.state,
+    bookingStatus: routed.bookingStatus,
+    conversationStatus: routed.conversationStatus
+  };
+  return {
+    reply: turn.reply,
+    state,
+    runtime: turn.runtime,
+    model: turn.model,
+    fallbackReason: turn.fallbackReason,
+    conversationIntent: routed.conversationIntent,
+    treatmentTopic: routed.treatmentTopic,
+    bookingStatus: routed.bookingStatus,
+    conversationStatus: routed.conversationStatus
   };
 }
 

@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   buildDentalSummary,
+  computeBookingStatus,
+  hasSlotOfferPrerequisites,
   initialDentalAgentState,
   runDentalSeniorTurn,
   type DentalAgentState
@@ -157,7 +159,10 @@ describe("runDentalSeniorTurn", () => {
     expect(withoutPriceAsk.state.treatmentNeed).toBe("Periodoncia");
     expect(withoutPriceAsk.state.budget).toBe("desde 90 EUR");
     expect(withoutPriceAsk.state.triageLabel).toBe("Prioridad 48-72h");
-    expect(withoutPriceAsk.reply).toContain("gingivitis");
+    // Bug real corregido: antes de la pregunta de seguridad (sangrado leve/
+    // abundante, golpe) no debe adelantarse un diagnostico como "gingivitis".
+    expect(withoutPriceAsk.reply).not.toContain("gingivitis");
+    expect(withoutPriceAsk.reply).toContain("El sangrado es leve o abundante");
     expect(withoutPriceAsk.reply).not.toContain("90 EUR");
 
     const withPriceAsk = runDentalSeniorTurn(
@@ -300,7 +305,11 @@ describe("runDentalSeniorTurn", () => {
     expect(turn.reply).not.toContain("Que dia y hora o franja te encaja");
   });
 
-  it("does not repeat the price note when asking for consent", () => {
+  it("does not repeat the price note and does not ask for consent on a pure price question", () => {
+    // Bug real corregido (CASO 5): una consulta de precio de implante pedia
+    // consentimiento en el mismo turno, antes de que el paciente aceptara
+    // nada. Ahora solo da el precio + aclara que el presupuesto definitivo
+    // requiere valoracion + pregunta si quiere ayuda para pedir cita.
     const turn = runDentalSeniorTurn(
       initialDentalAgentState,
       "Me falta una muela y quiero saber el precio de un implante y si se puede financiar."
@@ -309,7 +318,12 @@ describe("runDentalSeniorTurn", () => {
     const priceNote = "El implante unitario parte desde 1.200 EUR";
     const occurrences = turn.reply.split(priceNote).length - 1;
     expect(occurrences).toBe(1);
-    expect(turn.reply).toContain("Aceptas que guardemos tus datos");
+    expect(turn.reply).not.toContain("Aceptas que guardemos tus datos");
+    expect(turn.reply).toContain("ayude a solicitar una cita");
+
+    // La continuacion natural (aceptar) SI avanza al flujo de datos.
+    const accepted = runDentalSeniorTurn(turn.state, "Vale, ayudame.");
+    expect(accepted.reply).toContain("nombre");
   });
 
   it("does not repeat orientation or price on later turns and asks one thing at a time", () => {
@@ -391,7 +405,10 @@ describe("runDentalSeniorTurn", () => {
 
     expect(turn.state.intent).toBe("periodontics");
     expect(turn.state.treatmentNeed).toBe("Periodoncia");
-    expect(turn.reply.toLowerCase()).toContain("gingivitis");
+    // Bug real corregido: con la pregunta de seguridad (sangrado leve/abundante,
+    // golpe) todavia pendiente, no debe adelantarse un diagnostico como "gingivitis".
+    expect(turn.reply.toLowerCase()).not.toContain("gingivitis");
+    expect(turn.reply.toLowerCase()).toContain("el sangrado es leve o abundante");
   });
 
   it("does not reduce orthodontics to invisible aligners when the patient asks for brackets", () => {
@@ -486,7 +503,12 @@ describe("runDentalSeniorTurn", () => {
       email: "alex@example.com",
       location: "Elche - Altabix",
       availability: "viernes, 24/07, 10:45",
-      ready: true
+      ready: true,
+      // El comentario de arriba describe un "perfecto" YA respondido antes:
+      // ese cierre ya se envio, asi que este "gracias" es el agradecimiento
+      // posterior, no el primer cierre (que ahora usa un mensaje distinto,
+      // ver "confirms the real booking status...").
+      closureAcknowledged: true
     };
     const turn = runDentalSeniorTurn(readyState, "gracias");
     expect(turn.reply).toContain("Gracias a ti");
@@ -843,5 +865,48 @@ describe("runDentalSeniorTurn", () => {
     // no debe disparar el aviso de idioma (ya cubierto por el motor normal).
     const mixed = runDentalSeniorTurn(initialDentalAgentState, "hello quiero i want cita por favor pleaaase tooth hurts mucho");
     expect(mixed.reply.toLowerCase()).not.toContain("solo puedo atenderte en español");
+  });
+});
+
+describe("hasSlotOfferPrerequisites / computeBookingStatus", () => {
+  // Fix real (revision PR #11, "Keep location-only states in data collection"):
+  // computeBookingStatus devolvia READY_TO_OFFER_SLOTS solo porque existia
+  // state.location, aunque siguieran faltando consent/nombre/email/telefono.
+  const withOnlyLocation: DentalAgentState = {
+    ...initialDentalAgentState,
+    intent: "prosthetics",
+    location: "Murcia centro"
+  };
+
+  it("no considera listo para ofrecer huecos solo por tener la sede", () => {
+    expect(hasSlotOfferPrerequisites(withOnlyLocation)).toBe(false);
+    expect(computeBookingStatus(withOnlyLocation)).not.toBe("READY_TO_OFFER_SLOTS");
+    expect(computeBookingStatus(withOnlyLocation)).toBe("COLLECTING_CONSENT");
+  });
+
+  it("tampoco esta listo si falta solo un dato administrativo (nombre, telefono o email)", () => {
+    const missingName = { ...withOnlyLocation, consent: true, phone: "611222333", email: "juan@example.com" };
+    expect(hasSlotOfferPrerequisites(missingName)).toBe(false);
+    expect(computeBookingStatus(missingName)).toBe("COLLECTING_PATIENT_DATA");
+
+    const missingPhone = { ...missingName, name: "Juan Perez", phone: "" };
+    expect(hasSlotOfferPrerequisites(missingPhone)).toBe(false);
+    expect(computeBookingStatus(missingPhone)).toBe("COLLECTING_PATIENT_DATA");
+
+    const missingEmail = { ...missingPhone, phone: "611222333", email: "" };
+    expect(hasSlotOfferPrerequisites(missingEmail)).toBe(false);
+    expect(computeBookingStatus(missingEmail)).toBe("COLLECTING_PATIENT_DATA");
+  });
+
+  it("esta listo para ofrecer huecos solo con consent + nombre completo + telefono + email + sede", () => {
+    const complete: DentalAgentState = {
+      ...withOnlyLocation,
+      consent: true,
+      name: "Juan Perez",
+      phone: "611222333",
+      email: "juan@example.com"
+    };
+    expect(hasSlotOfferPrerequisites(complete)).toBe(true);
+    expect(computeBookingStatus(complete)).toBe("READY_TO_OFFER_SLOTS");
   });
 });

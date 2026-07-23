@@ -1,6 +1,7 @@
 import {
   hasConcreteAvailability,
   hasFullName,
+  jumpsToBookingOptions,
   mentionsPaymentCredentials,
   normalize,
   type DentalAgentState
@@ -241,14 +242,15 @@ export function asksOpenDateQuestion(reply: string): boolean {
 // (state.ready + availability concreta), cualquiera de estas debe cerrar la
 // conversacion, nunca reabrir el agendado.
 const BOOKING_CLOSING_ACKNOWLEDGMENT_PATTERN =
-  /\b(vale|ok|okay|okey|de acuerdo|esta bien|asi esta bien|todo bien|todo correcto|todo ok|todo claro|queda claro|entendido|entendida|perfecto|perfecta|genial|estupendo|guay|gracias|muchas gracias|mil gracias|te lo agradezco|me vale|me vale asi|correcto|exacto|eso es|listo|ya esta|sale|dale|conforme|sin problema|ningun problema|de 10|de diez)\b/;
+  /\b(vale|ok|okay|okey|de acuerdo|esta bien|asi esta bien|todo bien|todo correcto|todo ok|todo claro|queda claro|entendido|entendida|perfecto|perfecta|genial|estupendo|guay|gracias|muchas gracias|mil gracias|te lo agradezco|me vale|me vale asi|correcto|exacto|eso es|listo|ya esta|sale|dale|conforme|sin problema|ningun problema|de 10|de diez|hasta luego|hasta pronto|nos vemos|adios)\b/;
 
 export function isBookingClosingAcknowledgment(message: string): boolean {
   const normalized = normalize(message).replace(/[!¡¿?.,\s]+/g, " ").trim();
   return BOOKING_CLOSING_ACKNOWLEDGMENT_PATTERN.test(normalized);
 }
 
-export function jumpsToBookingOptions(reply: string): boolean {
-  const normalized = normalize(reply);
-  return /(huecos|opciones|te propongo|pre-reservada|reservada|miercoles|jueves|viernes|lunes|martes)/.test(normalized);
-}
+// Movida a dental-senior-agent.ts (PR #11, fix "la tercera"): el motor local
+// tambien necesita saber si el ultimo mensaje del asistente ofrecio huecos,
+// para resolver ordinales en texto libre con la misma funcion que el router.
+// Se reexporta aqui para no romper los imports existentes desde guardrails.
+export { jumpsToBookingOptions };
