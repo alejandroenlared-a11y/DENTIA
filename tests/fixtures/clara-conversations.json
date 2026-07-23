@@ -344,8 +344,9 @@
     "messages": ["Me sangran las encias al cepillarme y noto mal aliento"],
     "criteria": [
       { "type": "stateEquals", "field": "intent", "value": "periodontics", "weight": 2 },
-      { "type": "replyIncludes", "value": "gingivitis", "weight": 2 },
-      { "type": "replyIncludes", "value": "periodontitis", "weight": 2 },
+      { "type": "replyIncludes", "value": "El sangrado es leve o abundante", "weight": 2 },
+      { "type": "replyExcludes", "value": "gingivitis", "weight": 2 },
+      { "type": "replyExcludes", "value": "periodontitis", "weight": 2 },
       { "type": "replyExcludes", "value": "90 EUR", "weight": 3 }
     ]
   },
@@ -367,9 +368,9 @@
     "messages": ["Creo que tengo una caries en una muela"],
     "criteria": [
       { "type": "stateEquals", "field": "intent", "value": "caries_restoration", "weight": 2 },
-      { "type": "replyIncludes", "value": "caries", "weight": 2 },
       { "type": "replyIncludes", "value": "frio/calor", "weight": 2 },
-      { "type": "replyIncludes", "value": "al morder", "weight": 2 }
+      { "type": "replyIncludes", "value": "al morder", "weight": 2 },
+      { "type": "replyExcludes", "value": "filtración de empaste", "weight": 2 }
     ]
   },
   {
@@ -544,8 +545,9 @@
     "messages": ["Tengo un diente que se mueve y me sangran las encias"],
     "criteria": [
       { "type": "stateEquals", "field": "intent", "value": "periodontics", "weight": 2 },
-      { "type": "replyIncludes", "value": "gingivitis", "weight": 2 },
-      { "type": "replyIncludes", "value": "periodontitis", "weight": 2 }
+      { "type": "replyIncludes", "value": "El sangrado es leve o abundante", "weight": 2 },
+      { "type": "replyExcludes", "value": "gingivitis", "weight": 2 },
+      { "type": "replyExcludes", "value": "periodontitis", "weight": 2 }
     ]
   },
   {

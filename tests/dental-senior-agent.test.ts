@@ -157,7 +157,10 @@ describe("runDentalSeniorTurn", () => {
     expect(withoutPriceAsk.state.treatmentNeed).toBe("Periodoncia");
     expect(withoutPriceAsk.state.budget).toBe("desde 90 EUR");
     expect(withoutPriceAsk.state.triageLabel).toBe("Prioridad 48-72h");
-    expect(withoutPriceAsk.reply).toContain("gingivitis");
+    // Bug real corregido: antes de la pregunta de seguridad (sangrado leve/
+    // abundante, golpe) no debe adelantarse un diagnostico como "gingivitis".
+    expect(withoutPriceAsk.reply).not.toContain("gingivitis");
+    expect(withoutPriceAsk.reply).toContain("El sangrado es leve o abundante");
     expect(withoutPriceAsk.reply).not.toContain("90 EUR");
 
     const withPriceAsk = runDentalSeniorTurn(
@@ -391,7 +394,10 @@ describe("runDentalSeniorTurn", () => {
 
     expect(turn.state.intent).toBe("periodontics");
     expect(turn.state.treatmentNeed).toBe("Periodoncia");
-    expect(turn.reply.toLowerCase()).toContain("gingivitis");
+    // Bug real corregido: con la pregunta de seguridad (sangrado leve/abundante,
+    // golpe) todavia pendiente, no debe adelantarse un diagnostico como "gingivitis".
+    expect(turn.reply.toLowerCase()).not.toContain("gingivitis");
+    expect(turn.reply.toLowerCase()).toContain("el sangrado es leve o abundante");
   });
 
   it("does not reduce orthodontics to invisible aligners when the patient asks for brackets", () => {

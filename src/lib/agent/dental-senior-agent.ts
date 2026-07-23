@@ -836,6 +836,17 @@ function buildIntro(state: DentalAgentState, profile: IntentProfile, latestPatie
   ) {
     return "Que una muela se mueva conviene revisarlo pronto para valorar la encia y el soporte de la pieza.";
   }
+  // Bug real: con una pregunta de seguridad/aclaracion todavia pendiente
+  // (missingClinicalData), este guion generico decia "podria ser gingivitis o
+  // periodontitis"/"caries o filtracion de empaste" ANTES de preguntar nada,
+  // inventando un diagnostico sin haber descartado ni un sintoma. La pregunta ya
+  // la hace nextStep() a continuacion: aqui solo va la empatia si aplica, nunca
+  // la hipotesis clinica, hasta que esa pregunta quede contestada.
+  // Si el paciente pregunta el precio explicitamente, respondemos aunque quede
+  // una pregunta de seguridad pendiente: no retenemos informacion que ya pidio.
+  if (pendingSafetyScreenQuestion(state) && !asksPriceNow) {
+    return `${suitabilityAnswer || empathy.trim()}${alarm}`.trim();
+  }
   const suitabilityPrefix = suitabilityAnswer ? `${suitabilityAnswer} ` : empathy;
   return `${suitabilityPrefix}Por lo que me cuentas podria ser ${causes}; te lo confirmara el doctor al verte.${alarm}${price}`;
 }
@@ -870,6 +881,20 @@ const CONSENT_ASKS = [
   "Te dejo la cita preparada si te va bien. Aceptas que guardemos tus datos para gestionarla?",
   "Puedo dejarte la cita lista ahora mismo. Aceptas que guardemos tus datos para gestionarla?"
 ];
+
+// Mismas condiciones que nextStep() usa para decidir si el turno hace (o ya esta
+// haciendo) una pregunta de seguridad/diferencial pendiente, expresadas aparte para
+// que buildIntro() pueda comprobarlas sin adelantar una hipotesis clinica antes de
+// esa pregunta (bug real: "podria ser gingivitis o periodontitis"/"caries o
+// filtracion de empaste" aparecian ANTES de la pregunta de seguridad).
+function pendingSafetyScreenQuestion(state: DentalAgentState): boolean {
+  if (state.safetyScreened || state.escalated) return false;
+  if (state.missingClinicalData[0]) return true;
+  if (state.redFlags.length === 0 && ["urgent_pain", "endodontics", "wisdom_tooth", "trauma"].includes(state.intent ?? "")) {
+    return true;
+  }
+  return state.intent === "caries_restoration" && state.redFlags.length === 0;
+}
 
 function nextStep(state: DentalAgentState, latestPatientText: string) {
   if (state.intent === "trauma" && state.redFlags.length === 0 && !state.safetyScreened) {

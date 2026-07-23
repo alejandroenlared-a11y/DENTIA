@@ -282,8 +282,8 @@
     "messages": ["tengo mal aliento desde hace meses"],
     "criteria": [
       { "type": "stateEquals", "field": "intent", "value": "periodontics" },
-      { "type": "replyIncludes", "value": "gingivitis" },
-      { "type": "replyIncludes", "value": "mal aliento" }
+      { "type": "replyIncludes", "value": "mal aliento" },
+      { "type": "replyExcludes", "value": "gingivitis" }
     ]
   },
   {
@@ -293,7 +293,6 @@
     "messages": ["tengo una mancha negra en una muela"],
     "criteria": [
       { "type": "stateEquals", "field": "intent", "value": "caries_restoration" },
-      { "type": "replyIncludes", "value": "caries" },
       { "type": "replyIncludes", "value": "frio/calor" }
     ]
   },

@@ -20,7 +20,7 @@ import {
   type DentalAgentState
 } from "@/lib/agent/dental-senior-agent";
 import { mapConversationIntent, normalizeDentalAgentState } from "@/lib/agent/dental-agent-migration";
-import type { ConversationIntent, TreatmentTopic } from "@/lib/agent/dental-agent-types";
+import type { BookingStatus, ConversationIntent, ConversationStatus, TreatmentTopic } from "@/lib/agent/dental-agent-types";
 
 // Mismo patron que el "gracias" suelto ya usado en dental-senior-agent.ts (nextStep/
 // buildCourtesyReply) para distinguir un agradecimiento de cierre de una confirmacion
@@ -42,7 +42,33 @@ export function routeConversationIntent(latestPatientText: string): Conversation
 export type RoutedConversationFields = {
   conversationIntent: ConversationIntent;
   treatmentTopic: TreatmentTopic;
+  bookingStatus: BookingStatus;
+  conversationStatus: ConversationStatus;
 };
+
+const BOOKED_STATUSES = new Set<BookingStatus>(["PREBOOKED", "CONFIRMED"]);
+const CLOSING_CONVERSATION_INTENTS = new Set<ConversationIntent>(["thanks", "confirm"]);
+
+// Sin campo persistido de "conversacion cerrada" en DentalAgentState (séria un
+// cambio de esquema mas arriesgado), esto se deriva del turno actual: una
+// reserva ya hecha (bookingStatus PREBOOKED/CONFIRMED) mas un acto de cierre
+// puro (gracias/confirmacion sin mas contenido) cierra la conversacion. Nunca
+// puede quedar "atascada" cerrada: en cuanto el paciente escribe algo con
+// contenido real (gestionar cita, sintoma nuevo, pregunta...), ese mismo turno
+// ya clasifica como otro conversationIntent y esto vuelve a ACTIVE solo.
+function deriveConversationStatus(
+  state: DentalAgentState,
+  bookingStatus: BookingStatus,
+  conversationIntent: ConversationIntent
+): ConversationStatus {
+  if (state.requiresGuardian || state.escalated) {
+    return "ESCALATED";
+  }
+  if (BOOKED_STATUSES.has(bookingStatus) && CLOSING_CONVERSATION_INTENTS.has(conversationIntent)) {
+    return "CLOSED";
+  }
+  return "ACTIVE";
+}
 
 // Ordinal/numero de opcion en texto libre ("la primera", "opcion 2"), para
 // complementar extractSelectedAvailabilityOption (que solo reconoce un "1"/"2"/"3"
@@ -76,29 +102,38 @@ export function routeDentalConversationTurn(input: {
 }): RoutedConversationFields {
   const normalizedState = normalizeDentalAgentState(input.state);
   const treatmentTopic = normalizedState.treatmentTopic;
+  const bookingStatus = normalizedState.bookingStatus;
+  const conversationIntent = resolveConversationIntent(input);
+  const conversationStatus = deriveConversationStatus(input.state, bookingStatus, conversationIntent);
+
+  return { conversationIntent, treatmentTopic, bookingStatus, conversationStatus };
+}
+
+function resolveConversationIntent(input: {
+  latestPatientText: string;
+  state: DentalAgentState;
+  lastAssistantMessage?: string;
+}): ConversationIntent {
   const normalizedText = normalize(input.latestPatientText);
 
   if (input.state.dataErasureRequested) {
-    return { conversationIntent: "data_erasure", treatmentTopic };
+    return "data_erasure";
   }
 
   if (asksAppointmentManagement(normalizedText)) {
-    const conversationIntent: ConversationIntent = /(cancel|anular)/.test(normalizedText)
-      ? "cancel_appointment"
-      : "reschedule_appointment";
-    return { conversationIntent, treatmentTopic };
+    return /(cancel|anular)/.test(normalizedText) ? "cancel_appointment" : "reschedule_appointment";
   }
 
   const assistantOfferedSlots = Boolean(input.lastAssistantMessage && jumpsToBookingOptions(input.lastAssistantMessage));
   const selectedSlot = extractSelectedAvailabilityOption(input.state, normalizedText);
   if (selectedSlot || (assistantOfferedSlots && ORDINAL_SLOT_PATTERN.test(normalizedText))) {
-    return { conversationIntent: "select_slot", treatmentTopic };
+    return "select_slot";
   }
 
   const textIntent = routeConversationIntent(input.latestPatientText);
   if (textIntent !== "unknown") {
-    return { conversationIntent: textIntent, treatmentTopic };
+    return textIntent;
   }
 
-  return { conversationIntent: mapConversationIntent(input.state), treatmentTopic };
+  return mapConversationIntent(input.state);
 }

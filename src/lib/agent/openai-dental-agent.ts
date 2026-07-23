@@ -15,7 +15,9 @@ import { routeDentalConversationTurn, type RoutedConversationFields } from "@/li
 import {
   CONVERSATION_INTENT_VALUES,
   TREATMENT_TOPIC_VALUES,
+  type BookingStatus,
   type ConversationIntent,
+  type ConversationStatus,
   type TreatmentTopic
 } from "@/lib/agent/dental-agent-types";
 
@@ -80,6 +82,8 @@ export type DentalAgentApiTurn = {
   // independientemente de la version de schema activa.
   conversationIntent?: ConversationIntent;
   treatmentTopic?: TreatmentTopic;
+  bookingStatus?: BookingStatus;
+  conversationStatus?: ConversationStatus;
 };
 
 // V1 (por defecto) es el esquema/prompt actual, sin cambios. V2 anade
@@ -964,7 +968,9 @@ function attachConversationFields(
     model: turn.model,
     fallbackReason: turn.fallbackReason,
     conversationIntent: routed.conversationIntent,
-    treatmentTopic: routed.treatmentTopic
+    treatmentTopic: routed.treatmentTopic,
+    bookingStatus: routed.bookingStatus,
+    conversationStatus: routed.conversationStatus
   };
 }
 
