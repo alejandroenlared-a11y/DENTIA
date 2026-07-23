@@ -343,19 +343,30 @@ describe("hotfix dental-negation-context - contexto y negacion en el pipeline re
     expect(reply2).not.toContain("filtración de empaste");
   });
 
-  it("CASO 2: \"Es poco y no he recibido ningun golpe\" registra sangrado leve, nunca cambia a trauma", async () => {
+  it("CASO 2: \"Es poco y no he recibido ningun golpe\" registra sangrado leve, nunca cambia a trauma, y NO completa el cribado por si solo (Problema 2)", async () => {
     const t1 = await turn("Me duele una muela y sangra.", initialDentalAgentState);
     expect(t1.reply.toLowerCase()).toContain("golpe");
     expect(t1.state.intent).not.toBe("trauma");
 
     const t2 = await turn("Es poco y no he recibido ningun golpe.", t1.state);
     expect(t2.state.intent).not.toBe("trauma");
-    expect(t2.state.safetyScreened).toBe(true);
+    // Sangrado/golpe resuelto no basta: sigue faltando fiebre/hinchazon/pus/
+    // dificultad antes de dar el cribado por completo.
+    expect(t2.state.safetyScreened).toBe(false);
+    expect(t2.state.bleedingDifferentialResolved).toBe(true);
     const reply2 = t2.reply.toLowerCase();
     expect(reply2).not.toContain("fractura");
     expect(reply2).not.toContain("luxacion");
     expect(reply2).not.toContain("luxación");
     expect(reply2).not.toContain("cuando te diste el golpe");
+    expect(reply2).not.toContain("aceptas que guardemos");
+    expect(reply2).toContain("fiebre");
+
+    const t3 = await turn("No tengo fiebre, hinchazon ni pus y puedo abrir la boca y tragar bien.", t2.state);
+    expect(t3.state.safetyScreened).toBe(true);
+    expect(t3.state.consent).toBe(false);
+    expect(t3.reply.toLowerCase()).toContain("quieres que te ayude a solicitar una cita");
+    expect(t3.reply.toLowerCase()).not.toContain("aceptas que guardemos");
   });
 
   it("CASO 5: \"Si, recibi un golpe ayer\" SI activa el protocolo de traumatismo (la correccion de negaciones no rompe afirmaciones reales)", async () => {
@@ -379,5 +390,93 @@ describe("hotfix dental-negation-context - contexto y negacion en el pipeline re
     const result = await turn("Hola, quiero una cita para una limpieza.", initialDentalAgentState);
     expect(result.conversationIntent).toBe("book_appointment");
     expect(result.treatmentTopic).toBe("hygiene");
+  });
+});
+
+// Hotfix dental-negation-context: PROBLEMA 1/2/3 - la oferta de ayuda con la
+// cita y la peticion de consentimiento nunca pueden ir en el mismo turno, y
+// resolver sangrado/golpe no basta para dar el cribado de seguridad por
+// completo. CASO A-F tal y como los especifico el usuario.
+describe("hotfix dental-negation-context - CASO A-F (oferta de cita antes de consentimiento)", () => {
+  it("CASO A: \"Me duele al morder\" -> pregunta de seguridad -> \"No, nada de eso\" no repite, cierra el cribado, ofrece cita, no pide consentimiento", async () => {
+    const t1 = await turn("Me duele al morder.", initialDentalAgentState);
+    expect(t1.reply.toLowerCase()).toContain("fiebre");
+    expect(t1.state.safetyScreened).toBe(false);
+
+    const t2 = await turn("No, nada de eso.", t1.state);
+    expect(t2.state.safetyScreened).toBe(true);
+    const reply2 = t2.reply.toLowerCase();
+    expect(reply2).not.toContain("antes de nada");
+    expect(reply2).not.toContain("hay fiebre");
+    expect(t2.reply).toContain("Quieres que te ayude a solicitar una cita");
+    expect(reply2).not.toContain("aceptas que guardemos");
+    expect(t2.state.consent).toBe(false);
+  });
+
+  it("CASO B: tras la oferta, \"Si\" pide UNICAMENTE el consentimiento (sin nombre/email/telefono)", async () => {
+    const t1 = await turn("Me duele al morder.", initialDentalAgentState);
+    const t2 = await turn("No, nada de eso.", t1.state);
+    expect(t2.state.lastAssistantAction).toBe("OFFER_APPOINTMENT_HELP");
+
+    const t3 = await turn("Si", t2.state);
+    const reply3 = t3.reply.toLowerCase();
+    expect(reply3).toContain("aceptas que guardemos");
+    expect(reply3).not.toContain("nombre");
+    expect(reply3).not.toContain("email");
+    expect(reply3).not.toContain("telefono");
+    expect(reply3).not.toContain("teléfono");
+    expect(t3.state.consent).toBe(false);
+  });
+
+  it("CASO C: \"Acepto\" activa el consentimiento y pide solo el siguiente dato administrativo (nombre)", async () => {
+    const t1 = await turn("Me duele al morder.", initialDentalAgentState);
+    const t2 = await turn("No, nada de eso.", t1.state);
+    const t3 = await turn("Si", t2.state);
+    expect(t3.state.consent).toBe(false);
+
+    const t4 = await turn("Acepto", t3.state);
+    expect(t4.state.consent).toBe(true);
+    expect(t4.reply.toLowerCase()).toContain("nombre");
+    expect(t4.reply.toLowerCase()).not.toContain("email");
+    expect(t4.reply.toLowerCase()).not.toContain("telefono");
+  });
+
+  it("CASO D: tras la oferta, \"No, gracias\" no pide consentimiento ni recoge datos - cierre breve", async () => {
+    const t1 = await turn("Me duele al morder.", initialDentalAgentState);
+    const t2 = await turn("No, nada de eso.", t1.state);
+    expect(t2.state.lastAssistantAction).toBe("OFFER_APPOINTMENT_HELP");
+
+    const t3 = await turn("No, gracias", t2.state);
+    expect(t3.state.appointmentHelpDeclined).toBe(true);
+    expect(t3.state.consent).toBe(false);
+    const reply3 = t3.reply.toLowerCase();
+    expect(reply3).not.toContain("aceptas que guardemos");
+    expect(reply3).not.toContain("nombre");
+    expect(reply3).not.toContain("email");
+    expect(reply3.length).toBeLessThan(160);
+  });
+
+  it("CASO E: sangrado leve sin golpe registra la diferencial, pero no ofrece cita ni pide consentimiento todavia", async () => {
+    const t1 = await turn("Me duele una muela y sangra.", initialDentalAgentState);
+    expect(t1.reply.toLowerCase()).toContain("golpe");
+
+    const t2 = await turn("Es poco y no he recibido ningun golpe.", t1.state);
+    expect(t2.state.bleedingDifferentialResolved).toBe(true);
+    expect(t2.state.intent).not.toBe("trauma");
+    const reply2 = t2.reply.toLowerCase();
+    expect(reply2).not.toContain("fractura");
+    expect(reply2).not.toContain("luxacion");
+    expect(reply2).not.toContain("quieres que te ayude a solicitar una cita");
+    expect(reply2).not.toContain("aceptas que guardemos");
+  });
+
+  it("CASO F: al descartar tambien fiebre/hinchazon/pus/dificultad, cierra el cribado y ofrece cita (sin consentimiento en el mismo turno)", async () => {
+    const t1 = await turn("Me duele una muela y sangra.", initialDentalAgentState);
+    const t2 = await turn("Es poco y no he recibido ningun golpe.", t1.state);
+
+    const t3 = await turn("No tengo fiebre, hinchazon ni pus y puedo abrir la boca y tragar bien.", t2.state);
+    expect(t3.state.safetyScreened).toBe(true);
+    expect(t3.reply).toContain("Quieres que te ayude a solicitar una cita");
+    expect(t3.reply.toLowerCase()).not.toContain("aceptas que guardemos");
   });
 });

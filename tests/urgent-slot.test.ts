@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { formatUrgentSlotSentence, inferPreferredStartForTest, roundUpToSlot, type UrgentBooking } from "@/lib/agent";
 
 describe("roundUpToSlot", () => {
@@ -14,6 +14,18 @@ describe("roundUpToSlot", () => {
 });
 
 describe("formatUrgentSlotSentence", () => {
+  // Fijamos la hora "actual" al mediodia para que sumar 1h nunca cruce
+  // medianoche (bug real: si el test corria pasadas las 23:00, sumar 1h
+  // desbordaba al dia siguiente y "hoy" dejaba de aparecer en la frase).
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-01-15T12:00:00"));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("dice 'hoy' cuando la cita cae en el dia actual", () => {
     const now = new Date();
     const startsAt = new Date(now);

@@ -118,9 +118,19 @@ describe("runDentalSeniorTurn", () => {
     expect(second.reply.toLowerCase()).not.toContain("implante, ortodoncia");
     expect(second.reply).toContain("El sangrado es leve o abundante");
 
+    // Hotfix dental-negation-context (Problema 2): descartar sangrado/golpe
+    // ya no completa el cribado por si solo - todavia falta la pregunta
+    // general de fiebre/hinchazon/pus/dificultad antes de ofrecer la cita.
     const third = runDentalSeniorTurn(second.state, "leve, sin golpe");
-    expect(third.state.safetyScreened).toBe(true);
-    expect(third.reply).toContain("Aceptas que guardemos tus datos");
+    expect(third.state.safetyScreened).toBe(false);
+    expect(third.state.bleedingDifferentialResolved).toBe(true);
+    expect(third.reply).toContain("fiebre");
+    expect(third.reply).not.toContain("Aceptas que guardemos tus datos");
+
+    const fourth = runDentalSeniorTurn(third.state, "no tengo fiebre, hinchazon ni pus y puedo abrir la boca y tragar bien");
+    expect(fourth.state.safetyScreened).toBe(true);
+    expect(fourth.reply).toContain("Quieres que te ayude a solicitar una cita");
+    expect(fourth.reply).not.toContain("Aceptas que guardemos tus datos");
   });
 
   it("uses natural wording when asking about a dental trauma", () => {
@@ -972,13 +982,16 @@ describe("hotfix dental-negation-context: resolveAnswerToLastClinicalQuestion", 
     expect(result.resolvesSafetyScreen).toBe(true);
   });
 
-  it('CASO2: "Es poco y no he recibido ningun golpe" tras bleeding_severity_or_impact niega sangrado incontrolado y trauma', () => {
+  it('CASO2: "Es poco y no he recibido ningun golpe" tras bleeding_severity_or_impact niega sangrado incontrolado y trauma, pero NO resuelve el cribado general (Problema 2)', () => {
     const result = resolveAnswerToLastClinicalQuestion({
       patientMessage: "Es poco y no he recibido ningun golpe",
       lastQuestionKey: "bleeding_severity_or_impact"
     });
     expect(result.negated).toEqual(expect.arrayContaining(["bleedingUncontrolled", "trauma"]));
-    expect(result.resolvesSafetyScreen).toBe(true);
+    // Resolver sangrado/golpe cierra su propia diferencial, no el cribado
+    // general (todavia falta fiebre/hinchazon/pus/dificultad).
+    expect(result.resolvesBleedingDifferential).toBe(true);
+    expect(result.resolvesSafetyScreen).toBe(false);
   });
 
   it("sin lastQuestionKey, una negacion global no resuelve nada (no hay pregunta que interpretar)", () => {

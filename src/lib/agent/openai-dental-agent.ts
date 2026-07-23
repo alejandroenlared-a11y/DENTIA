@@ -150,7 +150,18 @@ export const dentalAgentStateSchema = z.object({
   // seguridad fija se hizo el ultimo turno, para interpretar negaciones
   // ("no, nada de eso") en contexto. Default seguro ("" = ninguna) para
   // estados antiguos persistidos antes de este hotfix.
-  lastQuestionKey: z.string().default("")
+  lastQuestionKey: z.string().default(""),
+  // Hotfix dental-negation-context (Problema 2): sangrado/golpe resuelto no
+  // implica cribado general completo. Default seguro (false) para estados
+  // antiguos persistidos antes de este hotfix.
+  bleedingDifferentialResolved: z.boolean().default(false),
+  // Hotfix dental-negation-context (Problema 1/3): identifica la ultima
+  // pregunta/oferta del flujo completo (no solo clinica) para interpretar
+  // "si"/"no, gracias" en contexto. Default seguro ("") para estados
+  // antiguos.
+  lastAssistantAction: z.string().default(""),
+  appointmentHelpAccepted: z.boolean().default(false),
+  appointmentHelpDeclined: z.boolean().default(false)
 });
 
 const dentalChatMessageSchema = z.object({
@@ -1087,6 +1098,10 @@ function mergeAiState(localState: DentalAgentState, aiOutput: DentalAgentAiOutpu
     missingClinicalData: localState.missingClinicalData,
     redFlags: localState.redFlags,
     lastQuestionKey: localState.lastQuestionKey,
+    bleedingDifferentialResolved: localState.bleedingDifferentialResolved,
+    lastAssistantAction: localState.lastAssistantAction,
+    appointmentHelpAccepted: localState.appointmentHelpAccepted,
+    appointmentHelpDeclined: localState.appointmentHelpDeclined,
     bookingStatus: localState.bookingStatus,
     conversationStatus: localState.conversationStatus,
     location: localState.location,

@@ -63,7 +63,40 @@ export type DentalAgentState = {
   // en funcion de que se pregunto, no solo del texto suelto del paciente.
   // "" cuando el ultimo turno no hizo ninguna de estas preguntas fijas.
   lastQuestionKey: string;
+  // Hotfix dental-negation-context (Problema 2): resolver sangrado
+  // leve/abundante + presencia/ausencia de golpe (bleeding_severity_or_impact)
+  // ya NO basta por si solo para dar el cribado de seguridad por completo -
+  // todavia falta preguntar fiebre/hinchazon/pus/dificultad para abrir o
+  // tragar. Este flag distingue "la diferencial de sangrado esta resuelta" de
+  // "el cribado de seguridad completo esta resuelto" (safetyScreened).
+  bleedingDifferentialResolved: boolean;
+  // Hotfix dental-negation-context (Problema 1/3): identifica de forma
+  // semantica cual fue la ULTIMA pregunta/oferta que Clara hizo (mirroring de
+  // lastQuestionKey pero para el flujo completo de reserva, no solo las
+  // preguntas clinicas), para interpretar correctamente una respuesta corta
+  // ("si"/"no, gracias") segun el contexto real, no solo por texto suelto.
+  // Tipado como string (no LastAssistantAction) por el mismo motivo que
+  // lastQuestionKey: viaja serializado via Zod (dentalAgentStateSchema) y
+  // estados antiguos persistidos no garantizan un valor del enum.
+  lastAssistantAction: string;
+  // Una vez completado el triaje de seguridad, Clara ofrece ayuda para pedir
+  // cita ANTES de pedir consentimiento (nunca en el mismo turno). Estos dos
+  // flags son sticky: una vez el paciente acepta o declina esa oferta, la
+  // decision se recuerda en toda la conversacion.
+  appointmentHelpAccepted: boolean;
+  appointmentHelpDeclined: boolean;
 };
+
+export type LastAssistantAction =
+  | ""
+  | "ASK_CLINICAL_SAFETY"
+  | "OFFER_APPOINTMENT_HELP"
+  | "ASK_PRIVACY_CONSENT"
+  | "ASK_NAME"
+  | "ASK_EMAIL"
+  | "ASK_PHONE"
+  | "ASK_LOCATION"
+  | "OFFER_SLOTS";
 
 export type DentalAgentTurn = {
   state: DentalAgentState;
@@ -110,8 +143,25 @@ export const initialDentalAgentState: DentalAgentState = {
   bookingStatus: "IDLE",
   conversationStatus: "ACTIVE",
   closureAcknowledged: false,
-  lastQuestionKey: ""
+  lastQuestionKey: "",
+  bleedingDifferentialResolved: false,
+  lastAssistantAction: "",
+  appointmentHelpAccepted: false,
+  appointmentHelpDeclined: false
 };
+
+// Intents que exigen cribado clinico de seguridad antes de poder ofrecer
+// ayuda con la cita (Problema 1/3): el resto (administrativos, presupuesto,
+// primera visita sin sintomas...) sigue yendo directo a consentimiento como
+// hasta ahora, sin este paso intermedio.
+const CLINICAL_SAFETY_INTENTS: DentalIntentId[] = [
+  "urgent_pain",
+  "endodontics",
+  "wisdom_tooth",
+  "trauma",
+  "caries_restoration",
+  "periodontics"
+];
 
 export const intentProfiles: Record<DentalIntentId, IntentProfile> = {
   first_visit: {
@@ -369,7 +419,10 @@ const DIFFICULTY_SIGNAL_RULES: Record<
 // afirmacion real en otra clausula del mismo mensaje ("pero si tengo
 // hinchazon" ya queda en su propia clausula).
 const CLAUSE_SPLIT_PATTERN = /[.,;!¡¿?]+|\bpero\b/;
-const NEGATION_CUE_PATTERN = /\b(no|ningun[oa]?|nada|sin|tampoco|nunca)\b/;
+// "ni" incluido: bug real (CASO F) - "hinchazon ni pus" sin "ni" aqui no se
+// reconocia como negacion (solo la primera clausula, "no tengo fiebre",
+// tenia "no"), y la segunda clausula afirmaba hinchazon/pus por defecto.
+const NEGATION_CUE_PATTERN = /\b(no|ningun[oa]?|nada|sin|tampoco|nunca|ni)\b/;
 const AFFIRMATION_OVERRIDE_PATTERN = /\b(si|sí)\b/;
 
 export type ClinicalSignalExtraction = {
@@ -486,6 +539,7 @@ export type ResolvedClinicalAnswer = {
   affirmed: ClinicalSignalKey[];
   negated: ClinicalSignalKey[];
   resolvesSafetyScreen: boolean;
+  resolvesBleedingDifferential: boolean;
 };
 
 // Fuente unica de verdad para interpretar una respuesta a la ULTIMA pregunta
@@ -514,10 +568,20 @@ export function resolveAnswerToLastClinicalQuestion(input: {
     if (bleedingLevel === "abundante") affirmed.add("bleedingUncontrolled");
   }
 
+  // Hotfix dental-negation-context (Problema 2): resolver sangrado leve/
+  // abundante + golpe si/no NO completa por si solo el cribado general de
+  // seguridad (fiebre/hinchazon/pus/dificultad abrir-tragar siguen sin
+  // preguntarse) - solo cierra su propia diferencial de sangrado
+  // (resolvesBleedingDifferential), nunca resolvesSafetyScreen.
+  const isBleedingQuestion = input.lastQuestionKey === "bleeding_severity_or_impact";
   const resolvesSafetyScreen =
-    expectedSignals.length > 0 && expectedSignals.every(key => negated.has(key) || affirmed.has(key));
+    !isBleedingQuestion &&
+    expectedSignals.length > 0 &&
+    expectedSignals.every(key => negated.has(key) || affirmed.has(key));
+  const resolvesBleedingDifferential =
+    isBleedingQuestion && expectedSignals.every(key => negated.has(key) || affirmed.has(key));
 
-  return { affirmed: [...affirmed], negated: [...negated], resolvesSafetyScreen };
+  return { affirmed: [...affirmed], negated: [...negated], resolvesSafetyScreen, resolvesBleedingDifferential };
 }
 
 // Determina que pregunta clinica/de seguridad fija hara nextStep ESTE turno
@@ -525,7 +589,10 @@ export function resolveAnswerToLastClinicalQuestion(input: {
 // paciente el turno siguiente). Replica las mismas condiciones que nextStep,
 // sin duplicar el texto de las preguntas.
 function identifyNextClinicalQuestionKey(
-  state: Pick<DentalAgentState, "intent" | "redFlags" | "safetyScreened" | "missingClinicalData" | "escalated">,
+  state: Pick<
+    DentalAgentState,
+    "intent" | "redFlags" | "safetyScreened" | "missingClinicalData" | "escalated" | "bleedingDifferentialResolved"
+  >,
   latestPatientText: string
 ): LastQuestionKey {
   if (state.intent === "trauma" && state.redFlags.length === 0 && !state.safetyScreened) {
@@ -545,6 +612,18 @@ function identifyNextClinicalQuestionKey(
     return "bleeding_severity_or_impact";
   }
   if (!state.escalated && state.intent === "caries_restoration" && state.redFlags.length === 0 && !state.safetyScreened) {
+    return "safety_screen_general";
+  }
+  // Hotfix dental-negation-context (Problema 2): tras resolver la diferencial
+  // de sangrado/golpe en periodoncia, todavia falta la pregunta general de
+  // fiebre/hinchazon/pus/dificultad antes de dar el cribado por completo.
+  if (
+    !state.escalated &&
+    state.intent === "periodontics" &&
+    state.redFlags.length === 0 &&
+    !state.safetyScreened &&
+    state.bleedingDifferentialResolved
+  ) {
     return "safety_screen_general";
   }
   return "";
@@ -688,18 +767,30 @@ export function runDentalSeniorTurn(current: DentalAgentState, rawText: string, 
   // safetyScreened se quedaba false para siempre y Clara repetia la misma
   // pregunta indefinidamente. clinicalAnswer.resolvesSafetyScreen cubre
   // exactamente esta negacion generica, sin palabra clave.
+  // Hotfix dental-negation-context (Problema 2): el fallback generico de
+  // detectSafetyScreen (palabras sueltas como "leve"/"sin golpe") no puede
+  // completar el cribado GENERAL cuando lo que en realidad se esta
+  // respondiendo es la pregunta ESTRECHA de sangrado/golpe - si no, "leve,
+  // sin golpe" cerraba de un tiron todo el cribado sin haber preguntado
+  // nunca fiebre/hinchazon/pus/dificultad.
+  const isAnsweringBleedingQuestion = current.lastQuestionKey === "bleeding_severity_or_impact";
   const safetyScreened =
     current.safetyScreened ||
     clinicalAnswer.resolvesSafetyScreen ||
-    (intent === "trauma"
-      ? detectTraumaSafetyScreen(normalized, redFlags)
-      : detectSafetyScreen(normalized, redFlags)) ||
+    (!isAnsweringBleedingQuestion &&
+      (intent === "trauma"
+        ? detectTraumaSafetyScreen(normalized, redFlags)
+        : detectSafetyScreen(normalized, redFlags))) ||
     patientDeescalates;
+  // Hotfix dental-negation-context (Problema 2): sangrado leve/abundante +
+  // golpe si/no resuelto es un requisito PREVIO al cribado general, nunca lo
+  // sustituye - ver comentario en resolveAnswerToLastClinicalQuestion.
+  const bleedingDifferentialResolved = current.bleedingDifferentialResolved || clinicalAnswer.resolvesBleedingDifferential;
   let triageLevel = getTriageLevel(intent, redFlags, detectedSignals);
   if (patientDeescalates && (triageLevel === "URGENT_24H" || triageLevel === "PRIORITY_72H")) {
     triageLevel = "ROUTINE";
   }
-  const missingClinicalData = getMissingClinicalData(intent, detectedSignals, safetyScreened);
+  const missingClinicalData = getMissingClinicalData(intent, detectedSignals, safetyScreened, bleedingDifferentialResolved);
   // Bug real detectado en pruebas de estres: un menor que dice su edad y pide
   // cita "sin mis padres" recibia el mismo guion de consentimiento/reserva que
   // un adulto. Una vez detectado, se pide tutor en todos los turnos
@@ -724,7 +815,35 @@ export function runDentalSeniorTurn(current: DentalAgentState, rawText: string, 
   // Hotfix dental-negation-context: que pregunta hara nextStep (mas abajo)
   // ESTE turno, para poder interpretar la respuesta del paciente el turno
   // siguiente con resolveAnswerToLastClinicalQuestion.
-  const lastQuestionKey = identifyNextClinicalQuestionKey({ intent, redFlags, safetyScreened, missingClinicalData, escalated }, text);
+  const lastQuestionKey = identifyNextClinicalQuestionKey(
+    { intent, redFlags, safetyScreened, missingClinicalData, escalated, bleedingDifferentialResolved },
+    text
+  );
+  // Hotfix dental-negation-context (Problema 1): interpreta "si"/"no, gracias"
+  // segun si Clara ACABA de ofrecer ayuda para pedir cita (current.lastAssistantAction),
+  // no por texto suelto sin contexto - sticky una vez aceptado o declinado.
+  const offeredAppointmentHelpLastTurn = current.lastAssistantAction === "OFFER_APPOINTMENT_HELP";
+  const appointmentHelpAccepted =
+    current.appointmentHelpAccepted || (offeredAppointmentHelpLastTurn && acceptsAppointmentHelp(normalized));
+  const appointmentHelpDeclined =
+    !appointmentHelpAccepted &&
+    (current.appointmentHelpDeclined || (offeredAppointmentHelpLastTurn && declinesAppointmentHelp(normalized)));
+  const lastAssistantAction = identifyLastAssistantAction({
+    intent,
+    redFlags,
+    safetyScreened,
+    missingClinicalData,
+    escalated,
+    bleedingDifferentialResolved,
+    consent,
+    name,
+    email,
+    phone,
+    location,
+    availability,
+    appointmentHelpAccepted,
+    appointmentHelpDeclined
+  });
 
   let nextState = completeDentalState({
     ...current,
@@ -750,6 +869,10 @@ export function runDentalSeniorTurn(current: DentalAgentState, rawText: string, 
     missingClinicalData,
     safetyScreened,
     lastQuestionKey,
+    bleedingDifferentialResolved,
+    lastAssistantAction,
+    appointmentHelpAccepted,
+    appointmentHelpDeclined,
     consent,
     name,
     phone,
@@ -1230,6 +1353,13 @@ function buildIntro(state: DentalAgentState, profile: IntentProfile, latestPatie
 }
 
 function buildAck(state: DentalAgentState, previous: DentalAgentState) {
+  // Hotfix dental-negation-context (Problema 1): el paciente declino la
+  // oferta de ayuda con la cita - cierre breve, sin pedir consentimiento ni
+  // iniciar la reserva (ver nextStep, que en este mismo turno ya no pregunta
+  // nada mas).
+  if (state.appointmentHelpDeclined && !previous.appointmentHelpDeclined) {
+    return "De acuerdo, no pasa nada. Si cambias de opinión o necesitas algo más, aquí estoy.";
+  }
   // Bug real (pruebas de estres): un paciente que bajaba de "10/10, no
   // aguanto" a "puede esperar a la semana que viene" recibia la misma
   // pregunta de seguridad tal cual, como si no hubiera dicho nada.
@@ -1271,7 +1401,11 @@ function pendingSafetyScreenQuestion(state: DentalAgentState): boolean {
   if (state.redFlags.length === 0 && ["urgent_pain", "endodontics", "wisdom_tooth", "trauma"].includes(state.intent ?? "")) {
     return true;
   }
-  return state.intent === "caries_restoration" && state.redFlags.length === 0;
+  if (state.intent === "caries_restoration" && state.redFlags.length === 0) return true;
+  // Hotfix dental-negation-context (Problema 2): tras resolver sangrado/golpe
+  // en periodoncia, la pregunta general de fiebre/hinchazon/pus/dificultad
+  // sigue pendiente - no diagnosticar todavia en ese turno intermedio.
+  return state.intent === "periodontics" && state.redFlags.length === 0 && state.bleedingDifferentialResolved;
 }
 
 function nextStep(state: DentalAgentState, latestPatientText: string) {
@@ -1301,11 +1435,23 @@ function nextStep(state: DentalAgentState, latestPatientText: string) {
   // un primer mensaje de caries simple), pero una vez resuelta la diferencial
   // (missingClinicalData ya vacio) sigue haciendo falta descartar
   // absceso/infeccion antes de pasar a diagnostico + consentimiento.
-  // (periodontics no necesita este mismo parche: sus missingClinicalData de
-  // sangrado/movilidad estan atados a safetyScreened por diseno y nunca
-  // quedan vacios sin que safetyScreened ya sea true; ver getMissingClinicalData).
+  // periodontics: su missingClinicalData de sangrado/movilidad se cierra con
+  // bleedingDifferentialResolved (ver getMissingClinicalData), no con
+  // safetyScreened - todavia falta la pregunta general de abajo.
   if (!state.escalated && state.intent === "caries_restoration" && state.redFlags.length === 0 && !state.safetyScreened) {
     return "Antes de nada: hay fiebre, hinchazon, pus o te cuesta abrir la boca o tragar?";
+  }
+  // Hotfix dental-negation-context (Problema 2): resolver sangrado leve/
+  // abundante + golpe si/no NO completa el cribado - todavia falta descartar
+  // fiebre/hinchazon/pus/dificultad para abrir o tragar en una pregunta aparte.
+  if (
+    !state.escalated &&
+    state.intent === "periodontics" &&
+    state.redFlags.length === 0 &&
+    !state.safetyScreened &&
+    state.bleedingDifferentialResolved
+  ) {
+    return "Gracias. ¿Tienes también fiebre, hinchazón, pus o dificultad para abrir la boca o tragar?";
   }
   // Fix real (CASO 1): una peticion administrativa de cita (limpieza, sin
   // sintomas) no debe pedir consentimiento como primer dato - la sede no es
@@ -1314,6 +1460,29 @@ function nextStep(state: DentalAgentState, latestPatientText: string) {
   // disponibilidad).
   if (!state.escalated && state.intent === "reactivation" && !state.consent && !state.location) {
     return `Te viene mejor ${demoKnowledge.clinic.locations.join(" o ")}?`;
+  }
+  // Hotfix dental-negation-context (Problema 1/3): tras completar el triaje
+  // clinico de seguridad, Clara ofrece ayuda para la cita ANTES de pedir
+  // consentimiento - nunca ambas cosas en el mismo turno. Solo aplica a
+  // conversaciones que de verdad pasaron por un cribado clinico (sintoma
+  // real); las peticiones administrativas (limpieza, presupuesto...) siguen
+  // yendo directas a consentimiento como hasta ahora.
+  if (
+    !state.escalated &&
+    !state.consent &&
+    !state.appointmentHelpAccepted &&
+    !state.appointmentHelpDeclined &&
+    state.intent &&
+    CLINICAL_SAFETY_INTENTS.includes(state.intent) &&
+    state.safetyScreened
+  ) {
+    return "De acuerdo. No aparecen señales de alarma inmediatas, pero conviene que un dentista valore la zona. ¿Quieres que te ayude a solicitar una cita?";
+  }
+  // El paciente declino la oferta de ayuda: no se pide consentimiento ni se
+  // recogen datos. buildAck ya emitio el cierre breve este mismo turno (ver
+  // mas arriba); aqui no hay nada mas pendiente que preguntar.
+  if (!state.escalated && !state.consent && state.appointmentHelpDeclined) {
+    return "";
   }
   if (!state.consent) {
     return state.escalated
@@ -1709,6 +1878,23 @@ function completeDentalState(state: DentalAgentState): DentalAgentState {
 // clausula, no una lista cerrada de frases) - sustituye a la vieja
 // isTraumaNegated, que no reconocia frases como "no he recibido ningun
 // golpe".
+// Bug real (Problema 2 / CASO F): negar fiebre/hinchazon/pus al responder la
+// pregunta general de seguridad ("no tengo fiebre, hinchazon ni pus...")
+// coincidia con las palabras sueltas de la rama generica de urgent_pain (mas
+// abajo) y reclasificaba el intent aunque el paciente estuviera DESCARTANDO
+// alarmas, no reportandolas. Reutiliza el mismo escaneo por clausula que
+// extractAffirmedAndNegatedClinicalSignals para saber si la mencion esta
+// realmente negada en su propia clausula.
+function mentionsUrgentAlarmWithoutNegation(normalized: string): boolean {
+  const clauses = normalized
+    .split(CLAUSE_SPLIT_PATTERN)
+    .map(clause => clause.trim())
+    .filter(Boolean);
+  return clauses.some(
+    clause => /(dolor|duele|hinchad|inflamad|pus|flemon|urgencia)/.test(clause) && !NEGATION_CUE_PATTERN.test(clause)
+  );
+}
+
 function inferIntent(
   current: DentalIntentId | undefined,
   normalized: string,
@@ -1746,7 +1932,7 @@ function inferIntent(
   if (/(bruxismo|aprieto|rechino|chasquido|mandibula|atm|dolor de cabeza)/.test(normalized)) return "tmj_bruxism";
   if (/(late|pulsatil|por la noche|me despierta|calor|dolor espontaneo|nervio)/.test(normalized)) return "endodontics";
   if (/(frio|dulce|agujero|mancha|caries|empaste|sensibilidad|al morder)/.test(normalized)) return "caries_restoration";
-  if ((/(dolor|duele|hinchad|inflamad|pus|flemon|urgencia)/.test(normalized) && !isPainNegated(normalized)) || signals.includes("dolor intenso")) return "urgent_pain";
+  if (mentionsUrgentAlarmWithoutNegation(normalized) || signals.includes("dolor intenso")) return "urgent_pain";
   if (/(limpieza|limpiar|higiene|quitar sarro|sarro)/.test(normalized)) return "reactivation";
   if (/(revision|revisar|primera visita|cita|valoracion)/.test(normalized)) return current ?? "first_visit";
   return current;
@@ -1779,7 +1965,12 @@ function getTriageLevel(intent: DentalIntentId | undefined, redFlags: string[], 
   return "ROUTINE";
 }
 
-function getMissingClinicalData(intent: DentalIntentId | undefined, signals: string[], safetyScreened: boolean) {
+function getMissingClinicalData(
+  intent: DentalIntentId | undefined,
+  signals: string[],
+  safetyScreened: boolean,
+  bleedingDifferentialResolved: boolean
+) {
   const missing: string[] = [];
   if (!intent) return missing;
   if (["urgent_pain", "endodontics", "caries_restoration"].includes(intent) && !safetyScreened) {
@@ -1793,10 +1984,18 @@ function getMissingClinicalData(intent: DentalIntentId | undefined, signals: str
   if (["urgent_pain", "endodontics", "wisdom_tooth"].includes(intent) && !safetyScreened) {
     missing.push("Desde cuando ocurre y que intensidad tiene del 0 al 10?");
   }
-  if (intent === "periodontics" && signals.includes("sangrado de encias") && !safetyScreened) {
+  // Hotfix dental-negation-context (Problema 2): esta pregunta se cierra con
+  // su propio flag (bleedingDifferentialResolved) ademas de safetyScreened -
+  // asi no se repite una vez respondida especificamente, pero resolverla
+  // tampoco da por completo el cribado general (fiebre/hinchazon/pus/
+  // dificultad siguen pendientes hasta que safetyScreened tambien sea true).
+  if (intent === "periodontics" && signals.includes("sangrado de encias") && !bleedingDifferentialResolved && !safetyScreened) {
     missing.push("El sangrado es leve o abundante, y ha empezado tras un golpe?");
   }
-  if (intent === "periodontics" && signals.includes("movilidad dental") && !safetyScreened) {
+  // bleedingDifferentialResolved tambien cierra esta pregunta cuando ambas
+  // señales (sangrado + movilidad) coinciden en la misma conversación: pregunta
+  // por el mismo trauma/sangrado de fondo, resolverlo una vez basta.
+  if (intent === "periodontics" && signals.includes("movilidad dental") && !safetyScreened && !bleedingDifferentialResolved) {
     missing.push("Te duele, notas inflamación, sangrado o ha sido por un golpe?");
   }
   if (intent === "periodontics" && !signals.some(signal => ["sangrado de encias", "movilidad dental"].includes(signal))) {
@@ -2048,6 +2247,20 @@ function wasAskedForConsent(state: DentalAgentState): boolean {
   if (state.intent === "reactivation" && !state.location) {
     return false;
   }
+  // Hotfix dental-negation-context (Problema 1): mientras la oferta de ayuda
+  // con la cita siga pendiente de resolver, un "si"/"vale" suelto responde a
+  // ESA oferta, no es una aceptacion de guardar datos - sin esto,
+  // acceptsConsent() marcaria consent=true por error en el mismo turno que
+  // debia limitarse a aceptar (o declinar) la oferta.
+  if (
+    !state.escalated &&
+    !state.appointmentHelpAccepted &&
+    !state.appointmentHelpDeclined &&
+    CLINICAL_SAFETY_INTENTS.includes(state.intent) &&
+    state.safetyScreened
+  ) {
+    return false;
+  }
   return true;
 }
 
@@ -2161,6 +2374,105 @@ function acceptsConsent(normalized: string) {
 
 function acceptsExplicitConsent(normalized: string) {
   return /\b(acepto|autorizo|consiento)\b.{0,50}\b(datos|guardar|guarde|gestionarla|gestionarlo|cita)\b/.test(normalized);
+}
+
+// Hotfix dental-negation-context (Problema 1): interpreta la respuesta a la
+// oferta de ayuda con la cita. declinesAppointmentHelp se comprueba primero
+// (una negacion explicita nunca se confunde con una aceptacion).
+function declinesAppointmentHelp(normalized: string) {
+  return /\bno\b/.test(normalized);
+}
+
+function acceptsAppointmentHelp(normalized: string) {
+  if (declinesAppointmentHelp(normalized)) return false;
+  return /(\bsi\b|\bvale\b|\bdale\b|\bok\b|de acuerdo|ayudame|ayudeme|quiero cita|porfavor|por favor)/.test(normalized);
+}
+
+// Hotfix dental-negation-context (Problema 3): replica la secuencia completa
+// de nextStep() para identificar, en terminos semanticos, que pregunta u
+// oferta hara ESTE turno - se persiste para poder interpretar correctamente
+// una respuesta corta ("si"/"no, gracias") el turno siguiente segun el
+// contexto real, no solo por texto suelto.
+function identifyLastAssistantAction(
+  state: Pick<
+    DentalAgentState,
+    | "intent"
+    | "redFlags"
+    | "safetyScreened"
+    | "missingClinicalData"
+    | "escalated"
+    | "bleedingDifferentialResolved"
+    | "consent"
+    | "name"
+    | "email"
+    | "phone"
+    | "location"
+    | "availability"
+    | "appointmentHelpAccepted"
+    | "appointmentHelpDeclined"
+  >
+): LastAssistantAction {
+  if (state.intent === "trauma" && state.redFlags.length === 0 && !state.safetyScreened) {
+    return "ASK_CLINICAL_SAFETY";
+  }
+  if (
+    state.redFlags.length === 0 &&
+    !state.safetyScreened &&
+    ["urgent_pain", "endodontics", "wisdom_tooth", "trauma"].includes(state.intent ?? "")
+  ) {
+    return "ASK_CLINICAL_SAFETY";
+  }
+  if (!state.escalated && state.missingClinicalData[0]) {
+    return "ASK_CLINICAL_SAFETY";
+  }
+  if (!state.escalated && state.intent === "caries_restoration" && state.redFlags.length === 0 && !state.safetyScreened) {
+    return "ASK_CLINICAL_SAFETY";
+  }
+  if (
+    !state.escalated &&
+    state.intent === "periodontics" &&
+    state.redFlags.length === 0 &&
+    !state.safetyScreened &&
+    state.bleedingDifferentialResolved
+  ) {
+    return "ASK_CLINICAL_SAFETY";
+  }
+  if (!state.escalated && state.intent === "reactivation" && !state.consent && !state.location) {
+    return "ASK_LOCATION";
+  }
+  if (
+    !state.escalated &&
+    !state.consent &&
+    !state.appointmentHelpAccepted &&
+    !state.appointmentHelpDeclined &&
+    state.intent &&
+    CLINICAL_SAFETY_INTENTS.includes(state.intent) &&
+    state.safetyScreened
+  ) {
+    return "OFFER_APPOINTMENT_HELP";
+  }
+  if (!state.escalated && !state.consent && state.appointmentHelpDeclined) {
+    return "";
+  }
+  if (!state.consent) {
+    return "ASK_PRIVACY_CONSENT";
+  }
+  if (!state.name || !hasFullName(state.name)) {
+    return "ASK_NAME";
+  }
+  if (!state.escalated && !state.email) {
+    return "ASK_EMAIL";
+  }
+  if (!state.phone) {
+    return "ASK_PHONE";
+  }
+  if (!state.location) {
+    return "ASK_LOCATION";
+  }
+  if (!state.availability) {
+    return "OFFER_SLOTS";
+  }
+  return "";
 }
 
 function unique(values: string[]) {

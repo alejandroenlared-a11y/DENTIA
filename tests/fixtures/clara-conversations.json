@@ -124,14 +124,34 @@
     ]
   },
   {
-    "id": "moving-tooth-consent-after-safety",
+    "id": "moving-tooth-safety-not-done-after-bleeding",
     "category": "triaje",
-    "title": "Tras descartar golpe pide consentimiento",
+    "title": "Descartar golpe no cierra el cribado, falta fiebre/hinchazon/pus",
     "messages": ["se me mueve una muela", "sangrado", "leve, sin golpe"],
     "criteria": [
       { "type": "stateEquals", "field": "intent", "value": "periodontics", "weight": 2 },
+      { "type": "stateEquals", "field": "safetyScreened", "value": false, "weight": 2 },
+      { "type": "replyIncludes", "value": "fiebre", "weight": 3 },
+      { "type": "replyExcludes", "value": "Aceptas que guardemos", "weight": 2 },
+      { "type": "replyExcludes", "value": "solicitar una cita", "weight": 2 }
+    ]
+  },
+  {
+    "id": "moving-tooth-offer-after-safety",
+    "category": "triaje",
+    "title": "Tras cribado completo ofrece ayuda con la cita antes de pedir consentimiento",
+    "messages": [
+      "se me mueve una muela",
+      "sangrado",
+      "leve, sin golpe",
+      "no tengo fiebre, hinchazon ni pus y puedo abrir la boca y tragar bien"
+    ],
+    "criteria": [
+      { "type": "stateEquals", "field": "intent", "value": "periodontics", "weight": 2 },
       { "type": "stateEquals", "field": "safetyScreened", "value": true, "weight": 2 },
-      { "type": "replyIncludes", "value": "Aceptas que guardemos tus datos", "weight": 3 }
+      { "type": "stateEquals", "field": "consent", "value": false, "weight": 2 },
+      { "type": "replyIncludes", "value": "Quieres que te ayude a solicitar una cita", "weight": 3 },
+      { "type": "replyExcludes", "value": "Aceptas que guardemos", "weight": 2 }
     ]
   },
   {

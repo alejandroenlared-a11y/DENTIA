@@ -133,7 +133,11 @@ export function normalizeDentalAgentState(
       ? base.conversationStatus
       : "ACTIVE") as ConversationStatus,
     closureAcknowledged: Boolean(base.closureAcknowledged),
-    lastQuestionKey: stringField(base.lastQuestionKey)
+    lastQuestionKey: stringField(base.lastQuestionKey),
+    bleedingDifferentialResolved: Boolean(base.bleedingDifferentialResolved),
+    lastAssistantAction: stringField(base.lastAssistantAction),
+    appointmentHelpAccepted: Boolean(base.appointmentHelpAccepted),
+    appointmentHelpDeclined: Boolean(base.appointmentHelpDeclined)
   };
 
   return {

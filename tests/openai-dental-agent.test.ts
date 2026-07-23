@@ -387,7 +387,11 @@ describe("runDentalAgentTurn", () => {
     });
 
     expect(result.runtime).toBe("gemini");
-    expect(result.reply).toContain("Aceptas que guardemos tus datos");
+    // Hotfix dental-negation-context (Problema 1): tras el cribado, Clara
+    // ofrece ayuda con la cita ANTES de pedir consentimiento - nunca pide
+    // datos de contacto directamente en este turno.
+    expect(result.reply).toContain("Quieres que te ayude a solicitar una cita");
+    expect(result.reply).not.toContain("Aceptas que guardemos tus datos");
     expect(result.reply.toLowerCase()).not.toContain("me podrias indicar tu nombre");
     expect(result.reply.toLowerCase()).not.toContain("murcia o elche");
   });
