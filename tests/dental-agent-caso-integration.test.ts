@@ -413,19 +413,31 @@ describe("hotfix dental-negation-context - CASO A-F (oferta de cita antes de con
     expect(t2.state.consent).toBe(false);
   });
 
-  it("CASO B: tras la oferta, \"Si\" pide UNICAMENTE el consentimiento (sin nombre/email/telefono)", async () => {
+  it("CASO B: tras la oferta, \"Si\" pide UNICAMENTE el consentimiento (sin nombre/email/telefono, sin repetir la oferta de cita)", async () => {
     const t1 = await turn("Me duele al morder.", initialDentalAgentState);
     const t2 = await turn("No, nada de eso.", t1.state);
     expect(t2.state.lastAssistantAction).toBe("OFFER_APPOINTMENT_HELP");
 
     const t3 = await turn("Si", t2.state);
     const reply3 = t3.reply.toLowerCase();
-    expect(reply3).toContain("aceptas que guardemos");
+    expect(reply3).toContain("aceptas que");
     expect(reply3).not.toContain("nombre");
     expect(reply3).not.toContain("email");
     expect(reply3).not.toContain("telefono");
     expect(reply3).not.toContain("teléfono");
     expect(t3.state.consent).toBe(false);
+  });
+
+  // PR #13 (comentario de Codex): "Si quieres te preparo una cita" repetia la
+  // oferta de ayuda con la cita que el paciente YA habia aceptado - la
+  // pregunta de consentimiento en ese turno debe ser autonoma, sin volver a
+  // ofrecer la cita.
+  it("no repite 'Si quieres te preparo una cita' tras aceptar la oferta con 'Si'", async () => {
+    const t1 = await turn("Me duele al morder.", initialDentalAgentState);
+    const t2 = await turn("No, nada de eso.", t1.state);
+    const t3 = await turn("Si", t2.state);
+    expect(t3.reply).not.toContain("Si quieres te preparo una cita");
+    expect(t3.reply).not.toContain("¿Quieres que te ayude a solicitar una cita?");
   });
 
   it("CASO C: \"Acepto\" activa el consentimiento y pide solo el siguiente dato administrativo (nombre)", async () => {
@@ -478,5 +490,35 @@ describe("hotfix dental-negation-context - CASO A-F (oferta de cita antes de con
     expect(t3.state.safetyScreened).toBe(true);
     expect(t3.reply).toContain("Quieres que te ayude a solicitar una cita");
     expect(t3.reply.toLowerCase()).not.toContain("aceptas que guardemos");
+  });
+});
+
+// PR #13 (comentario P1 de Codex - "Do not negate red flags from unrelated
+// no"): end-to-end obligatorio por el pipeline real.
+describe("PR #13 P1: hinchazon en el ojo se conserva pese a negar fiebre en la misma frase", () => {
+  it("niega fiebre, afirma hinchazon, conserva la red flag, eleva el triaje y recomienda atencion urgente sin iniciar reserva normal", async () => {
+    const result = await turn("No tengo fiebre y tengo hinchazón en el ojo", initialDentalAgentState);
+
+    expect(result.state.redFlags).toContain("hinchazon en cuello, boca u ojo");
+    expect(result.state.triageLevel).not.toBe("ROUTINE");
+    expect(result.state.escalated).toBe(true);
+    expect(result.reply.toLowerCase()).toContain("urgencias");
+    // No inicia una reserva normal (huecos/disponibilidad): pide priorizar,
+    // no ofrece franjas.
+    expect(result.reply.toLowerCase()).not.toContain("que dia y hora");
+    expect(result.reply.toLowerCase()).not.toContain("franja");
+    expect(result.state.bookingStatus).not.toBe("SLOTS_OFFERED");
+  });
+});
+
+// PR #13 (comentario P2 de Codex): un lastQuestionKey invalido persistido en
+// el estado no puede tumbar la API con un 500.
+describe("PR #13 P2: lastQuestionKey invalido no provoca una excepcion en el pipeline real", () => {
+  it('lastQuestionKey="valor-invalido" se normaliza y el turno responde con normalidad (sin lanzar/500)', async () => {
+    const state = { ...initialDentalAgentState, lastQuestionKey: "valor-invalido" as never };
+    const result = await turn("No tengo fiebre", state);
+    expect(result.state.lastQuestionKey).not.toBe("valor-invalido");
+    expect(typeof result.reply).toBe("string");
+    expect(result.reply.length).toBeGreaterThan(0);
   });
 });

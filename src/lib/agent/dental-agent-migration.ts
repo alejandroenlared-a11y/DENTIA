@@ -4,6 +4,7 @@
 // del codigo todavia. Nada llama a esto hasta la fase 2 (el reductor).
 import {
   computeBookingStatus,
+  LAST_QUESTION_KEY_VALUES,
   type DentalAgentState,
   type DentalIntentId
 } from "@/lib/agent/dental-senior-agent";
@@ -133,7 +134,13 @@ export function normalizeDentalAgentState(
       ? base.conversationStatus
       : "ACTIVE") as ConversationStatus,
     closureAcknowledged: Boolean(base.closureAcknowledged),
-    lastQuestionKey: stringField(base.lastQuestionKey),
+    // PR #13 (comentario P2): normaliza un valor desconocido/corrupto a "" en
+    // vez de dejarlo pasar crudo (este migrador es un camino de entrada
+    // distinto al Zod schema de openai-dental-agent.ts, asi que necesita su
+    // propia validacion contra el mismo enum).
+    lastQuestionKey: (LAST_QUESTION_KEY_VALUES as readonly string[]).includes(base.lastQuestionKey as string)
+      ? (base.lastQuestionKey as DentalAgentState["lastQuestionKey"])
+      : "",
     bleedingDifferentialResolved: Boolean(base.bleedingDifferentialResolved),
     lastAssistantAction: stringField(base.lastAssistantAction),
     appointmentHelpAccepted: Boolean(base.appointmentHelpAccepted),

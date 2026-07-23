@@ -998,4 +998,82 @@ describe("hotfix dental-negation-context: resolveAnswerToLastClinicalQuestion", 
     const result = resolveAnswerToLastClinicalQuestion({ patientMessage: "No, nada de eso", lastQuestionKey: "" });
     expect(result.resolvesSafetyScreen).toBe(false);
   });
+
+  // PR #13 (comentario P2 de Codex): un lastQuestionKey desconocido/corrupto
+  // (persistido por error, o un estado antiguo) no debe lanzar excepcion.
+  it('lastQuestionKey="valor-invalido" no lanza excepcion y se trata como "sin pregunta pendiente"', () => {
+    expect(() =>
+      resolveAnswerToLastClinicalQuestion({
+        patientMessage: "No tengo fiebre",
+        lastQuestionKey: "valor-invalido" as never
+      })
+    ).not.toThrow();
+    const result = resolveAnswerToLastClinicalQuestion({
+      patientMessage: "No tengo fiebre",
+      lastQuestionKey: "valor-invalido" as never
+    });
+    expect(result.resolvesSafetyScreen).toBe(false);
+    expect(result.resolvesBleedingDifferential).toBe(false);
+  });
+});
+
+// PR #13 (comentario P1 de Codex - "Do not negate red flags from unrelated
+// no"): la negacion debe tener alcance LOCAL por señal, no por clausula
+// completa. Cubre los 8 casos exigidos en el comentario.
+describe("PR #13 P1: negacion de alcance local (extractAffirmedAndNegatedClinicalSignals)", () => {
+  it("1. 'No tengo fiebre y tengo hinchazón en el ojo' -> fever negada, swelling afirmada (NO se contamina entre señales)", () => {
+    const result = extractAffirmedAndNegatedClinicalSignals("No tengo fiebre y tengo hinchazón en el ojo");
+    expect(result.negated).toContain("fever");
+    expect(result.affirmed).toContain("swelling");
+    expect(result.negated).not.toContain("swelling");
+  });
+
+  it("2. 'No tengo fiebre ni hinchazón' -> ambas negadas", () => {
+    const result = extractAffirmedAndNegatedClinicalSignals("No tengo fiebre ni hinchazón");
+    expect(result.negated).toEqual(expect.arrayContaining(["fever", "swelling"]));
+  });
+
+  it("3. 'Tengo fiebre pero no tengo hinchazón' -> fever afirmada, swelling negada", () => {
+    const result = extractAffirmedAndNegatedClinicalSignals("Tengo fiebre pero no tengo hinchazón");
+    expect(result.affirmed).toContain("fever");
+    expect(result.negated).toContain("swelling");
+    expect(result.negated).not.toContain("fever");
+  });
+
+  it("4. 'No tengo fiebre, pero sí tengo pus' -> fever negada, pus afirmada", () => {
+    const result = extractAffirmedAndNegatedClinicalSignals("No tengo fiebre, pero sí tengo pus");
+    expect(result.negated).toContain("fever");
+    expect(result.affirmed).toContain("pus");
+    expect(result.negated).not.toContain("pus");
+  });
+
+  it("5. 'No he recibido ningún golpe pero el sangrado es abundante' -> trauma negado, sangrado afirmado", () => {
+    const result = extractAffirmedAndNegatedClinicalSignals("No he recibido ningún golpe pero el sangrado es abundante");
+    expect(result.negated).toContain("trauma");
+    expect(result.affirmed).toContain("bleedingUncontrolled");
+  });
+
+  it("6. 'No tengo dificultad para respirar ni para tragar' -> ambas dificultades negadas", () => {
+    const result = extractAffirmedAndNegatedClinicalSignals("No tengo dificultad para respirar ni para tragar");
+    expect(result.negated).toEqual(expect.arrayContaining(["breathingDifficulty", "swallowingDifficulty"]));
+  });
+
+  it('7. "No puedo respirar bien" -> dificultad respiratoria AFIRMADA (el "no" de "no puedo" no es una negacion)', () => {
+    const result = extractAffirmedAndNegatedClinicalSignals("No puedo respirar bien");
+    expect(result.affirmed).toContain("breathingDifficulty");
+    expect(result.negated).not.toContain("breathingDifficulty");
+  });
+
+  it('8. "No puedo tragar" -> dificultad para tragar AFIRMADA', () => {
+    const result = extractAffirmedAndNegatedClinicalSignals("No puedo tragar");
+    expect(result.affirmed).toContain("swallowingDifficulty");
+    expect(result.negated).not.toContain("swallowingDifficulty");
+  });
+
+  it("'Ni fiebre ni hinchazón' (sin verbo 'tengo') niega ambas señales", () => {
+    const result = extractAffirmedAndNegatedClinicalSignals("Ni fiebre ni hinchazón");
+    expect(result.negated).toEqual(expect.arrayContaining(["fever", "swelling"]));
+    expect(result.affirmed).not.toContain("fever");
+    expect(result.affirmed).not.toContain("swelling");
+  });
 });

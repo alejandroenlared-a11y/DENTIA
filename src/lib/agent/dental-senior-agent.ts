@@ -419,11 +419,73 @@ const DIFFICULTY_SIGNAL_RULES: Record<
 // afirmacion real en otra clausula del mismo mensaje ("pero si tengo
 // hinchazon" ya queda en su propia clausula).
 const CLAUSE_SPLIT_PATTERN = /[.,;!¡¿?]+|\bpero\b/;
-// "ni" incluido: bug real (CASO F) - "hinchazon ni pus" sin "ni" aqui no se
-// reconocia como negacion (solo la primera clausula, "no tengo fiebre",
-// tenia "no"), y la segunda clausula afirmaba hinchazon/pus por defecto.
+// Usado por mentionsUrgentAlarmWithoutNegation (mas abajo) para descartar
+// menciones de dolor/hinchazon/pus claramente negadas antes de reclasificar
+// el intent a urgent_pain.
 const NEGATION_CUE_PATTERN = /\b(no|ningun[oa]?|nada|sin|tampoco|nunca|ni)\b/;
-const AFFIRMATION_OVERRIDE_PATTERN = /\b(si|sí)\b/;
+
+// Bug real (PR #13, comentario P1 de Codex - "Do not negate red flags from
+// unrelated no"): tratar TODA la clausula como negada o afirmada de un tiron
+// (un solo booleano por clausula) hacia que "No tengo fiebre y tengo
+// hinchazon en el ojo" negara TAMBIEN hinchazon, solo por compartir clausula
+// con un "no" que en realidad solo gobierna a "fiebre". La negacion/
+// afirmacion tiene alcance LOCAL: se resuelve por el marcador (verbo u
+// operador) mas cercano a cada señal, no por toda la clausula.
+//
+// Los marcadores compuestos ("no tengo", "no hay") van ANTES que sus
+// homologos sueltos ("tengo", "hay") en la alternancia: si no, el escaneo
+// global encontraria "no" y "tengo" como dos marcadores SEPARADOS (uno
+// negado, otro afirmado) en vez de una sola unidad negada, y "tengo"
+// (mas cercano a la señal) ganaria por error deshaciendo el "no".
+const SIGNAL_SEGMENT_MARKER_PATTERN =
+  /\b(no tengo|no hay|no puedo|sin|ningun[oa]?|nada de|tampoco|nunca|ni|no|si tengo|tambien tengo|ademas tengo|tengo|hay|presento|noto)\b/g;
+
+const NEGATION_MARKER_WORDS = new Set([
+  "no tengo",
+  "no hay",
+  "no puedo",
+  "sin",
+  "ningun",
+  "nada de",
+  "tampoco",
+  "nunca",
+  "ni",
+  "no"
+]);
+
+type SignalMarker = { index: number; negated: boolean };
+
+function findSignalSegmentMarkers(clause: string): SignalMarker[] {
+  const markers: SignalMarker[] = [];
+  const pattern = new RegExp(SIGNAL_SEGMENT_MARKER_PATTERN.source, "g");
+  let match: RegExpExecArray | null;
+  while ((match = pattern.exec(clause))) {
+    const word = match[1].startsWith("ningun") ? "ningun" : match[1];
+    markers.push({ index: match.index, negated: NEGATION_MARKER_WORDS.has(word) });
+  }
+  return markers;
+}
+
+// El marcador que gobierna una señal es el mas cercano que la PRECEDE ("no
+// tengo fiebre" -> fiebre mira hacia atras y encuentra "no tengo"). Si la
+// señal aparece ANTES de cualquier marcador de la clausula (listas sin verbo
+// propio: "hinchazon ni pus"), hereda la polaridad del marcador que la SIGUE
+// (aqui, "ni" -> negada). Una clausula sin ningun marcador ("el sangrado es
+// abundante") no tiene nada que negarla: se asume afirmada.
+function resolveSignalPolarityAt(markers: SignalMarker[], signalIndex: number): boolean {
+  let preceding: SignalMarker | null = null;
+  let following: SignalMarker | null = null;
+  for (const marker of markers) {
+    if (marker.index <= signalIndex) {
+      if (!preceding || marker.index > preceding.index) preceding = marker;
+    } else if (!following || marker.index < following.index) {
+      following = marker;
+    }
+  }
+  if (preceding) return preceding.negated;
+  if (following) return following.negated;
+  return false;
+}
 
 export type ClinicalSignalExtraction = {
   affirmed: ClinicalSignalKey[];
@@ -445,16 +507,13 @@ export function extractAffirmedAndNegatedClinicalSignals(message: string): Clini
   const simpleKeys = Object.keys(SIMPLE_NEGATION_SIGNAL_PATTERNS) as Array<keyof typeof SIMPLE_NEGATION_SIGNAL_PATTERNS>;
 
   for (const clause of clauses) {
-    const clauseHasNegation = NEGATION_CUE_PATTERN.test(clause);
-    const clauseHasAffirmationOverride = AFFIRMATION_OVERRIDE_PATTERN.test(clause);
+    const markers = findSignalSegmentMarkers(clause);
     for (const key of simpleKeys) {
-      if (!SIMPLE_NEGATION_SIGNAL_PATTERNS[key].test(clause)) continue;
-      if (clauseHasNegation) {
+      const match = SIMPLE_NEGATION_SIGNAL_PATTERNS[key].exec(clause);
+      if (!match) continue;
+      if (resolveSignalPolarityAt(markers, match.index)) {
         negated.add(key);
       } else {
-        affirmed.add(key);
-      }
-      if (clauseHasAffirmationOverride && !clauseHasNegation) {
         affirmed.add(key);
       }
     }
@@ -519,13 +578,20 @@ function resolveBleedingLevel(normalized: string): "leve" | "abundante" | null {
 // nextStep (mas abajo) puede hacer, y que señales cubre cada una - unica
 // fuente de verdad para que resolveAnswerToLastClinicalQuestion sepa que
 // negar/afirmar ante una respuesta corta como "no, nada de eso".
-export type LastQuestionKey =
-  | "safety_screen_general"
-  | "trauma_initial"
-  | "trauma_opening_only"
-  | "trauma_swallowing_only"
-  | "bleeding_severity_or_impact"
-  | "";
+// Unica fuente de verdad para los valores validos - reusada por el enum Zod
+// de dentalAgentStateSchema (openai-dental-agent.ts) para que un valor
+// invalido persistido en el estado (ej. "valor-invalido") se normalice a ""
+// en el limite de la API en vez de llegar crudo al motor.
+export const LAST_QUESTION_KEY_VALUES = [
+  "safety_screen_general",
+  "trauma_initial",
+  "trauma_opening_only",
+  "trauma_swallowing_only",
+  "bleeding_severity_or_impact",
+  ""
+] as const;
+
+export type LastQuestionKey = (typeof LAST_QUESTION_KEY_VALUES)[number];
 
 const QUESTION_SIGNAL_MAP: Record<Exclude<LastQuestionKey, "">, ClinicalSignalKey[]> = {
   safety_screen_general: ["fever", "swelling", "pus", "swallowingDifficulty", "openingDifficulty"],
@@ -553,7 +619,14 @@ export function resolveAnswerToLastClinicalQuestion(input: {
 }): ResolvedClinicalAnswer {
   const normalized = normalize(input.patientMessage);
   const extraction = extractAffirmedAndNegatedClinicalSignals(input.patientMessage);
-  const expectedSignals = input.lastQuestionKey ? QUESTION_SIGNAL_MAP[input.lastQuestionKey] : [];
+  // Defensa en profundidad (P2, PR #13): lastQuestionKey viaja como string
+  // simple en DentalAgentState (no como enum en tiempo de ejecucion), asi que
+  // un valor corrupto o desconocido no puede asumirse valido solo porque es
+  // truthy - sin este chequeo, QUESTION_SIGNAL_MAP[valorDesconocido] es
+  // undefined y .every() de mas abajo lanzaba una excepcion no capturada.
+  const expectedSignals = Object.prototype.hasOwnProperty.call(QUESTION_SIGNAL_MAP, input.lastQuestionKey)
+    ? QUESTION_SIGNAL_MAP[input.lastQuestionKey as Exclude<LastQuestionKey, "">]
+    : [];
 
   const negated = new Set(extraction.negated);
   const affirmed = new Set(extraction.affirmed);
@@ -1483,6 +1556,13 @@ function nextStep(state: DentalAgentState, latestPatientText: string) {
   // mas arriba); aqui no hay nada mas pendiente que preguntar.
   if (!state.escalated && !state.consent && state.appointmentHelpDeclined) {
     return "";
+  }
+  // PR #13 (comentario de Codex): tras aceptar la oferta de ayuda con la
+  // cita, repetir "te preparo/dejo la cita" en la pregunta de consentimiento
+  // es redundante (el paciente YA acepto esa ayuda en el turno anterior).
+  // Este turno debe pedir UNICAMENTE el consentimiento.
+  if (!state.escalated && !state.consent && state.appointmentHelpAccepted) {
+    return "Para gestionar la cita necesitamos utilizar tus datos de contacto. ¿Aceptas que los usemos únicamente para organizar tu atención?";
   }
   if (!state.consent) {
     return state.escalated

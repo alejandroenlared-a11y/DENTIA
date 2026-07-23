@@ -5,6 +5,7 @@ import {
   hasConcreteAvailability,
   hasFullName,
   initialDentalAgentState,
+  LAST_QUESTION_KEY_VALUES,
   runDentalSeniorTurn,
   TRIAGE_URGENCY_ORDER,
   triageLabel,
@@ -150,7 +151,12 @@ export const dentalAgentStateSchema = z.object({
   // seguridad fija se hizo el ultimo turno, para interpretar negaciones
   // ("no, nada de eso") en contexto. Default seguro ("" = ninguna) para
   // estados antiguos persistidos antes de este hotfix.
-  lastQuestionKey: z.string().default(""),
+  // PR #13 (comentario P2): un valor desconocido/corrupto (ej.
+  // "valor-invalido") se normaliza a "" en el limite de la API en vez de
+  // viajar crudo hasta el motor - z.enum().catch() nunca lanza ni deja pasar
+  // un valor fuera del enum (defensa adicional en resolveAnswerToLastClinicalQuestion,
+  // dental-senior-agent.ts, para cualquier estado que no pase por este schema).
+  lastQuestionKey: z.enum(LAST_QUESTION_KEY_VALUES).catch(""),
   // Hotfix dental-negation-context (Problema 2): sangrado/golpe resuelto no
   // implica cribado general completo. Default seguro (false) para estados
   // antiguos persistidos antes de este hotfix.
