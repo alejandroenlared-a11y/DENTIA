@@ -60,6 +60,20 @@ const dentalIntentValues = [
 
 const triageValues = ["EMERGENCY", "URGENT_24H", "PRIORITY_72H", "ROUTINE", "ESTHETIC"] as const;
 const confidenceValues = ["Baja", "Media", "Alta"] as const;
+const bookingStatusValues = [
+  "IDLE",
+  "COLLECTING_CONSENT",
+  "COLLECTING_PATIENT_DATA",
+  "READY_TO_OFFER_SLOTS",
+  "SLOTS_OFFERED",
+  "SLOT_SELECTED",
+  "HELD",
+  "PREBOOKED",
+  "CONFIRMED",
+  "RESCHEDULE_REQUESTED",
+  "CANCELLED"
+] as const;
+const conversationStatusValues = ["ACTIVE", "WAITING_PATIENT", "ESCALATED", "CLOSED"] as const;
 
 export type DentalChatMessage = {
   role: "patient" | "assistant";
@@ -123,7 +137,12 @@ export const dentalAgentStateSchema = z.object({
   confidence: z.enum(confidenceValues),
   safetyScreened: z.boolean(),
   requiresGuardian: z.boolean().default(false),
-  dataErasureRequested: z.boolean().default(false)
+  dataErasureRequested: z.boolean().default(false),
+  // Compatibilidad con estados antiguos (sin estos 3 campos): defaults
+  // seguros via z.default(), nunca inventan una reserva ni un cierre.
+  bookingStatus: z.enum(bookingStatusValues).default("IDLE"),
+  conversationStatus: z.enum(conversationStatusValues).default("ACTIVE"),
+  closureAcknowledged: z.boolean().default(false)
 });
 
 const dentalChatMessageSchema = z.object({
@@ -961,9 +980,20 @@ function attachConversationFields(
     lastAssistantMessage
   });
   logConversationClassificationShadow(routed, turn.aiSelfReportedFields, resolveDentalAgentSchemaVersion());
+  // Correccion de arquitectura: bookingStatus/conversationStatus antes solo se
+  // devolvian aqui como campos sueltos de DentalAgentApiTurn, nunca dentro de
+  // `state` - por lo que nunca llegaban a persistir (el llamador solo guarda
+  // `result.state`, ver extractPreviousDentalState en index.ts). Se escriben
+  // ahora tambien en el propio estado para que viajen de verdad al siguiente
+  // turno, incluyendo la reapertura/cierre real (ver deriveConversationStatus).
+  const state: DentalAgentState = {
+    ...turn.state,
+    bookingStatus: routed.bookingStatus,
+    conversationStatus: routed.conversationStatus
+  };
   return {
     reply: turn.reply,
-    state: turn.state,
+    state,
     runtime: turn.runtime,
     model: turn.model,
     fallbackReason: turn.fallbackReason,

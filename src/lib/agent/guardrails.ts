@@ -241,7 +241,7 @@ export function asksOpenDateQuestion(reply: string): boolean {
 // (state.ready + availability concreta), cualquiera de estas debe cerrar la
 // conversacion, nunca reabrir el agendado.
 const BOOKING_CLOSING_ACKNOWLEDGMENT_PATTERN =
-  /\b(vale|ok|okay|okey|de acuerdo|esta bien|asi esta bien|todo bien|todo correcto|todo ok|todo claro|queda claro|entendido|entendida|perfecto|perfecta|genial|estupendo|guay|gracias|muchas gracias|mil gracias|te lo agradezco|me vale|me vale asi|correcto|exacto|eso es|listo|ya esta|sale|dale|conforme|sin problema|ningun problema|de 10|de diez)\b/;
+  /\b(vale|ok|okay|okey|de acuerdo|esta bien|asi esta bien|todo bien|todo correcto|todo ok|todo claro|queda claro|entendido|entendida|perfecto|perfecta|genial|estupendo|guay|gracias|muchas gracias|mil gracias|te lo agradezco|me vale|me vale asi|correcto|exacto|eso es|listo|ya esta|sale|dale|conforme|sin problema|ningun problema|de 10|de diez|hasta luego|hasta pronto|nos vemos|adios)\b/;
 
 export function isBookingClosingAcknowledgment(message: string): boolean {
   const normalized = normalize(message).replace(/[!¡¿?.,\s]+/g, " ").trim();

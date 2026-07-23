@@ -3,7 +3,7 @@
 // vocabulario nuevo de dental-agent-types.ts, sin cambiar el tipo que consume el resto
 // del codigo todavia. Nada llama a esto hasta la fase 2 (el reductor).
 import {
-  hasConcreteAvailability,
+  computeBookingStatus,
   type DentalAgentState,
   type DentalIntentId
 } from "@/lib/agent/dental-senior-agent";
@@ -14,11 +14,14 @@ import type {
   TreatmentTopic
 } from "@/lib/agent/dental-agent-types";
 
+// bookingStatus/conversationStatus/closureAcknowledged ya son campos reales de
+// DentalAgentState (correccion de arquitectura: antes solo existian aqui,
+// nunca persistian). Esta extension solo añade las 2 dimensiones que
+// siguen siendo puramente derivadas y no se persisten como tales:
+// conversationIntent (fuente real: dental-agent-router.ts) y treatmentTopic.
 export type ExtendedDentalAgentState = DentalAgentState & {
   conversationIntent: ConversationIntent;
   treatmentTopic: TreatmentTopic;
-  bookingStatus: BookingStatus;
-  conversationStatus: ConversationStatus;
 };
 
 // Estado real del Appointment en Prisma, si el llamador lo conoce. La regla del
@@ -47,6 +50,7 @@ const TREATMENT_TOPIC_BY_INTENT: Record<DentalIntentId, TreatmentTopic> = {
 
 const TRIAGE_LEVELS = new Set(["EMERGENCY", "URGENT_24H", "PRIORITY_72H", "ROUTINE", "ESTHETIC"]);
 const CONFIDENCE_LEVELS = new Set(["Baja", "Media", "Alta"]);
+const CONVERSATION_STATUSES = new Set(["ACTIVE", "WAITING_PATIENT", "ESCALATED", "CLOSED"]);
 
 // Intents cuyo motivo de fondo es agendar/valorar un tratamiento programable, no un
 // sintoma activo (ver PRICE_FORWARD_INTENTS en dental-senior-agent.ts, que ya trata
@@ -120,7 +124,15 @@ export function normalizeDentalAgentState(
     confidence: (CONFIDENCE_LEVELS.has(base.confidence as string) ? base.confidence : "Baja") as DentalAgentState["confidence"],
     safetyScreened: Boolean(base.safetyScreened),
     requiresGuardian: Boolean(base.requiresGuardian),
-    dataErasureRequested: Boolean(base.dataErasureRequested)
+    dataErasureRequested: Boolean(base.dataErasureRequested),
+    // Compatibilidad con estados antiguos: si no existian (o traen un valor
+    // invalido), IDLE/ACTIVE/false son defaults seguros que no inventan una
+    // reserva ni un cierre que nunca ocurrio.
+    bookingStatus: "IDLE",
+    conversationStatus: (CONVERSATION_STATUSES.has(base.conversationStatus as string)
+      ? base.conversationStatus
+      : "ACTIVE") as ConversationStatus,
+    closureAcknowledged: Boolean(base.closureAcknowledged)
   };
 
   return {
@@ -144,28 +156,32 @@ function mapTreatmentTopic(intent: DentalIntentId | undefined): TreatmentTopic {
 export function mapConversationIntent(state: DentalAgentState): ConversationIntent {
   if (state.dataErasureRequested) return "data_erasure";
   if (!state.intent) return "unknown";
-  if (state.ready) return "confirm";
+  // Fix real (reapertura de conversacion cerrada): con la conversacion YA
+  // CLOSED, "ready -> confirm" asumia que cualquier texto no reconocido por
+  // el resto de la cascada (routeConversationIntent, gestion de cita,
+  // seleccion de hueco) era una confirmacion mas, lo que impedia reabrir ante
+  // una intencion material nueva sin patron propio ("tengo otra duda",
+  // "quiero otra cita"): al clasificar como "confirm" (un intent de cierre),
+  // deriveConversationStatus la mantenia CLOSED por error. Mientras NO este
+  // cerrada (p.ej. justo al seleccionar un hueco, CASO 7), este atajo sigue
+  // siendo correcto: no hay nada que reabrir todavia.
+  if (state.ready && state.conversationStatus !== "CLOSED") return "confirm";
   if (state.consent) return "provide_data";
   if (BOOKING_MOTIVATED_INTENTS.has(state.intent)) return "book_appointment";
   return "symptom";
 }
 
+// Delega en computeBookingStatus (dental-senior-agent.ts), unica fuente de la
+// heuristica basada en datos ya presentes - aqui solo se aplica la señal real
+// del Appointment cuando el llamador la conoce (nunca se infiere CONFIRMED de
+// state.ready ni de una cadena de disponibilidad textual).
 function mapBookingStatus(state: DentalAgentState, context: AppointmentConfirmationContext): BookingStatus {
   if (context.appointmentStatus === "CANCELLED") return "CANCELLED";
   if (context.appointmentStatus === "CONFIRMED") return "CONFIRMED";
-  // Regla explicita del documento de refactor: nunca inferir CONFIRMED solo de
-  // state.ready o de una cadena de disponibilidad textual. Sin una señal real del
-  // Appointment, lo maximo que se infiere es PREBOOKED (pre-reserva local).
-  if (state.ready && hasConcreteAvailability(state.availability)) return "PREBOOKED";
-  if (state.availability) return "SLOT_SELECTED";
-  if (state.offeredAvailabilityOptions.length > 0) return "SLOTS_OFFERED";
-  if (state.location) return "READY_TO_OFFER_SLOTS";
-  if (state.consent) return "COLLECTING_PATIENT_DATA";
-  if (state.intent) return "COLLECTING_CONSENT";
-  return "IDLE";
+  return computeBookingStatus(state);
 }
 
 function mapConversationStatus(state: DentalAgentState): ConversationStatus {
   if (state.requiresGuardian || state.escalated) return "ESCALATED";
-  return "ACTIVE";
+  return state.conversationStatus;
 }

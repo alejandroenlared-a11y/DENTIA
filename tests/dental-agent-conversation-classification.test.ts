@@ -27,6 +27,10 @@ function readyBookedState(overrides: Partial<DentalAgentState> = {}): DentalAgen
     availability: "viernes, 24/07, 10:45",
     offeredAvailabilityOptions: [],
     ready: true,
+    // Representa una reserva YA cerrada (el mensaje especifico de cierre ya
+    // se mando en un turno anterior) - un "gracias"/"perfecto" mas es un
+    // agradecimiento posterior, no el primer cierre.
+    closureAcknowledged: true,
     ...overrides
   };
 }

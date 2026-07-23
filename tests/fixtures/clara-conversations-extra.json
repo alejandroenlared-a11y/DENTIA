@@ -53,7 +53,7 @@
     "id": "time-only-is-not-enough",
     "category": "agenda",
     "title": "Una hora suelta no basta si falta dia",
-    "messages": ["quiero una limpieza", "si", "Ana Perez Lopez", "654718663", "ana@example.com", "Murcia", "18:00"],
+    "messages": ["quiero una limpieza", "Murcia", "si", "Ana Perez Lopez", "654718663", "ana@example.com", "18:00"],
     "criteria": [
       { "type": "replyIncludes", "value": "Responde con 1, 2 o 3", "critical": true },
       { "type": "replyExcludes", "value": "Que dia y hora", "critical": true },
@@ -425,7 +425,7 @@
     "id": "exact-date-time-ready",
     "category": "agenda",
     "title": "Fecha y hora exactas completan disponibilidad",
-    "messages": ["quiero limpieza", "si", "Maria Perez Lopez", "654718663", "maria@example.com", "Murcia", "20/07 a las 10:30"],
+    "messages": ["quiero limpieza", "Murcia", "si", "Maria Perez Lopez", "654718663", "maria@example.com", "20/07 a las 10:30"],
     "criteria": [
       { "type": "replyIncludes", "value": "pre-reserva lista", "critical": true },
       { "type": "availabilityIncludes", "value": "20/07 10:30", "critical": true },
@@ -438,7 +438,8 @@
     "title": "Tras cita normal confirmada no promete llamada de recepcion",
     "messages": ["quiero cita para blanqueamiento", "si", "Sara Ruiz Moreno", "654718663", "sara@example.com", "Elche", "viernes a las 17:30", "vale gracias"],
     "criteria": [
-      { "type": "replyIncludes", "value": "Gracias a ti", "critical": true },
+      { "type": "replyIncludes", "value": "queda pre-reservada", "critical": true },
+      { "type": "replyExcludes", "value": "confirmada", "critical": true },
       { "type": "transcriptExcludes", "value": "te llamamos", "critical": true },
       { "type": "transcriptExcludes", "value": "te llamara recepcion", "critical": true },
       { "type": "stateTruthy", "field": "ready", "critical": true }
@@ -582,7 +583,7 @@
     "id": "normal-appointment-no-reception-call",
     "category": "agenda",
     "title": "Cita normal no mezcla llamada de recepcion",
-    "messages": ["quiero una higiene", "si", "Carlos Vega Martin", "654718663", "carlos@example.com", "Elche", "viernes por la mañana"],
+    "messages": ["quiero una higiene", "Elche", "si", "Carlos Vega Martin", "654718663", "carlos@example.com", "viernes por la mañana"],
     "criteria": [
       { "type": "replyIncludes", "value": "pre-reserva lista", "critical": true },
       { "type": "transcriptExcludes", "value": "te llamamos", "critical": true },

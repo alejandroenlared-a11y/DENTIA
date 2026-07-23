@@ -49,13 +49,20 @@ export type RoutedConversationFields = {
 const BOOKED_STATUSES = new Set<BookingStatus>(["PREBOOKED", "CONFIRMED"]);
 const CLOSING_CONVERSATION_INTENTS = new Set<ConversationIntent>(["thanks", "confirm"]);
 
-// Sin campo persistido de "conversacion cerrada" en DentalAgentState (séria un
-// cambio de esquema mas arriesgado), esto se deriva del turno actual: una
-// reserva ya hecha (bookingStatus PREBOOKED/CONFIRMED) mas un acto de cierre
-// puro (gracias/confirmacion sin mas contenido) cierra la conversacion. Nunca
-// puede quedar "atascada" cerrada: en cuanto el paciente escribe algo con
-// contenido real (gestionar cita, sintoma nuevo, pregunta...), ese mismo turno
-// ya clasifica como otro conversationIntent y esto vuelve a ACTIVE solo.
+// conversationStatus ahora es un campo REAL y persistido de DentalAgentState
+// (antes solo se derivaba fresco cada turno, sin memoria - ver corrección de
+// arquitectura). state.conversationStatus que llega aqui es el valor ANTERIOR
+// (dental-senior-agent.ts no lo toca, solo lo deja pasar), asi que esta
+// funcion puede implementar la reapertura de verdad:
+//   - Una conversacion ya CLOSED se mantiene cerrada mientras el paciente solo
+//     conteste con un acto de cortesia puro (gracias/perfecto/vale/hasta
+//     luego, que clasifican como "thanks"/"confirm") - nunca se reabre por
+//     eso.
+//   - Cualquier otra intencion con contenido real (cambiar/cancelar cita,
+//     sintoma nuevo, pregunta, otra duda...) reabre la conversacion a ACTIVE
+//     ese mismo turno.
+//   - Si no estaba cerrada, una reserva ya hecha (bookingStatus PREBOOKED/
+//     CONFIRMED) mas un acto de cierre puro es lo unico que cierra.
 function deriveConversationStatus(
   state: DentalAgentState,
   bookingStatus: BookingStatus,
@@ -63,6 +70,9 @@ function deriveConversationStatus(
 ): ConversationStatus {
   if (state.requiresGuardian || state.escalated) {
     return "ESCALATED";
+  }
+  if (state.conversationStatus === "CLOSED") {
+    return CLOSING_CONVERSATION_INTENTS.has(conversationIntent) ? "CLOSED" : "ACTIVE";
   }
   if (BOOKED_STATUSES.has(bookingStatus) && CLOSING_CONVERSATION_INTENTS.has(conversationIntent)) {
     return "CLOSED";

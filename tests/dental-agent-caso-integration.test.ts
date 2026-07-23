@@ -9,7 +9,11 @@
 // "no repite huecos"/"no repite despedida"/"reabre la conversacion".
 import { afterEach, describe, expect, it } from "vitest";
 import { initialDentalAgentState, type DentalAgentState } from "@/lib/agent/dental-senior-agent";
-import { runOpenAiDentalAgentTurn, type DentalAgentApiTurn } from "@/lib/agent/openai-dental-agent";
+import {
+  dentalAgentStateSchema,
+  runOpenAiDentalAgentTurn,
+  type DentalAgentApiTurn
+} from "@/lib/agent/openai-dental-agent";
 
 const OPENAI_KEY_ENV = ["OPENAI", "API", "KEY"].join("_");
 
@@ -35,7 +39,7 @@ async function turn(message: string, state: DentalAgentState): Promise<DentalAge
 }
 
 describe("CASO 1 - cita para limpieza", () => {
-  it("clasifica book_appointment/hygiene sin inventar diagnostico periodontal", async () => {
+  it("clasifica book_appointment/hygiene, no da precio ni pide consentimiento, y avanza a la sede", async () => {
     const result = await turn("Hola, quiero una cita para una limpieza.", initialDentalAgentState);
 
     expect(result.conversationIntent).toBe("book_appointment");
@@ -46,6 +50,13 @@ describe("CASO 1 - cita para limpieza", () => {
     expect(reply).not.toContain("gingivitis");
     expect(reply).not.toContain("periodontitis");
     expect(reply).not.toContain("mantenimiento periodontal");
+    // Fix real (item 1): no debe dar precio ni pedir consentimiento en este
+    // turno - el siguiente paso administrativo es la sede.
+    expect(reply).not.toContain("eur");
+    expect(reply).not.toContain("aceptas que guardemos");
+    expect(result.state.consent).toBe(false);
+    expect(reply).toContain("murcia");
+    expect(reply).toContain("elche");
   });
 });
 
@@ -87,7 +98,7 @@ describe("CASO 4 - diente que se mueve con caries", () => {
 });
 
 describe("CASO 5 - precio de implante", () => {
-  it("responde ask_price/implant con el rango autorizado, sin iniciar triaje", async () => {
+  it("responde ask_price/implant con el rango autorizado, sin iniciar triaje ni pedir datos", async () => {
     const result = await turn("Cuanto cuesta un implante?", initialDentalAgentState);
 
     expect(result.conversationIntent).toBe("ask_price");
@@ -97,6 +108,43 @@ describe("CASO 5 - precio de implante", () => {
     expect(reply).not.toContain("fiebre");
     expect(reply).not.toContain("hinchazon");
     expect(reply).not.toContain("dolor intenso");
+    // Fix real (item 2): no pedir consentimiento ni datos personales todavia,
+    // solo preguntar si quiere ayuda para solicitar cita.
+    expect(reply).not.toContain("aceptas que guardemos");
+    expect(reply).not.toContain("nombre");
+    expect(reply).not.toContain("email");
+    expect(reply).not.toContain("telefono");
+    expect(result.state.consent).toBe(false);
+    expect(reply).toContain("ayude a solicitar una cita");
+  });
+});
+
+describe("item 6 - una conversacion CLOSED solo se reabre ante intencion material", () => {
+  it("perfecto/vale/hasta luego mantienen CLOSED; cambiar la cita reabre", async () => {
+    const offeredState: DentalAgentState = {
+      ...initialDentalAgentState,
+      intent: "prosthetics",
+      consent: true,
+      name: "Sara Ruiz",
+      phone: "654718663",
+      email: "sara@example.com",
+      location: "Elche - Altabix",
+      availability: "",
+      offeredAvailabilityOptions: ["jueves, 23/07, 10:00", "viernes, 24/07, 11:00", "lunes, 27/07, 10:00"],
+      ready: false
+    };
+    const booked = await turn("1", offeredState);
+    expect(booked.conversationStatus).toBe("CLOSED");
+
+    let state = booked.state;
+    for (const courtesy of ["Perfecto.", "Vale.", "Hasta luego."]) {
+      const result = await turn(courtesy, state);
+      expect(result.conversationStatus).toBe("CLOSED");
+      state = result.state;
+    }
+
+    const reopened = await turn("Me duele una muela.", state);
+    expect(reopened.conversationStatus).toBe("ACTIVE");
   });
 });
 
@@ -142,6 +190,10 @@ describe("CASO 7 a 10 - seleccion de hueco, cierre, agradecimiento y reapertura 
     expect(caso8.conversationStatus).toBe("CLOSED");
     expect(caso8.state.offeredAvailabilityOptions).toEqual([]);
     expect(caso8.state.availability).toBe(caso7.state.availability);
+    // Fix real (item 3): confirma el estado REAL (pre-reservada), nunca dice
+    // "confirmada"/"te esperamos" sin que el backend la haya confirmado.
+    expect(caso8.reply).toContain("queda pre-reservada");
+    expect(caso8.reply.toLowerCase()).not.toContain("confirmada");
     const reply8 = caso8.reply.toLowerCase();
     expect(reply8).not.toContain("hueco");
     expect(reply8).not.toContain("disponibilidad");
@@ -160,5 +212,16 @@ describe("CASO 7 a 10 - seleccion de hueco, cierre, agradecimiento y reapertura 
     expect(caso10.conversationIntent).toBe("reschedule_appointment");
     expect(caso10.conversationStatus).toBe("ACTIVE");
     expect(caso10.state.availability).toBe(caso9.state.availability);
+
+    // Item 7 (F): el estado serializado (como se persiste de verdad en BD -
+    // ver dentalAgentStateSchema/extractPreviousDentalState) conserva
+    // bookingStatus, conversationStatus, la disponibilidad seleccionada y
+    // closureAcknowledged, no solo mientras el objeto vive en memoria.
+    const serialized = JSON.parse(JSON.stringify(caso8.state));
+    const parsed = dentalAgentStateSchema.parse(serialized);
+    expect(parsed.bookingStatus).toBe("PREBOOKED");
+    expect(parsed.conversationStatus).toBe("CLOSED");
+    expect(parsed.availability).toBe(caso7.state.availability);
+    expect(parsed.closureAcknowledged).toBe(true);
   });
 });
