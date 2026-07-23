@@ -28,6 +28,20 @@ export function preparePatientReply(
   if (!state.intent && isSimpleGreeting(latestPatientMessage)) {
     return formatReplyForChat("Hola.\n\nPara poder orientarte, cuentame qué necesitas o qué te preocupa.");
   }
+  // Hotfix dental-clinical-authority (fallo confirmado en produccion): "me
+  // duele al morder" (caries_restoration) recibia diagnostico prematuro
+  // (caries/filtracion de empaste) + solicitud de consentimiento, saltandose
+  // la pregunta de seguridad (fiebre/hinchazon/pus/abrir boca/tragar). Esa
+  // pregunta para caries_restoration/urgent_pain/endodontics/wisdom_tooth/
+  // trauma NO pasa por missingClinicalData (ver nextStep en
+  // dental-senior-agent.ts) - el guardrail de abajo no la cubria. En vez de
+  // duplicar la lista de intents que la exigen (riesgo de divergencia),
+  // se usa localReply como fuente de verdad directa: si el motor
+  // deterministico decidio que TOCA preguntar seguridad ahora (localReply
+  // es esa pregunta) y la IA no la toca, se descarta el reply de la IA.
+  if (!state.safetyScreened && isMandatorySafetyScreenQuestion(localReply) && !isMandatorySafetyScreenQuestion(aiReply)) {
+    return formatReplyForChat(localReply);
+  }
   // Bug real (produccion): con "me duele una muela y sangra" el motor local
   // pedia bien la pregunta de seguridad pendiente (missingClinicalData), pero
   // el LLM la salto y fue directo del diagnostico al consentimiento de
@@ -125,6 +139,16 @@ const CLINICAL_QUESTION_KEYWORDS: Record<string, RegExp> = {
   "Hay sangrado al cepillar, mal aliento, movilidad o encia retraida?": /(cepillar|mal aliento|movilidad|encia retraida)/,
   "La pieza ya falta o todavia hay que extraerla?": /(ya falta|extraerla|extraer)/
 };
+
+// Palabras clave de la pregunta general de alarma ("Antes de nada: hay
+// fiebre, hinchazon, pus o te cuesta abrir la boca o tragar?", mas las 3
+// variantes de golpe en trauma) que nextStep (dental-senior-agent.ts) genera
+// fuera del sistema de missingClinicalData.
+const SAFETY_SCREEN_KEYWORDS = /(fiebre|hinchazon|pus|abrir la boca|tragar|golpe)/;
+
+export function isMandatorySafetyScreenQuestion(reply: string): boolean {
+  return SAFETY_SCREEN_KEYWORDS.test(normalize(reply));
+}
 
 export function skipsMandatoryClinicalQuestion(reply: string, missingQuestion: string): boolean {
   const keywordPattern = CLINICAL_QUESTION_KEYWORDS[missingQuestion];

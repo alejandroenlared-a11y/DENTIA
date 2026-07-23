@@ -1425,7 +1425,7 @@ describe("runDentalAgentTurn", () => {
     expect(result.state.ready).toBe(false);
   });
 
-  it("escalates when Gemini detects an emergency the local engine missed", async () => {
+  it("hotfix dental-clinical-authority: no escala solo porque Gemini devuelva escalated/triageLevel EMERGENCY - el motor local es la unica autoridad", async () => {
     process.env.LLM_PROVIDER = "gemini";
     process.env.GEMINI_API_KEY = "gemini-test-key";
     process.env.GEMINI_MODEL = "gemini-test-model";
@@ -1465,6 +1465,161 @@ describe("runDentalAgentTurn", () => {
       state: initialDentalAgentState
     });
 
+    // Hotfix (fallo confirmado en produccion): antes la IA podia forzar
+    // escalated/triageLevel/safetyScreened/missingClinicalData a su antojo
+    // (aqui, como "red de seguridad" para emergencias que el motor local se
+    // saltara), pero ese mismo mecanismo era la causa raiz de que la IA
+    // pudiera marcar safetyScreened=true y vaciar missingClinicalData para
+    // saltarse la pregunta de seguridad obligatoria y pasar directo a
+    // diagnostico + consentimiento. mergeClinicalEscalation (openai-dental-agent.ts)
+    // exige ademas una red flag validada por codigo (classifyAuthorizedRedFlagSignal)
+    // en aiOutput.redFlags - decir escalated:true/triageLevel:EMERGENCY con
+    // redFlags:[] (como aqui) nunca basta por si solo, se ignora.
+    expect(result.state.escalated).toBe(false);
+    expect(result.state.triageLevel).toBe("ROUTINE");
+  });
+
+  it("hotfix dental-clinical-authority: SI eleva el triaje cuando la IA aporta una red flag validada por codigo que el motor local no vio", async () => {
+    process.env.LLM_PROVIDER = "gemini";
+    process.env.GEMINI_API_KEY = "gemini-test-key";
+    process.env.GEMINI_MODEL = "gemini-test-model";
+
+    const output = {
+      reply: "Esto suena a una emergencia real, te doy prioridad maxima.",
+      intent: "urgent_pain",
+      intentCode: "TRIAJE_DOLOR_INFECCION",
+      treatmentNeed: "Urgencia dental",
+      budget: "desde 70 EUR",
+      estimatedValue: 70,
+      escalated: true,
+      consent: false,
+      name: "",
+      phone: "",
+      location: "",
+      availability: "",
+      triageLevel: "EMERGENCY",
+      triageLabel: "Emergencia inmediata",
+      clinicalReading: "El paciente describe dificultad para respirar con sus propias palabras.",
+      likelyCauses: ["complicacion post-tratamiento"],
+      detectedSignals: [],
+      // Red flag validada: coincide con el patron determinista real
+      // (redFlagPatterns, dental-senior-agent.ts), no es solo una etiqueta
+      // inventada por la IA.
+      redFlags: ["me cuesta respirar desde hace unos minutos"],
+      missingClinicalData: [],
+      confidence: "Media",
+      safetyScreened: true
+    };
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => geminiResponse(JSON.stringify(output))
+    } as Response);
+
+    const result = await runDentalAgentTurn({
+      latestPatientMessage: "no se que hacer, esto no tiene buena pinta",
+      history: [],
+      state: initialDentalAgentState
+    });
+
+    // A diferencia del test anterior (redFlags:[]), aqui SI hay una senal
+    // real y validada -> el nivel se eleva y escalated pasa a true. La IA
+    // solo puede subir, nunca sustituir el juicio local sin esta validacion.
+    expect(result.state.triageLevel).toBe("EMERGENCY");
+    expect(result.state.escalated).toBe(true);
+  });
+
+  it("hotfix dental-clinical-authority: ignora una 'red flag' de la IA que no coincide con ningun patron determinista", async () => {
+    process.env.LLM_PROVIDER = "gemini";
+    process.env.GEMINI_API_KEY = "gemini-test-key";
+    process.env.GEMINI_MODEL = "gemini-test-model";
+
+    const output = {
+      reply: "Esto suena grave, te doy prioridad maxima.",
+      intent: "urgent_pain",
+      intentCode: "TRIAJE_DOLOR_INFECCION",
+      treatmentNeed: "Urgencia dental",
+      budget: "desde 70 EUR",
+      estimatedValue: 70,
+      escalated: true,
+      consent: false,
+      name: "",
+      phone: "",
+      location: "",
+      availability: "",
+      triageLevel: "EMERGENCY",
+      triageLabel: "Emergencia inmediata",
+      clinicalReading: "El paciente parece muy nervioso al escribir.",
+      likelyCauses: [],
+      detectedSignals: [],
+      // "Red flag" inventada por la IA que no coincide con ningun patron
+      // determinista real - debe ignorarse por completo.
+      redFlags: ["el paciente parece muy nervioso"],
+      missingClinicalData: [],
+      confidence: "Media",
+      safetyScreened: true
+    };
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => geminiResponse(JSON.stringify(output))
+    } as Response);
+
+    const result = await runDentalAgentTurn({
+      latestPatientMessage: "no se que hacer, esto no tiene buena pinta",
+      history: [],
+      state: initialDentalAgentState
+    });
+
+    expect(result.state.triageLevel).toBe("ROUTINE");
+    expect(result.state.escalated).toBe(false);
+  });
+
+  it("hotfix dental-clinical-authority: la IA nunca puede bajar un triaje EMERGENCY real del motor local", async () => {
+    process.env.LLM_PROVIDER = "gemini";
+    process.env.GEMINI_API_KEY = "gemini-test-key";
+    process.env.GEMINI_MODEL = "gemini-test-model";
+
+    const output = {
+      reply: "No parece grave, puedes esperar a la semana que viene sin problema.",
+      intent: "urgent_pain",
+      intentCode: "TRIAJE_DOLOR_INFECCION",
+      treatmentNeed: "Urgencia dental",
+      budget: "desde 70 EUR",
+      estimatedValue: 70,
+      escalated: false,
+      consent: false,
+      name: "",
+      phone: "",
+      location: "",
+      availability: "",
+      triageLevel: "ROUTINE",
+      triageLabel: "Cita normal",
+      clinicalReading: "Nada preocupante.",
+      likelyCauses: [],
+      detectedSignals: [],
+      redFlags: [],
+      missingClinicalData: [],
+      confidence: "Media",
+      safetyScreened: true
+    };
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => geminiResponse(JSON.stringify(output))
+    } as Response);
+
+    // El motor local SI detecta una emergencia real en el propio mensaje del
+    // paciente (dificultad para respirar) - la IA, en cambio, la minimiza a
+    // ROUTINE/escalated:false. El resultado final debe mantenerse en el
+    // nivel local (EMERGENCY), nunca bajar al nivel que sugiere la IA.
+    const result = await runDentalAgentTurn({
+      latestPatientMessage: "no puedo respirar bien y me duele muchisimo",
+      history: [],
+      state: initialDentalAgentState
+    });
+
+    expect(result.state.triageLevel).toBe("EMERGENCY");
     expect(result.state.escalated).toBe(true);
   });
 
@@ -1520,5 +1675,68 @@ describe("runDentalAgentTurn", () => {
 
     expect(result.state.escalated).toBe(false);
     expect(result.state.ready).toBe(true);
+  });
+
+  it("hotfix dental-clinical-authority: repite el fallo real de produccion - 'me duele al morder' ya no permite diagnostico prematuro ni salta la pregunta de seguridad", async () => {
+    delete process.env.LLM_PROVIDER;
+    const openAiKeyEnvName = ["OPENAI", "API", "KEY"].join("_");
+    process.env[openAiKeyEnvName] = "test-key";
+    process.env.OPENAI_MODEL = "gpt-test";
+
+    // Fallo real reportado en produccion: el proveedor real devolvia esto -
+    // diagnostico prematuro (caries/filtracion de empaste) y saltaba directo
+    // a pedir consentimiento, marcando safetyScreened=true y vaciando
+    // missingClinicalData para evitar que el guardrail (preparePatientReply)
+    // detectara que la pregunta de seguridad obligatoria no se hizo.
+    const output = {
+      reply:
+        "Podria ser caries o filtracion de empaste, conviene revisarlo con calma.",
+      intent: "caries_restoration",
+      intentCode: "CARIES_MORDER",
+      treatmentNeed: "Restauracion",
+      budget: "desde 60 EUR",
+      estimatedValue: 6000,
+      escalated: false,
+      consent: true,
+      name: "",
+      phone: "",
+      location: "",
+      availability: "",
+      triageLevel: "ROUTINE",
+      triageLabel: "Rutina",
+      clinicalReading: "Caries o filtracion de empaste probable.",
+      likelyCauses: ["caries", "filtracion de empaste"],
+      detectedSignals: [],
+      redFlags: [],
+      missingClinicalData: [],
+      confidence: "Alta",
+      safetyScreened: true
+    };
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => ({ output_text: JSON.stringify(output) })
+    } as Response);
+
+    const result = await runOpenAiDentalAgentTurn({
+      latestPatientMessage: "Me duele al morder.",
+      history: [],
+      state: initialDentalAgentState
+    });
+
+    // El motor local (localState) es la unica autoridad: para caries_restoration
+    // la pregunta de seguridad general (fiebre/hinchazon/pus/abrir boca/tragar)
+    // no pasa por missingClinicalData (ver nextStep, dental-senior-agent.ts) -
+    // safetyScreened se mantiene false pase lo que pase en aiOutput, y el
+    // nuevo guardrail isMandatorySafetyScreenQuestion (guardrails.ts) compara
+    // localReply/aiReply directamente para descartar el diagnostico prematuro.
+    expect(result.state.safetyScreened).toBe(false);
+    expect(result.state.consent).toBe(false);
+    const reply = result.reply.toLowerCase();
+    expect(reply).not.toContain("caries");
+    expect(reply).not.toContain("filtracion de empaste");
+    expect(reply).not.toContain("filtración de empaste");
+    expect(reply).not.toContain("aceptas que guardemos");
+    expect(reply).toContain("?");
   });
 });
