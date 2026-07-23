@@ -132,7 +132,8 @@ export function normalizeDentalAgentState(
     conversationStatus: (CONVERSATION_STATUSES.has(base.conversationStatus as string)
       ? base.conversationStatus
       : "ACTIVE") as ConversationStatus,
-    closureAcknowledged: Boolean(base.closureAcknowledged)
+    closureAcknowledged: Boolean(base.closureAcknowledged),
+    lastQuestionKey: stringField(base.lastQuestionKey)
   };
 
   return {

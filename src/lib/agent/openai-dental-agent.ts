@@ -145,7 +145,12 @@ export const dentalAgentStateSchema = z.object({
   // seguros via z.default(), nunca inventan una reserva ni un cierre.
   bookingStatus: z.enum(bookingStatusValues).default("IDLE"),
   conversationStatus: z.enum(conversationStatusValues).default("ACTIVE"),
-  closureAcknowledged: z.boolean().default(false)
+  closureAcknowledged: z.boolean().default(false),
+  // Hotfix dental-negation-context: identifica que pregunta clinica/de
+  // seguridad fija se hizo el ultimo turno, para interpretar negaciones
+  // ("no, nada de eso") en contexto. Default seguro ("" = ninguna) para
+  // estados antiguos persistidos antes de este hotfix.
+  lastQuestionKey: z.string().default("")
 });
 
 const dentalChatMessageSchema = z.object({
@@ -1081,6 +1086,7 @@ function mergeAiState(localState: DentalAgentState, aiOutput: DentalAgentAiOutpu
     safetyScreened: localState.safetyScreened,
     missingClinicalData: localState.missingClinicalData,
     redFlags: localState.redFlags,
+    lastQuestionKey: localState.lastQuestionKey,
     bookingStatus: localState.bookingStatus,
     conversationStatus: localState.conversationStatus,
     location: localState.location,

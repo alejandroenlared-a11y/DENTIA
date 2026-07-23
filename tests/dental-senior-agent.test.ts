@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   buildDentalSummary,
   computeBookingStatus,
+  extractAffirmedAndNegatedClinicalSignals,
   hasSlotOfferPrerequisites,
   initialDentalAgentState,
+  resolveAnswerToLastClinicalQuestion,
   runDentalSeniorTurn,
   type DentalAgentState
 } from "@/lib/agent/dental-senior-agent";
@@ -908,5 +910,79 @@ describe("hasSlotOfferPrerequisites / computeBookingStatus", () => {
     };
     expect(hasSlotOfferPrerequisites(complete)).toBe(true);
     expect(computeBookingStatus(complete)).toBe("READY_TO_OFFER_SLOTS");
+  });
+});
+
+describe("hotfix dental-negation-context: extractAffirmedAndNegatedClinicalSignals", () => {
+  it('CASO3: "No tengo fiebre, pero si tengo hinchazon" niega fiebre y afirma hinchazon por separado', () => {
+    const result = extractAffirmedAndNegatedClinicalSignals("No tengo fiebre, pero si tengo hinchazon");
+    expect(result.negated).toContain("fever");
+    expect(result.affirmed).toContain("swelling");
+    expect(result.affirmed).not.toContain("fever");
+    expect(result.negated).not.toContain("swelling");
+  });
+
+  it('CASO4: "No tengo dificultad para respirar ni para tragar" niega ambas, nunca las afirma', () => {
+    const result = extractAffirmedAndNegatedClinicalSignals("No tengo dificultad para respirar ni para tragar");
+    expect(result.negated).toContain("breathingDifficulty");
+    expect(result.negated).toContain("swallowingDifficulty");
+    expect(result.affirmed).not.toContain("breathingDifficulty");
+    expect(result.affirmed).not.toContain("swallowingDifficulty");
+  });
+
+  it('CASO5: "Si, recibi un golpe ayer" afirma trauma - una negacion vecina no debe romper una afirmacion real', () => {
+    const result = extractAffirmedAndNegatedClinicalSignals("Si, recibi un golpe ayer");
+    expect(result.affirmed).toContain("trauma");
+    expect(result.negated).not.toContain("trauma");
+  });
+
+  it('CASO6: "No, ningun golpe" niega trauma', () => {
+    const result = extractAffirmedAndNegatedClinicalSignals("No, ningun golpe");
+    expect(result.negated).toContain("trauma");
+    expect(result.affirmed).not.toContain("trauma");
+  });
+
+  it('"es poco y no he recibido ningun golpe" niega trauma sin depender de una frase cerrada', () => {
+    const result = extractAffirmedAndNegatedClinicalSignals("Es poco y no he recibido ningun golpe");
+    expect(result.negated).toContain("trauma");
+  });
+
+  it('"no puedo tragar nada" AFIRMA dificultad para tragar (no se cancela a si misma pese al "no")', () => {
+    const result = extractAffirmedAndNegatedClinicalSignals("No puedo tragar nada");
+    expect(result.affirmed).toContain("swallowingDifficulty");
+    expect(result.negated).not.toContain("swallowingDifficulty");
+  });
+
+  it('"puedo tragar bien" niega dificultad para tragar', () => {
+    const result = extractAffirmedAndNegatedClinicalSignals("Puedo tragar bien");
+    expect(result.negated).toContain("swallowingDifficulty");
+    expect(result.affirmed).not.toContain("swallowingDifficulty");
+  });
+});
+
+describe("hotfix dental-negation-context: resolveAnswerToLastClinicalQuestion", () => {
+  it('CASO1: "No, nada de eso" tras safety_screen_general niega las 5 señales y resuelve el cribado', () => {
+    const result = resolveAnswerToLastClinicalQuestion({
+      patientMessage: "No, nada de eso",
+      lastQuestionKey: "safety_screen_general"
+    });
+    expect(result.negated).toEqual(
+      expect.arrayContaining(["fever", "swelling", "pus", "swallowingDifficulty", "openingDifficulty"])
+    );
+    expect(result.resolvesSafetyScreen).toBe(true);
+  });
+
+  it('CASO2: "Es poco y no he recibido ningun golpe" tras bleeding_severity_or_impact niega sangrado incontrolado y trauma', () => {
+    const result = resolveAnswerToLastClinicalQuestion({
+      patientMessage: "Es poco y no he recibido ningun golpe",
+      lastQuestionKey: "bleeding_severity_or_impact"
+    });
+    expect(result.negated).toEqual(expect.arrayContaining(["bleedingUncontrolled", "trauma"]));
+    expect(result.resolvesSafetyScreen).toBe(true);
+  });
+
+  it("sin lastQuestionKey, una negacion global no resuelve nada (no hay pregunta que interpretar)", () => {
+    const result = resolveAnswerToLastClinicalQuestion({ patientMessage: "No, nada de eso", lastQuestionKey: "" });
+    expect(result.resolvesSafetyScreen).toBe(false);
   });
 });

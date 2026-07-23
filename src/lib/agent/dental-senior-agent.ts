@@ -56,6 +56,13 @@ export type DentalAgentState = {
   // reserva) al menos una vez, para no repetirlo en agradecimientos
   // posteriores (ver buildDentalReply, bloque state.ready).
   closureAcknowledged: boolean;
+  // Hotfix dental-negation-context: identifica de forma semantica (no por
+  // texto literal) cual fue la ULTIMA pregunta clinica/de seguridad que
+  // Clara hizo, para que resolveAnswerToLastClinicalQuestion (mas abajo)
+  // pueda interpretar una respuesta corta ("no, nada de eso", "es poco")
+  // en funcion de que se pregunto, no solo del texto suelto del paciente.
+  // "" cuando el ultimo turno no hizo ninguna de estas preguntas fijas.
+  lastQuestionKey: string;
 };
 
 export type DentalAgentTurn = {
@@ -102,7 +109,8 @@ export const initialDentalAgentState: DentalAgentState = {
   dataErasureRequested: false,
   bookingStatus: "IDLE",
   conversationStatus: "ACTIVE",
-  closureAcknowledged: false
+  closureAcknowledged: false,
+  lastQuestionKey: ""
 };
 
 export const intentProfiles: Record<DentalIntentId, IntentProfile> = {
@@ -302,6 +310,276 @@ const signalPatterns = [
   { label: "muela del juicio", pattern: /(muela del juicio|cordal|tercer molar|dolor atras|zona de atras)/ }
 ];
 
+// Hotfix dental-negation-context: fallo real en produccion - "no, nada de
+// eso" tras la pregunta de seguridad repetia la misma pregunta indefinidamente
+// (ningun patron de detectSafetyScreen reconoce una negacion generica sin
+// palabra clave), y "no he recibido ningun golpe" no coincidia con el listado
+// cerrado de isTraumaNegated ("sin golpe"/"no ha sido golpe"/...), asi que
+// "golpe" seguia detectandose como afirmado y el intent saltaba a trauma.
+// Estas funciones sustituyen las listas de frases cerradas por una deteccion
+// de negacion por clausula, genuinamente general.
+export type ClinicalSignalKey =
+  | "fever"
+  | "swelling"
+  | "pus"
+  | "swallowingDifficulty"
+  | "breathingDifficulty"
+  | "openingDifficulty"
+  | "bleedingUncontrolled"
+  | "trauma";
+
+// Solo las señales de "negacion simple" (no tengo/hay X => X ausente) usan el
+// algoritmo generico por clausula. tragar/respirar/abrir quedan fuera: su
+// forma AFIRMATIVA real ("no puedo respirar") contiene literalmente "no",
+// asi que un escaneo generico de negacion las cancelaria a si mismas (bug
+// real ya detectado antes en isNegatedLabel - ver DIFFICULTY_SIGNAL_RULES).
+const SIMPLE_NEGATION_SIGNAL_PATTERNS: Record<"fever" | "swelling" | "pus" | "bleedingUncontrolled" | "trauma", RegExp> = {
+  fever: /fiebre|decimas|escalofrios/,
+  swelling: /hinchaz/,
+  pus: /\bpus\b|flemon|absceso/,
+  bleedingUncontrolled: /sangr/,
+  trauma: /golpe|traumatismo|me golpee|\baccidente\b|\bcaida\b/
+};
+
+// tragar/respirar/abrir: "no puedo X" ES la afirmacion (hay dificultad real),
+// no una negacion - necesitan reglas dedicadas de afirmacion/via libre en vez
+// del escaneo generico de negacion de arriba.
+const DIFFICULTY_SIGNAL_RULES: Record<
+  "breathingDifficulty" | "swallowingDifficulty" | "openingDifficulty",
+  { affirmed: RegExp; allClear: RegExp }
+> = {
+  breathingDifficulty: {
+    allClear: /(?<!no )puedo respirar|sin dificultad para respirar|respiro bien|no (tengo|hay) dificultad.*respirar/,
+    affirmed: /no puedo respirar|dificultad.*respirar|me cuesta respirar|\bahogo\b|asfixia/
+  },
+  swallowingDifficulty: {
+    allClear:
+      /(?<!no )puedo tragar|trago bien|tragar bien|sin dificultad.*tragar|tragar.*sin dificultad|no me cuesta tragar|no (tengo|hay) dificultad.*tragar/,
+    affirmed: /no puedo tragar|dificultad.*tragar|me cuesta tragar/
+  },
+  openingDifficulty: {
+    allClear:
+      /(?<!no )puedo abrir|abro bien|sin dificultad.*abrir|abrir.*sin dificultad|no me cuesta abrir|no (tengo|hay) dificultad.*abrir/,
+    affirmed: /no puedo abrir|dificultad.*abrir|me cuesta abrir|mandibula bloqueada|trismus|cuesta abrir/
+  }
+};
+
+// Separa el mensaje en clausulas cortas (coma/punto/conjuncion "pero") para
+// que una negacion en una clausula ("no tengo fiebre") no contamine una
+// afirmacion real en otra clausula del mismo mensaje ("pero si tengo
+// hinchazon" ya queda en su propia clausula).
+const CLAUSE_SPLIT_PATTERN = /[.,;!¡¿?]+|\bpero\b/;
+const NEGATION_CUE_PATTERN = /\b(no|ningun[oa]?|nada|sin|tampoco|nunca)\b/;
+const AFFIRMATION_OVERRIDE_PATTERN = /\b(si|sí)\b/;
+
+export type ClinicalSignalExtraction = {
+  affirmed: ClinicalSignalKey[];
+  negated: ClinicalSignalKey[];
+  unknown: ClinicalSignalKey[];
+};
+
+// Deteccion de señales clinicas afirmadas/negadas por clausula - reemplaza el
+// enfoque anterior de "la palabra aparece => la señal es real" (que ignoraba
+// cualquier negacion no prevista en una lista cerrada de frases).
+export function extractAffirmedAndNegatedClinicalSignals(message: string): ClinicalSignalExtraction {
+  const normalized = normalize(message);
+  const clauses = normalized
+    .split(CLAUSE_SPLIT_PATTERN)
+    .map(clause => clause.trim())
+    .filter(Boolean);
+  const affirmed = new Set<ClinicalSignalKey>();
+  const negated = new Set<ClinicalSignalKey>();
+  const simpleKeys = Object.keys(SIMPLE_NEGATION_SIGNAL_PATTERNS) as Array<keyof typeof SIMPLE_NEGATION_SIGNAL_PATTERNS>;
+
+  for (const clause of clauses) {
+    const clauseHasNegation = NEGATION_CUE_PATTERN.test(clause);
+    const clauseHasAffirmationOverride = AFFIRMATION_OVERRIDE_PATTERN.test(clause);
+    for (const key of simpleKeys) {
+      if (!SIMPLE_NEGATION_SIGNAL_PATTERNS[key].test(clause)) continue;
+      if (clauseHasNegation) {
+        negated.add(key);
+      } else {
+        affirmed.add(key);
+      }
+      if (clauseHasAffirmationOverride && !clauseHasNegation) {
+        affirmed.add(key);
+      }
+    }
+  }
+  // Si la misma señal aparece afirmada en otra clausula del mismo mensaje
+  // ("no tengo fiebre, pero si tengo hinchazon" - dos clausulas, cada una con
+  // su propia señal), la afirmacion real gana sobre cualquier negacion.
+  for (const key of affirmed) negated.delete(key);
+
+  // tragar/respirar/abrir: reglas dedicadas sobre el mensaje completo (su via
+  // libre real, "puedo respirar", ya contiene la palabra sin negacion previa
+  // que el escaneo por clausula pudiera usar de forma fiable).
+  const difficultyKeys = Object.keys(DIFFICULTY_SIGNAL_RULES) as Array<keyof typeof DIFFICULTY_SIGNAL_RULES>;
+  for (const key of difficultyKeys) {
+    const rules = DIFFICULTY_SIGNAL_RULES[key];
+    if (rules.allClear.test(normalized)) {
+      negated.add(key);
+    } else if (rules.affirmed.test(normalized)) {
+      affirmed.add(key);
+    }
+  }
+
+  const signalKeys = [...simpleKeys, ...difficultyKeys];
+  const unknown = signalKeys.filter(key => !affirmed.has(key) && !negated.has(key));
+  return { affirmed: [...affirmed], negated: [...negated], unknown };
+}
+
+// "no, nada de eso" no menciona ninguna señal por su nombre: solo tiene
+// sentido en el contexto de la pregunta que se acaba de hacer. Un mensaje es
+// "negacion global" si, tras quitar puntuacion, todos sus tokens son
+// palabras de negacion/relleno (nunca contenido clinico real).
+const BARE_DENIAL_TOKENS = new Set([
+  "no",
+  "nada",
+  "ningun",
+  "ninguno",
+  "ninguna",
+  "tampoco",
+  "nunca",
+  "sin",
+  "de",
+  "eso",
+  "y",
+  "ni"
+]);
+
+function isBareDenial(normalized: string): boolean {
+  const tokens = normalized
+    .replace(/[^\wñ\s]/g, " ")
+    .split(/\s+/)
+    .filter(Boolean);
+  return tokens.length > 0 && tokens.every(token => BARE_DENIAL_TOKENS.has(token));
+}
+
+function resolveBleedingLevel(normalized: string): "leve" | "abundante" | null {
+  if (/(abundante|mucho|no para|no deja de sangrar|bastante)/.test(normalized)) return "abundante";
+  if (/(\bpoco\b|\bleve\b|un poco)/.test(normalized)) return "leve";
+  return null;
+}
+
+// Claves fijas de las preguntas clinicas/de seguridad deterministas que
+// nextStep (mas abajo) puede hacer, y que señales cubre cada una - unica
+// fuente de verdad para que resolveAnswerToLastClinicalQuestion sepa que
+// negar/afirmar ante una respuesta corta como "no, nada de eso".
+export type LastQuestionKey =
+  | "safety_screen_general"
+  | "trauma_initial"
+  | "trauma_opening_only"
+  | "trauma_swallowing_only"
+  | "bleeding_severity_or_impact"
+  | "";
+
+const QUESTION_SIGNAL_MAP: Record<Exclude<LastQuestionKey, "">, ClinicalSignalKey[]> = {
+  safety_screen_general: ["fever", "swelling", "pus", "swallowingDifficulty", "openingDifficulty"],
+  trauma_initial: ["trauma", "openingDifficulty", "swallowingDifficulty"],
+  trauma_opening_only: ["openingDifficulty"],
+  trauma_swallowing_only: ["swallowingDifficulty"],
+  bleeding_severity_or_impact: ["bleedingUncontrolled", "trauma"]
+};
+
+export type ResolvedClinicalAnswer = {
+  affirmed: ClinicalSignalKey[];
+  negated: ClinicalSignalKey[];
+  resolvesSafetyScreen: boolean;
+};
+
+// Fuente unica de verdad para interpretar una respuesta a la ULTIMA pregunta
+// clinica/de seguridad hecha (lastQuestionKey persistido en el estado). No
+// reconstruye señales por texto libre solamente: si la respuesta es una
+// negacion global ("no, nada de eso"), niega TODAS las señales que esa
+// pregunta concreta cubria, aunque el texto no las repita una a una.
+export function resolveAnswerToLastClinicalQuestion(input: {
+  patientMessage: string;
+  lastQuestionKey: LastQuestionKey;
+}): ResolvedClinicalAnswer {
+  const normalized = normalize(input.patientMessage);
+  const extraction = extractAffirmedAndNegatedClinicalSignals(input.patientMessage);
+  const expectedSignals = input.lastQuestionKey ? QUESTION_SIGNAL_MAP[input.lastQuestionKey] : [];
+
+  const negated = new Set(extraction.negated);
+  const affirmed = new Set(extraction.affirmed);
+
+  if (expectedSignals.length > 0 && isBareDenial(normalized)) {
+    for (const key of expectedSignals) negated.add(key);
+  }
+
+  if (input.lastQuestionKey === "bleeding_severity_or_impact") {
+    const bleedingLevel = resolveBleedingLevel(normalized);
+    if (bleedingLevel === "leve") negated.add("bleedingUncontrolled");
+    if (bleedingLevel === "abundante") affirmed.add("bleedingUncontrolled");
+  }
+
+  const resolvesSafetyScreen =
+    expectedSignals.length > 0 && expectedSignals.every(key => negated.has(key) || affirmed.has(key));
+
+  return { affirmed: [...affirmed], negated: [...negated], resolvesSafetyScreen };
+}
+
+// Determina que pregunta clinica/de seguridad fija hara nextStep ESTE turno
+// (para persistirla como lastQuestionKey y poder interpretar la respuesta del
+// paciente el turno siguiente). Replica las mismas condiciones que nextStep,
+// sin duplicar el texto de las preguntas.
+function identifyNextClinicalQuestionKey(
+  state: Pick<DentalAgentState, "intent" | "redFlags" | "safetyScreened" | "missingClinicalData" | "escalated">,
+  latestPatientText: string
+): LastQuestionKey {
+  if (state.intent === "trauma" && state.redFlags.length === 0 && !state.safetyScreened) {
+    const normalized = normalize(latestPatientText);
+    if (mentionsSwallowingAnswer(normalized) && !mentionsOpeningAnswer(normalized)) return "trauma_swallowing_only";
+    if (mentionsOpeningAnswer(normalized) && !mentionsSwallowingAnswer(normalized)) return "trauma_opening_only";
+    return "trauma_initial";
+  }
+  if (
+    state.redFlags.length === 0 &&
+    !state.safetyScreened &&
+    ["urgent_pain", "endodontics", "wisdom_tooth", "trauma"].includes(state.intent ?? "")
+  ) {
+    return "safety_screen_general";
+  }
+  if (!state.escalated && state.missingClinicalData[0] === "El sangrado es leve o abundante, y ha empezado tras un golpe?") {
+    return "bleeding_severity_or_impact";
+  }
+  if (!state.escalated && state.intent === "caries_restoration" && state.redFlags.length === 0 && !state.safetyScreened) {
+    return "safety_screen_general";
+  }
+  return "";
+}
+
+// Los labels de redFlagPatterns/signalPatterns que corresponden 1:1 a una
+// señal clinica ya cubierta por extractAffirmedAndNegatedClinicalSignals -
+// una negacion detectada alli nunca puede dejar pasar el label equivalente
+// aqui, aunque isNegatedLabel (mas abajo, frases cerradas) no la reconozca.
+const REDFLAG_LABEL_TO_SIGNAL_KEY: Record<string, ClinicalSignalKey> = {
+  "dificultad para respirar": "breathingDifficulty",
+  "dificultad para tragar o hablar": "swallowingDifficulty",
+  "hinchazon en cuello, boca u ojo": "swelling",
+  "sangrado no controlado": "bleedingUncontrolled",
+  "fiebre o mal estado general": "fever",
+  "dificultad para abrir la boca": "openingDifficulty"
+};
+
+const SIGNAL_LABEL_TO_SIGNAL_KEY: Record<string, ClinicalSignalKey> = {
+  inflamación: "swelling",
+  "sangrado de encias": "bleedingUncontrolled"
+};
+
+function filterOutNegatedLabels(
+  labels: string[],
+  negated: ClinicalSignalKey[],
+  labelMap: Record<string, ClinicalSignalKey>
+): string[] {
+  if (negated.length === 0) return labels;
+  return labels.filter(label => {
+    const key = labelMap[label];
+    return !key || !negated.includes(key);
+  });
+}
+
 // Transparencia obligatoria (AI Act): si preguntan directamente si es humana,
 // se responde siempre que no, sin ambiguedad. Esto se ANADE a la respuesta
 // que tocaria de todas formas: no sustituye el triaje. Si el mismo mensaje
@@ -326,15 +604,35 @@ export function runDentalSeniorTurn(current: DentalAgentState, rawText: string, 
   // clasificacion de conversationIntent.
   const assistantOfferedSlotsLastTurn = Boolean(lastAssistantMessage && jumpsToBookingOptions(lastAssistantMessage));
 
-  const messageRedFlags = detectLabels(normalized, redFlagPatterns);
-  const messageSignals = detectLabels(normalized, signalPatterns);
+  // Hotfix dental-negation-context: interpreta ESTE mensaje en el contexto de
+  // la ultima pregunta clinica/de seguridad real (current.lastQuestionKey,
+  // persistida el turno anterior) antes de derivar cualquier señal por texto
+  // suelto - "no, nada de eso" no repite ninguna palabra clave, solo tiene
+  // sentido sabiendo que se pregunto.
+  const clinicalAnswer = resolveAnswerToLastClinicalQuestion({
+    patientMessage: text,
+    lastQuestionKey: (current.lastQuestionKey || "") as LastQuestionKey
+  });
+  const messageRedFlags = filterOutNegatedLabels(
+    detectLabels(normalized, redFlagPatterns),
+    clinicalAnswer.negated,
+    REDFLAG_LABEL_TO_SIGNAL_KEY
+  );
+  const messageSignals = filterOutNegatedLabels(
+    detectLabels(normalized, signalPatterns),
+    clinicalAnswer.negated,
+    SIGNAL_LABEL_TO_SIGNAL_KEY
+  );
   let redFlags = unique([...current.redFlags, ...messageRedFlags]);
   let detectedSignals = unique([...current.detectedSignals, ...messageSignals]);
   // La clasificación de intención usa SOLO las señales/alarmas de ESTE
   // mensaje, no el historial acumulado: si no, un "dolor intenso" mencionado
   // hace varios turnos seguia forzando urgent_pain en cualquier mensaje
   // posterior sin relación (incluso una simple negación de síntomas).
-  const intent = inferIntent(current.intent, normalized, messageSignals, messageRedFlags);
+  // Hotfix dental-negation-context: una señal de golpe NEGADA ("no he
+  // recibido ningun golpe") nunca puede activar el intent trauma, aunque la
+  // palabra "golpe" este presente en el mensaje.
+  const intent = inferIntent(current.intent, normalized, messageSignals, messageRedFlags, clinicalAnswer.negated.includes("trauma"));
   // Cambio de tema: los síntomas y alarmas del motivo anterior no deben
   // arrastrar la urgencia a una consulta nueva distinta (p.ej. de un dolor ya
   // resuelto a una consulta de ortodoncia días después).
@@ -384,8 +682,15 @@ export function runDentalSeniorTurn(current: DentalAgentState, rawText: string, 
   // esperar a la semana que viene" no se reconocia; Clara repetia la misma
   // pregunta de seguridad tal cual, ignorando que el paciente se retracto.
   const patientDeescalates = redFlags.length === 0 && patientDeescalatesUrgency(normalized);
+  // Hotfix dental-negation-context: fallo real - "no, nada de eso" tras la
+  // pregunta de seguridad no coincidia con ninguna frase de
+  // detectSafetyScreen (que exige mencionar la palabra clave), asi que
+  // safetyScreened se quedaba false para siempre y Clara repetia la misma
+  // pregunta indefinidamente. clinicalAnswer.resolvesSafetyScreen cubre
+  // exactamente esta negacion generica, sin palabra clave.
   const safetyScreened =
     current.safetyScreened ||
+    clinicalAnswer.resolvesSafetyScreen ||
     (intent === "trauma"
       ? detectTraumaSafetyScreen(normalized, redFlags)
       : detectSafetyScreen(normalized, redFlags)) ||
@@ -410,6 +715,16 @@ export function runDentalSeniorTurn(current: DentalAgentState, rawText: string, 
   // que se entendio, avisar con honestidad y escalar para que un humano
   // contacte en su idioma.
   const needsHumanForLanguage = !intent && detectsNonSpanishLanguage(text);
+  const escalated =
+    triageLevel === "EMERGENCY" ||
+    triageLevel === "URGENT_24H" ||
+    Boolean(profile && profile.defaultTriage === "URGENT_24H" && redFlags.length > 0) ||
+    dataErasureRequested ||
+    needsHumanForLanguage;
+  // Hotfix dental-negation-context: que pregunta hara nextStep (mas abajo)
+  // ESTE turno, para poder interpretar la respuesta del paciente el turno
+  // siguiente con resolveAnswerToLastClinicalQuestion.
+  const lastQuestionKey = identifyNextClinicalQuestionKey({ intent, redFlags, safetyScreened, missingClinicalData, escalated }, text);
 
   let nextState = completeDentalState({
     ...current,
@@ -428,17 +743,13 @@ export function runDentalSeniorTurn(current: DentalAgentState, rawText: string, 
     detectedSignals,
     triageLevel,
     triageLabel: triageLabel(triageLevel),
-    escalated:
-      triageLevel === "EMERGENCY" ||
-      triageLevel === "URGENT_24H" ||
-      Boolean(profile && profile.defaultTriage === "URGENT_24H" && redFlags.length > 0) ||
-      dataErasureRequested ||
-      needsHumanForLanguage,
+    escalated,
     requiresGuardian,
     dataErasureRequested,
     confidence: getConfidence(intent, detectedSignals, redFlags),
     missingClinicalData,
     safetyScreened,
+    lastQuestionKey,
     consent,
     name,
     phone,
@@ -1393,13 +1704,24 @@ function completeDentalState(state: DentalAgentState): DentalAgentState {
   return { ...state, ready };
 }
 
-function inferIntent(current: DentalIntentId | undefined, normalized: string, signals: string[], redFlags: string[]): DentalIntentId | undefined {
+// Hotfix dental-negation-context: traumaNegated ya viene de
+// extractAffirmedAndNegatedClinicalSignals (deteccion de negacion por
+// clausula, no una lista cerrada de frases) - sustituye a la vieja
+// isTraumaNegated, que no reconocia frases como "no he recibido ningun
+// golpe".
+function inferIntent(
+  current: DentalIntentId | undefined,
+  normalized: string,
+  signals: string[],
+  redFlags: string[],
+  traumaNegated: boolean
+): DentalIntentId | undefined {
   if (asksAppointmentManagement(normalized)) {
     return current;
   }
   const mentionsWisdomTooth = /(muela del juicio|cordal|tercer molar|dolor atras|zona de atras)/.test(normalized);
   if (redFlags.length > 0) {
-    if (/(golpe|trauma|accidente|caida|roto)/.test(normalized) && !isTraumaNegated(normalized)) {
+    if (/(golpe|trauma|accidente|caida|roto)/.test(normalized) && !traumaNegated) {
       return "trauma";
     }
     if (mentionsWisdomTooth) {
@@ -1407,8 +1729,8 @@ function inferIntent(current: DentalIntentId | undefined, normalized: string, si
     }
     return "urgent_pain";
   }
-  if (/(golpe|trauma|accidente|caida|se ha salido|diente fuera)/.test(normalized) && !isTraumaNegated(normalized)) return "trauma";
-  if (current === "trauma" && looksLikeTraumaFollowUp(normalized)) return "trauma";
+  if (/(golpe|trauma|accidente|caida|se ha salido|diente fuera)/.test(normalized) && !traumaNegated) return "trauma";
+  if (current === "trauma" && looksLikeTraumaFollowUp(normalized) && !traumaNegated) return "trauma";
   if (mentionsWisdomTooth) return "wisdom_tooth";
   if (/(implante|me falta|perdi una pieza|sin muela|sin diente)/.test(normalized)) return "implant_price";
   if (/(ortodoncia|alineador|invisible|invisalign|brackets|aparato|retenedor|retencion|apin|mordida)/.test(normalized)) return "orthodontics";
@@ -1570,10 +1892,6 @@ function mentionsSwallowingAnswer(normalized: string) {
 
 function isPainNegated(normalized: string) {
   return /(no hay dolor|no tengo dolor|sin dolor|no me duele|no duele|no es dolor)/.test(normalized);
-}
-
-function isTraumaNegated(normalized: string) {
-  return /(sin golpe|no ha sido golpe|no fue golpe|no me he golpeado|no me di golpe|no hubo golpe)/.test(normalized);
 }
 
 function isNegatedLabel(label: string, normalized: string) {

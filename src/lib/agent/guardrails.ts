@@ -42,6 +42,18 @@ export function preparePatientReply(
   if (!state.safetyScreened && isMandatorySafetyScreenQuestion(localReply) && !isMandatorySafetyScreenQuestion(aiReply)) {
     return formatReplyForChat(localReply);
   }
+  // Hotfix dental-negation-context (fallo confirmado en produccion): "es
+  // poco y no he recibido ningun golpe" seguia generando "Podria ser
+  // fractura dental o luxacion..." - la IA hipotetizaba traumatismo aunque
+  // el paciente lo hubiera negado explicitamente. No se usa state.intent
+  // como guarda (la IA podria haberlo sobrescrito en su propia respuesta
+  // JSON, ver mergeAiState) sino localReply: si el motor deterministico ni
+  // siquiera menciona "golpe" en su respuesta de este turno (no considera
+  // que sea un caso de traumatismo), cualquier hipotesis de fractura/
+  // luxacion/traumatismo de la IA se descarta.
+  if (!normalize(localReply).includes("golpe") && mentionsUnauthorizedTraumaHypothesis(aiReply)) {
+    return formatReplyForChat(localReply);
+  }
   // Bug real (produccion): con "me duele una muela y sangra" el motor local
   // pedia bien la pregunta de seguridad pendiente (missingClinicalData), pero
   // el LLM la salto y fue directo del diagnostico al consentimiento de
@@ -148,6 +160,15 @@ const SAFETY_SCREEN_KEYWORDS = /(fiebre|hinchazon|pus|abrir la boca|tragar|golpe
 
 export function isMandatorySafetyScreenQuestion(reply: string): boolean {
   return SAFETY_SCREEN_KEYWORDS.test(normalize(reply));
+}
+
+// Hotfix dental-negation-context: hipotesis de traumatismo que la IA no
+// puede formular sin que el motor local (localReply) este realmente
+// discutiendo un golpe este turno.
+const UNAUTHORIZED_TRAUMA_HYPOTHESIS_PATTERN = /(fractura|luxacion|traumatismo|golpe recibido)/;
+
+export function mentionsUnauthorizedTraumaHypothesis(reply: string): boolean {
+  return UNAUTHORIZED_TRAUMA_HYPOTHESIS_PATTERN.test(normalize(reply));
 }
 
 export function skipsMandatoryClinicalQuestion(reply: string, missingQuestion: string): boolean {

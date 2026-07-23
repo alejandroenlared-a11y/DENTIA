@@ -1739,4 +1739,107 @@ describe("runDentalAgentTurn", () => {
     expect(reply).not.toContain("aceptas que guardemos");
     expect(reply).toContain("?");
   });
+
+  it("CASO 7 (hotfix dental-negation-context): OpenAI usa la misma interpretacion de negacion - bloquea fractura/luxacion aunque aiOutput reclame trauma", async () => {
+    delete process.env.LLM_PROVIDER;
+    const openAiKeyEnvName = ["OPENAI", "API", "KEY"].join("_");
+    process.env[openAiKeyEnvName] = "test-key";
+    process.env.OPENAI_MODEL = "gpt-test";
+
+    const output = {
+      reply: "Podria ser una fractura dental o luxacion; cuentame cuando te diste el golpe.",
+      intent: "trauma",
+      intentCode: "TRAUMA_DENTAL",
+      treatmentNeed: "Traumatismo dental",
+      budget: "desde 70 EUR",
+      estimatedValue: 70,
+      escalated: false,
+      consent: false,
+      name: "",
+      phone: "",
+      location: "",
+      availability: "",
+      triageLevel: "URGENT_24H",
+      triageLabel: "Urgencia 24h",
+      clinicalReading: "Posible fractura o luxacion dental.",
+      likelyCauses: ["fractura dental", "luxacion"],
+      detectedSignals: [],
+      redFlags: [],
+      missingClinicalData: [],
+      confidence: "Media",
+      safetyScreened: false
+    };
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => ({ output_text: JSON.stringify(output) })
+    } as Response);
+
+    const result = await runOpenAiDentalAgentTurn({
+      latestPatientMessage: "Es poco y no he recibido ningun golpe.",
+      history: [],
+      state: {
+        ...initialDentalAgentState,
+        intent: "periodontics",
+        lastQuestionKey: "bleeding_severity_or_impact"
+      }
+    });
+
+    const reply = result.reply.toLowerCase();
+    expect(reply).not.toContain("fractura");
+    expect(reply).not.toContain("luxacion");
+    expect(reply).not.toContain("luxación");
+    expect(reply).not.toContain("cuando te diste el golpe");
+  });
+
+  it("CASO 7 (hotfix dental-negation-context): Gemini usa la misma interpretacion de negacion - bloquea fractura/luxacion aunque aiOutput reclame trauma", async () => {
+    process.env.LLM_PROVIDER = "gemini";
+    process.env.GEMINI_API_KEY = "gemini-test-key";
+    process.env.GEMINI_MODEL = "gemini-test-model";
+
+    const output = {
+      reply: "Podria ser una fractura dental o luxacion; cuentame cuando te diste el golpe.",
+      intent: "trauma",
+      intentCode: "TRAUMA_DENTAL",
+      treatmentNeed: "Traumatismo dental",
+      budget: "desde 70 EUR",
+      estimatedValue: 70,
+      escalated: false,
+      consent: false,
+      name: "",
+      phone: "",
+      location: "",
+      availability: "",
+      triageLevel: "URGENT_24H",
+      triageLabel: "Urgencia 24h",
+      clinicalReading: "Posible fractura o luxacion dental.",
+      likelyCauses: ["fractura dental", "luxacion"],
+      detectedSignals: [],
+      redFlags: [],
+      missingClinicalData: [],
+      confidence: "Media",
+      safetyScreened: false
+    };
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => geminiResponse(JSON.stringify(output))
+    } as Response);
+
+    const result = await runDentalAgentTurn({
+      latestPatientMessage: "Es poco y no he recibido ningun golpe.",
+      history: [],
+      state: {
+        ...initialDentalAgentState,
+        intent: "periodontics",
+        lastQuestionKey: "bleeding_severity_or_impact"
+      }
+    });
+
+    const reply = result.reply.toLowerCase();
+    expect(reply).not.toContain("fractura");
+    expect(reply).not.toContain("luxacion");
+    expect(reply).not.toContain("luxación");
+    expect(reply).not.toContain("cuando te diste el golpe");
+  });
 });

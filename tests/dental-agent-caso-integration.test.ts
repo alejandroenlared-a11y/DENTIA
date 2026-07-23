@@ -323,3 +323,61 @@ describe("CASO 7 a 10 - seleccion de hueco, cierre, agradecimiento y reapertura 
     expect(parsed.closureAcknowledged).toBe(true);
   });
 });
+
+describe("hotfix dental-negation-context - contexto y negacion en el pipeline real", () => {
+  it("CASO 1: \"No, nada de eso\" tras la pregunta de seguridad no la repite, cierra el cribado y conserva el dolor al morder", async () => {
+    const t1 = await turn("Me duele al morder.", initialDentalAgentState);
+    expect(t1.reply.toLowerCase()).toContain("fiebre");
+    expect(t1.state.safetyScreened).toBe(false);
+
+    const t2 = await turn("No, nada de eso.", t1.state);
+    expect(t2.state.safetyScreened).toBe(true);
+    expect(t2.state.intent).toBe("caries_restoration");
+    const reply2 = t2.reply.toLowerCase();
+    // No repite la misma pregunta de seguridad.
+    expect(reply2).not.toContain("antes de nada");
+    expect(reply2).not.toContain("hay fiebre");
+    // No diagnostica.
+    expect(reply2).not.toContain("caries");
+    expect(reply2).not.toContain("filtracion de empaste");
+    expect(reply2).not.toContain("filtración de empaste");
+  });
+
+  it("CASO 2: \"Es poco y no he recibido ningun golpe\" registra sangrado leve, nunca cambia a trauma", async () => {
+    const t1 = await turn("Me duele una muela y sangra.", initialDentalAgentState);
+    expect(t1.reply.toLowerCase()).toContain("golpe");
+    expect(t1.state.intent).not.toBe("trauma");
+
+    const t2 = await turn("Es poco y no he recibido ningun golpe.", t1.state);
+    expect(t2.state.intent).not.toBe("trauma");
+    expect(t2.state.safetyScreened).toBe(true);
+    const reply2 = t2.reply.toLowerCase();
+    expect(reply2).not.toContain("fractura");
+    expect(reply2).not.toContain("luxacion");
+    expect(reply2).not.toContain("luxación");
+    expect(reply2).not.toContain("cuando te diste el golpe");
+  });
+
+  it("CASO 5: \"Si, recibi un golpe ayer\" SI activa el protocolo de traumatismo (la correccion de negaciones no rompe afirmaciones reales)", async () => {
+    const result = await turn("Si, recibi un golpe ayer y me duele mucho.", initialDentalAgentState);
+    expect(result.state.intent).toBe("trauma");
+    expect(result.reply.toLowerCase()).toContain("golpe");
+  });
+
+  it("regresion: 'Donde estais?' sigue funcionando", async () => {
+    const result = await turn("Donde estais?", initialDentalAgentState);
+    expect(result.conversationIntent).toBe("ask_location");
+  });
+
+  it("regresion: precio de implante sigue funcionando", async () => {
+    const result = await turn("Cuanto cuesta un implante?", initialDentalAgentState);
+    expect(result.conversationIntent).toBe("ask_price");
+    expect(result.state.consent).toBe(false);
+  });
+
+  it("regresion: cita para limpieza sigue funcionando", async () => {
+    const result = await turn("Hola, quiero una cita para una limpieza.", initialDentalAgentState);
+    expect(result.conversationIntent).toBe("book_appointment");
+    expect(result.treatmentTopic).toBe("hygiene");
+  });
+});

@@ -7,6 +7,7 @@ import {
   isSimpleGreeting,
   jumpsToBookingOptions,
   mentionsHealthCard,
+  mentionsUnauthorizedTraumaHypothesis,
   preparePatientReply,
   promisesSpecificProvider
 } from "@/lib/agent/guardrails";
@@ -163,5 +164,21 @@ describe("guardrail predicates", () => {
   it("asksGenericSymptomMenu detects the generic symptom menu wording", () => {
     expect(asksGenericSymptomMenu("cuentame que necesitas o que te preocupa")).toBe(true);
     expect(asksGenericSymptomMenu("tu pre-reserva queda anotada")).toBe(false);
+  });
+
+  it("mentionsUnauthorizedTraumaHypothesis detects fractura/luxacion/traumatismo hypotheses", () => {
+    expect(mentionsUnauthorizedTraumaHypothesis("Podria ser una fractura o luxacion.")).toBe(true);
+    expect(mentionsUnauthorizedTraumaHypothesis("Puede ser caries o filtracion de empaste.")).toBe(false);
+  });
+
+  it("CASO 6 (hotfix dental-negation-context): bloquea la hipotesis de fractura/luxacion de la IA cuando el motor local no considera trauma", () => {
+    const state = runDentalSeniorTurn(initialDentalAgentState, "No, ningun golpe.").state;
+    const localReply = runDentalSeniorTurn(initialDentalAgentState, "No, ningun golpe.").reply;
+    expect(localReply.toLowerCase()).not.toContain("golpe");
+
+    const result = preparePatientReply("Podria ser una fractura o luxacion.", state, localReply, "No, ningun golpe.");
+    expect(result).not.toContain("fractura");
+    expect(result).not.toContain("luxacion");
+    expect(result).toBe(localReply);
   });
 });
