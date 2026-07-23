@@ -452,14 +452,10 @@ describe("runDentalSeniorTurn", () => {
     expect(second.reply).toContain("1.200 EUR");
   });
 
-  it("accepts a bare name reply when the agent just asked for the name", () => {
-    const emergency = runDentalSeniorTurn(
-      initialDentalAgentState,
-      "Me duele mucho una muela, tengo la cara muy hinchada y me cuesta tragar"
-    );
-    expect(emergency.state.triageLevel).toBe("EMERGENCY");
-
-    const consented = runDentalSeniorTurn(emergency.state, "me vale");
+  it("accepts a bare name reply when the agent just asked for the name (non-emergency flow)", () => {
+    const turn1 = runDentalSeniorTurn(initialDentalAgentState, "Me duele mucho una muela");
+    const turn2 = runDentalSeniorTurn(turn1.state, "No, nada de eso");
+    const consented = runDentalSeniorTurn(turn2.state, "Acepto");
     expect(consented.state.consent).toBe(true);
     expect(consented.reply.toLowerCase()).toContain("nombre");
     expect(consented.reply.toLowerCase()).not.toContain("telefono");
@@ -470,25 +466,30 @@ describe("runDentalSeniorTurn", () => {
     expect(named.reply.toLowerCase()).toContain("teléfono");
   });
 
-  it("does not ask the cold/heat/bite differential once fever and trouble swallowing already triggered a safety screen", () => {
-    // Bug real (produccion): tras escalar a EMERGENCY y pedir consentimiento
-    // para priorizar, Clara seguia preguntando el diferencial clinico
-    // (frio/calor/morder) en vez de pasar a pedir nombre, contradiciendo el
-    // "acude a urgencias ya" que acababa de decir.
+  // PR #13 (Codex): EMERGENCY corta el flujo por completo - la respuesta
+  // siempre es la misma indicacion de seguridad, sin importar que responda
+  // el paciente despues (nunca progresa a pedir consentimiento/nombre/telefono).
+  it("EMERGENCY never progresses to consent/name/phone regardless of what the patient replies afterwards", () => {
     const emergency = runDentalSeniorTurn(
       initialDentalAgentState,
       "Tengo fiebre y me cuesta tragar y el dolor un 6"
     );
     expect(emergency.state.triageLevel).toBe("EMERGENCY");
-    expect(emergency.state.safetyScreened).toBe(true);
-    expect(emergency.state.missingClinicalData).toEqual([]);
+    expect(emergency.state.escalated).toBe(true);
+    expect(emergency.state.consent).toBe(false);
+    expect(emergency.state.bookingStatus).toBe("IDLE");
     expect(emergency.reply.toLowerCase()).not.toContain("frio/calor");
+    expect(emergency.reply.toLowerCase()).not.toContain("aceptas");
+    expect(emergency.reply.toLowerCase()).not.toContain("nombre");
     expect(emergency.reply).toContain("urgencias");
 
-    const consented = runDentalSeniorTurn(emergency.state, "Si");
-    expect(consented.state.consent).toBe(true);
-    expect(consented.reply.toLowerCase()).not.toContain("frio/calor");
-    expect(consented.reply.toLowerCase()).toContain("como te llamas");
+    const afterSi = runDentalSeniorTurn(emergency.state, "Si");
+    expect(afterSi.state.triageLevel).toBe("EMERGENCY");
+    expect(afterSi.state.consent).toBe(false);
+    expect(afterSi.state.bookingStatus).toBe("IDLE");
+    expect(afterSi.reply.toLowerCase()).not.toContain("como te llamas");
+    expect(afterSi.reply.toLowerCase()).not.toContain("nombre");
+    expect(afterSi.reply).toContain("urgencias");
   });
 
   it("never surfaces more than one pending clinical question at a time", () => {

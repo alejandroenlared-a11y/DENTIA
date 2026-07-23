@@ -25,6 +25,21 @@ export function preparePatientReply(
   if (state.requiresGuardian || state.dataErasureRequested || mentionsPaymentCredentials(latestPatientMessage)) {
     return formatReplyForChat(localReply);
   }
+  // PR #13 (Codex - short-circuit obligatorio para EMERGENCY): el motor
+  // local ya corta el flujo (buildDentalReply en dental-senior-agent.ts
+  // devuelve SIEMPRE la misma indicacion de seguridad para EMERGENCY, nunca
+  // pide consentimiento/datos ni ofrece cita). Esta proteccion es la
+  // contraparte para la IA: si el estado determinista es EMERGENCY, CUALQUIER
+  // aiReply que pida datos de contacto/consentimiento o mencione cita/huecos/
+  // disponibilidad/reserva se descarta integramente a favor de localReply -
+  // sin excepciones, y por igual para OpenAI, Gemini y el fallback local (los
+  // tres pasan por preparePatientReply).
+  if (
+    state.triageLevel === "EMERGENCY" &&
+    (asksForPersonalData(aiReply) || jumpsToBookingOptions(aiReply) || /(disponibilidad|reserva)/.test(normalize(aiReply)))
+  ) {
+    return formatReplyForChat(localReply);
+  }
   if (!state.intent && isSimpleGreeting(latestPatientMessage)) {
     return formatReplyForChat("Hola.\n\nPara poder orientarte, cuentame qué necesitas o qué te preocupa.");
   }

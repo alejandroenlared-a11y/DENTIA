@@ -1846,4 +1846,147 @@ describe("runDentalAgentTurn", () => {
     expect(reply).not.toContain("luxación");
     expect(reply).not.toContain("cuando te diste el golpe");
   });
+
+  // PR #13 (Codex): short-circuit obligatorio para EMERGENCY - por igual para
+  // OpenAI y Gemini (los dos pasan por preparePatientReply/guardrails.ts).
+  it("EMERGENCY (OpenAI): descarta un aiReply que pide consentimiento - gana la respuesta determinista de emergencia", async () => {
+    delete process.env.LLM_PROVIDER;
+    const openAiKeyEnvName = ["OPENAI", "API", "KEY"].join("_");
+    process.env[openAiKeyEnvName] = "test-key";
+    process.env.OPENAI_MODEL = "gpt-test";
+
+    const output = {
+      reply: "Acude a urgencias. ¿Aceptas que guardemos tus datos para priorizarte?",
+      intent: "urgent_pain",
+      intentCode: "TRIAJE_DOLOR_INFECCION",
+      treatmentNeed: "Urgencia dental",
+      budget: "desde 70 EUR",
+      estimatedValue: 22000,
+      escalated: true,
+      consent: true,
+      name: "",
+      phone: "",
+      location: "",
+      availability: "",
+      triageLevel: "EMERGENCY",
+      triageLabel: "Emergencia inmediata",
+      clinicalReading: "Hinchazon ocular a valorar.",
+      likelyCauses: [],
+      detectedSignals: [],
+      redFlags: ["hinchazon en cuello, boca u ojo"],
+      missingClinicalData: [],
+      confidence: "Alta",
+      safetyScreened: true
+    };
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => ({ output_text: JSON.stringify(output) })
+    } as Response);
+
+    const result = await runOpenAiDentalAgentTurn({
+      latestPatientMessage: "No tengo fiebre y tengo hinchazón en el ojo",
+      history: [],
+      state: initialDentalAgentState
+    });
+
+    expect(result.state.triageLevel).toBe("EMERGENCY");
+    expect(result.reply.toLowerCase()).not.toContain("aceptas");
+    expect(result.reply).toContain("urgencias");
+    expect(result.state.consent).toBe(false);
+    expect(result.state.bookingStatus).toBe("IDLE");
+  });
+
+  it("EMERGENCY (OpenAI): bloquea un aiReply que ofrece cita/huecos", async () => {
+    delete process.env.LLM_PROVIDER;
+    const openAiKeyEnvName = ["OPENAI", "API", "KEY"].join("_");
+    process.env[openAiKeyEnvName] = "test-key";
+    process.env.OPENAI_MODEL = "gpt-test";
+
+    const output = {
+      reply: "Te propongo estos huecos:\n\n1. jueves, 10:00\n2. viernes, 11:00\n\nResponde con 1 o 2.",
+      intent: "urgent_pain",
+      intentCode: "TRIAJE_DOLOR_INFECCION",
+      treatmentNeed: "Urgencia dental",
+      budget: "desde 70 EUR",
+      estimatedValue: 22000,
+      escalated: true,
+      consent: true,
+      name: "",
+      phone: "",
+      location: "",
+      availability: "",
+      triageLevel: "EMERGENCY",
+      triageLabel: "Emergencia inmediata",
+      clinicalReading: "Hinchazon ocular a valorar.",
+      likelyCauses: [],
+      detectedSignals: [],
+      redFlags: ["hinchazon en cuello, boca u ojo"],
+      missingClinicalData: [],
+      confidence: "Alta",
+      safetyScreened: true
+    };
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => ({ output_text: JSON.stringify(output) })
+    } as Response);
+
+    const result = await runOpenAiDentalAgentTurn({
+      latestPatientMessage: "No tengo fiebre y tengo hinchazón en el ojo",
+      history: [],
+      state: initialDentalAgentState
+    });
+
+    expect(result.reply.toLowerCase()).not.toContain("huecos");
+    expect(result.reply).toContain("urgencias");
+  });
+
+  it("EMERGENCY (Gemini): descarta un aiReply que pide consentimiento/cita - gana la respuesta determinista de emergencia", async () => {
+    process.env.LLM_PROVIDER = "gemini";
+    process.env.GEMINI_API_KEY = "gemini-test-key";
+    process.env.GEMINI_MODEL = "gemini-test-model";
+
+    const output = {
+      reply: "Acude a urgencias ya. ¿Me confirmas tu nombre y telefono para preparar la cita?",
+      intent: "urgent_pain",
+      intentCode: "TRIAJE_DOLOR_INFECCION",
+      treatmentNeed: "Urgencia dental",
+      budget: "desde 70 EUR",
+      estimatedValue: 22000,
+      escalated: true,
+      consent: true,
+      name: "",
+      phone: "",
+      location: "",
+      availability: "",
+      triageLevel: "EMERGENCY",
+      triageLabel: "Emergencia inmediata",
+      clinicalReading: "Hinchazon ocular a valorar.",
+      likelyCauses: [],
+      detectedSignals: [],
+      redFlags: ["hinchazon en cuello, boca u ojo"],
+      missingClinicalData: [],
+      confidence: "Alta",
+      safetyScreened: true
+    };
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => geminiResponse(JSON.stringify(output))
+    } as Response);
+
+    const result = await runDentalAgentTurn({
+      latestPatientMessage: "No tengo fiebre y tengo hinchazón en el ojo",
+      history: [],
+      state: initialDentalAgentState
+    });
+
+    expect(result.state.triageLevel).toBe("EMERGENCY");
+    expect(result.reply.toLowerCase()).not.toContain("nombre");
+    expect(result.reply.toLowerCase()).not.toContain("telefono");
+    expect(result.reply).toContain("urgencias");
+    expect(result.state.consent).toBe(false);
+    expect(result.state.bookingStatus).toBe("IDLE");
+  });
 });

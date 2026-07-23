@@ -182,3 +182,60 @@ describe("guardrail predicates", () => {
     expect(result).toBe(localReply);
   });
 });
+
+// PR #13 (Codex): short-circuit obligatorio para EMERGENCY - cualquier
+// aiReply que pida consentimiento/datos u ofrezca cita/huecos se descarta
+// integramente a favor de la respuesta determinista de emergencia.
+describe("preparePatientReply - EMERGENCY short-circuit", () => {
+  function emergencyTurn() {
+    return runDentalSeniorTurn(initialDentalAgentState, "Tengo la cara muy hinchada y me cuesta respirar");
+  }
+
+  it("descarta un aiReply que pide consentimiento durante EMERGENCY - gana localReply sin consentimiento", () => {
+    const { state, reply: localReply } = emergencyTurn();
+    expect(state.triageLevel).toBe("EMERGENCY");
+
+    const result = preparePatientReply(
+      "Acude a urgencias. ¿Aceptas que guardemos tus datos para priorizarte?",
+      state,
+      localReply,
+      "Tengo la cara muy hinchada y me cuesta respirar"
+    );
+    expect(result).toBe(localReply);
+    expect(result.toLowerCase()).not.toContain("aceptas");
+  });
+
+  it("bloquea un aiReply que intenta ofrecer cita/disponibilidad durante EMERGENCY", () => {
+    const { state, reply: localReply } = emergencyTurn();
+
+    const result = preparePatientReply(
+      "Te propongo estos huecos:\n\n1. jueves, 10:00\n2. viernes, 11:00",
+      state,
+      localReply,
+      "Tengo la cara muy hinchada y me cuesta respirar"
+    );
+    expect(result).toBe(localReply);
+    expect(result.toLowerCase()).not.toContain("huecos");
+  });
+
+  it("no bloquea un aiReply normal (parafraseado) durante EMERGENCY que no pide datos ni ofrece cita", () => {
+    const { state, reply: localReply } = emergencyTurn();
+
+    const result = preparePatientReply(
+      "Esto es serio, ve a urgencias sin esperar.",
+      state,
+      localReply,
+      "Tengo la cara muy hinchada y me cuesta respirar"
+    );
+    expect(result).toContain("urgencias");
+  });
+
+  it("un caso ROUTINE tras completar el triaje sigue ofreciendo ayuda para la cita - el guardrail de emergencia no lo bloquea", () => {
+    const t1 = runDentalSeniorTurn(initialDentalAgentState, "Me duele al morder.");
+    const t2 = runDentalSeniorTurn(t1.state, "No, nada de eso.");
+    expect(t2.state.triageLevel).not.toBe("EMERGENCY");
+
+    const result = preparePatientReply(t2.reply, t2.state, t2.reply, "No, nada de eso.");
+    expect(result).toContain("Quieres que te ayude a solicitar una cita");
+  });
+});

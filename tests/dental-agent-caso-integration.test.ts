@@ -496,18 +496,79 @@ describe("hotfix dental-negation-context - CASO A-F (oferta de cita antes de con
 // PR #13 (comentario P1 de Codex - "Do not negate red flags from unrelated
 // no"): end-to-end obligatorio por el pipeline real.
 describe("PR #13 P1: hinchazon en el ojo se conserva pese a negar fiebre en la misma frase", () => {
-  it("niega fiebre, afirma hinchazon, conserva la red flag, eleva el triaje y recomienda atencion urgente sin iniciar reserva normal", async () => {
+  it("1. niega fiebre, afirma hinchazon, conserva la red flag, EMERGENCY, recomienda atencion urgente, sin consentimiento/datos/cita ni avance de bookingStatus", async () => {
     const result = await turn("No tengo fiebre y tengo hinchazón en el ojo", initialDentalAgentState);
 
     expect(result.state.redFlags).toContain("hinchazon en cuello, boca u ojo");
-    expect(result.state.triageLevel).not.toBe("ROUTINE");
+    expect(result.state.triageLevel).toBe("EMERGENCY");
     expect(result.state.escalated).toBe(true);
     expect(result.reply.toLowerCase()).toContain("urgencias");
-    // No inicia una reserva normal (huecos/disponibilidad): pide priorizar,
-    // no ofrece franjas.
-    expect(result.reply.toLowerCase()).not.toContain("que dia y hora");
-    expect(result.reply.toLowerCase()).not.toContain("franja");
-    expect(result.state.bookingStatus).not.toBe("SLOTS_OFFERED");
+    // PR #13 (Codex): EMERGENCY corta el flujo por completo - nada de
+    // consentimiento, datos ni cita en este turno.
+    const reply = result.reply.toLowerCase();
+    expect(reply).not.toContain("aceptas");
+    expect(reply).not.toContain("consentimiento");
+    expect(reply).not.toContain("nombre");
+    expect(reply).not.toContain("telefono");
+    expect(reply).not.toContain("email");
+    expect(reply).not.toContain("que dia y hora");
+    expect(reply).not.toContain("franja");
+    expect(result.state.consent).toBe(false);
+    expect(result.state.bookingStatus).toBe("IDLE");
+    expect(result.state.ready).toBe(false);
+    expect(result.conversationStatus).toBe("ESCALATED");
+  });
+
+  it("2. 'Tengo la cara muy hinchada y me cuesta respirar' -> EMERGENCY, mensaje de atencion inmediata, ninguna accion administrativa", async () => {
+    const result = await turn("Tengo la cara muy hinchada y me cuesta respirar", initialDentalAgentState);
+
+    expect(result.state.triageLevel).toBe("EMERGENCY");
+    expect(result.reply.toLowerCase()).toContain("urgencias");
+    const reply = result.reply.toLowerCase();
+    expect(reply).not.toContain("aceptas");
+    expect(reply).not.toContain("nombre");
+    expect(reply).not.toContain("telefono");
+    expect(reply).not.toContain("cita");
+    expect(result.state.consent).toBe(false);
+    expect(result.state.bookingStatus).toBe("IDLE");
+  });
+
+  // 6. Un caso ROUTINE, tras completar el triaje sin red flags, sigue
+  // ofreciendo ayuda para la cita - no queda bloqueado por el guardrail de
+  // emergencia (que solo actua cuando triageLevel === EMERGENCY).
+  it("6. un caso ROUTINE sigue ofreciendo ayuda para la cita tras el triaje, sin bloqueo del guardrail de emergencia", async () => {
+    const t1 = await turn("Me duele al morder.", initialDentalAgentState);
+    const t2 = await turn("No, nada de eso.", t1.state);
+    expect(t2.state.triageLevel).not.toBe("EMERGENCY");
+    expect(t2.reply).toContain("Quieres que te ayude a solicitar una cita");
+  });
+
+  // 7. URGENT_24H (escalado pero NO emergencia): a diferencia de EMERGENCY,
+  // SI pide consentimiento (para gestionar con prioridad) una vez resuelto
+  // el cribado clinico - pero nunca mezcla eso con una reserva ordinaria
+  // (no ofrece huecos/franja/sede en el mismo turno que pide prioridad).
+  it("7. URGENT_24H no trata la instruccion clinica prioritaria como una reserva ordinaria en el mismo turno", async () => {
+    const t1 = await turn("Me duele mucho por la noche, es un dolor pulsatil.", initialDentalAgentState);
+    expect(t1.state.triageLevel).toBe("URGENT_24H");
+    expect(t1.state.escalated).toBe(true);
+    // Primer turno: pregunta de seguridad pendiente, no pide consentimiento
+    // ni ofrece cita todavia.
+    expect(t1.reply.toLowerCase()).toContain("fiebre");
+    expect(t1.reply.toLowerCase()).not.toContain("aceptas");
+    expect(t1.reply.toLowerCase()).not.toContain("huecos");
+
+    const t2 = await turn("No, nada de eso.", t1.state);
+    expect(t2.state.triageLevel).toBe("URGENT_24H");
+    expect(t2.state.safetyScreened).toBe(true);
+    // Cribado resuelto: pide consentimiento para gestionar con prioridad (a
+    // diferencia de EMERGENCY, que nunca pide esto) - pero sigue sin ofrecer
+    // huecos/franja/sede en este mismo turno.
+    const reply2 = t2.reply.toLowerCase();
+    expect(reply2).toContain("prioridad");
+    expect(reply2).toContain("aceptas");
+    expect(reply2).not.toContain("huecos");
+    expect(reply2).not.toContain("franja");
+    expect(t2.state.consent).toBe(false);
   });
 });
 

@@ -89,6 +89,7 @@ export type DentalAgentState = {
 
 export type LastAssistantAction =
   | ""
+  | "EMERGENCY_GUIDANCE"
   | "ASK_CLINICAL_SAFETY"
   | "OFFER_APPOINTMENT_HELP"
   | "ASK_PRIVACY_CONSENT"
@@ -915,7 +916,8 @@ export function runDentalSeniorTurn(current: DentalAgentState, rawText: string, 
     location,
     availability,
     appointmentHelpAccepted,
-    appointmentHelpDeclined
+    appointmentHelpDeclined,
+    triageLevel
   });
 
   let nextState = completeDentalState({
@@ -1113,24 +1115,17 @@ function buildDentalReply(state: DentalAgentState, previous: DentalAgentState, l
   const isNewIntent = previous.intent !== state.intent;
   const first = firstName(state.name);
 
+  // PR #13 (Codex - short-circuit obligatorio para EMERGENCY): antes se
+  // mezclaba la instruccion de urgencia con peticion de consentimiento/datos
+  // en el mismo turno, y turnos siguientes progresaban nombre -> telefono ->
+  // "alerta enviada" como si fuera un flujo de reserva mas. EMERGENCY corta
+  // el flujo por completo: SIEMPRE la misma indicacion de seguridad, nunca
+  // pide consentimiento, nombre, telefono, email, ni ofrece cita/huecos. Si
+  // el paciente los menciona igualmente por su cuenta, quedan capturados en
+  // el estado (para que recepcion los vea), pero la respuesta visible nunca
+  // los solicita ni los confirma.
   if (state.triageLevel === "EMERGENCY") {
-    if (!state.consent) {
-      return `${pickVariant(EMPATHY_PAIN, latestPatientText)}\n\nEsto no debería esperar: si te cuesta respirar o tragar, o la hinchazón avanza, acude a urgencias ya. Mientras, ¿aceptas que guardemos tus datos para priorizarte?`;
-    }
-    if (!state.name) {
-      return pickVariant(
-        [
-          "Lo marco como prioridad máxima. Como te llamas?",
-          "Queda marcado como prioritario. Me dices tu nombre y apellidos?",
-          "Lo gestiono como urgencia ya. Dime tu nombre, por favor."
-        ],
-        latestPatientText
-      );
-    }
-    if (!state.phone) {
-      return `${first}, dime un teléfono y te llamamos ya.`;
-    }
-    return `${first}, alerta enviada: te llamamos ahora al ${state.phone}. Si notas que empeora, no esperes nuestra llamada y acude a urgencias.`;
+    return "Esto no puede esperar: acude a urgencias ahora mismo. Si notas dificultad para respirar o tragar, o la hinchazón empeora, no esperes y ve directamente a un servicio de urgencias.";
   }
 
   if (state.ready) {
@@ -1789,6 +1784,12 @@ export function hasSlotOfferPrerequisites(state: DentalAgentState): boolean {
 // solo aplica CONFIRMED/CANCELLED encima cuando hay una señal real del
 // Appointment (nunca se infiere CONFIRMED de una cadena de disponibilidad).
 export function computeBookingStatus(state: DentalAgentState): BookingStatus {
+  // PR #13 (Codex): EMERGENCY nunca avanza por el pipeline normal de reserva
+  // (COLLECTING_CONSENT/COLLECTING_PATIENT_DATA/...) aunque el paciente ya
+  // haya dado consentimiento/nombre/telefono por su cuenta - la conversacion
+  // queda marcada como escalada (conversationStatus, ver dental-agent-router.ts),
+  // no como un flujo de cita en curso.
+  if (state.triageLevel === "EMERGENCY") return "IDLE";
   if (state.ready && hasConcreteAvailability(state.availability)) return "PREBOOKED";
   if (state.availability) return "SLOT_SELECTED";
   if (state.offeredAvailabilityOptions.length > 0) return "SLOTS_OFFERED";
@@ -2285,8 +2286,10 @@ function wasAskedForName(state: DentalAgentState): boolean {
   if (!state.intent || !state.consent || state.name) {
     return false;
   }
+  // PR #13 (Codex): EMERGENCY ya no pide nombre nunca (short-circuit de
+  // seguridad) - una respuesta suelta no puede interpretarse como el nombre.
   if (state.triageLevel === "EMERGENCY") {
-    return true;
+    return false;
   }
   const safetyPending =
     state.redFlags.length === 0 &&
@@ -2305,8 +2308,11 @@ function wasAskedForConsent(state: DentalAgentState): boolean {
   if (!state.intent || state.consent) {
     return false;
   }
+  // PR #13 (Codex): EMERGENCY ya no pide consentimiento nunca (short-circuit
+  // de seguridad) - un "si" suelto tras la indicacion de urgencia no puede
+  // interpretarse como aceptacion de guardar datos.
   if (state.triageLevel === "EMERGENCY") {
-    return true;
+    return false;
   }
   const safetyPending =
     state.redFlags.length === 0 &&
@@ -2490,8 +2496,14 @@ function identifyLastAssistantAction(
     | "availability"
     | "appointmentHelpAccepted"
     | "appointmentHelpDeclined"
+    | "triageLevel"
   >
 ): LastAssistantAction {
+  // PR #13 (Codex): EMERGENCY corta el flujo antes que cualquier otra cosa -
+  // ni siquiera la pregunta de seguridad clinica normal aplica aqui.
+  if (state.triageLevel === "EMERGENCY") {
+    return "EMERGENCY_GUIDANCE";
+  }
   if (state.intent === "trauma" && state.redFlags.length === 0 && !state.safetyScreened) {
     return "ASK_CLINICAL_SAFETY";
   }
