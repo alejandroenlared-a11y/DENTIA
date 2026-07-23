@@ -1,12 +1,16 @@
 import { z } from "zod";
 import { demoKnowledge } from "@/lib/agent/demo-data";
 import {
+  classifyAuthorizedRedFlagSignal,
   hasConcreteAvailability,
   hasFullName,
   initialDentalAgentState,
   runDentalSeniorTurn,
+  TRIAGE_URGENCY_ORDER,
+  triageLabel,
   type DentalAgentState,
-  type DentalIntentId
+  type DentalIntentId,
+  type TriageLevel
 } from "@/lib/agent/dental-senior-agent";
 import { preparePatientReply } from "@/lib/agent/guardrails";
 import { fetchWithTimeout, isTimeoutError, resolveTimeoutMs } from "@/lib/http";
@@ -1018,12 +1022,46 @@ function attachConversationFields(
 // nunca se disparaba. El motor deterministico (localState, ya validado por
 // dental-senior-agent.ts) es la unica autoridad para estos campos; la IA
 // puede redactar el reply, pero nunca adelantar ni borrar estos estados.
+// Hotfix dental-clinical-authority: el triaje SOLO puede subir, nunca bajar
+// ni ser sustituido por la palabra de la IA. La IA nunca puede: reducir el
+// nivel local, convertir EMERGENCY en ROUTINE, ni forzar una elevacion con
+// solo decir escalated=true o un triageLevel alto - hace falta ademas que
+// aporte una red flag que las MISMAS reglas deterministas del motor local
+// (classifyAuthorizedRedFlagSignal, dental-senior-agent.ts) reconozcan como
+// real. Si ninguna de sus red flags valida, se ignora por completo su
+// intento de escalar y se conserva el nivel local intacto.
+function mergeClinicalEscalation(
+  localState: DentalAgentState,
+  aiOutput: DentalAgentAiOutput
+): { triageLevel: TriageLevel; triageLabelText: string; escalated: boolean } {
+  const validatedLevels = aiOutput.redFlags
+    .map(classifyAuthorizedRedFlagSignal)
+    .filter((level): level is "EMERGENCY" | "URGENT_24H" => level !== null);
+
+  const bestValidatedLevel = validatedLevels.reduce<TriageLevel | null>((best, level) => {
+    if (!best) return level;
+    return TRIAGE_URGENCY_ORDER[level] > TRIAGE_URGENCY_ORDER[best] ? level : best;
+  }, null);
+
+  const triageLevel =
+    bestValidatedLevel && TRIAGE_URGENCY_ORDER[bestValidatedLevel] > TRIAGE_URGENCY_ORDER[localState.triageLevel]
+      ? bestValidatedLevel
+      : localState.triageLevel;
+
+  return {
+    triageLevel,
+    triageLabelText: triageLevel === localState.triageLevel ? localState.triageLabel : triageLabel(triageLevel),
+    escalated: localState.escalated || triageLevel === "EMERGENCY" || triageLevel === "URGENT_24H"
+  };
+}
+
 function mergeAiState(localState: DentalAgentState, aiOutput: DentalAgentAiOutput): DentalAgentState {
   const aiIntent = aiOutput.intent === "unknown" ? localState.intent : (aiOutput.intent as DentalIntentId);
   const intent =
     localState.intent === "trauma" && ["urgent_pain", "endodontics", "caries_restoration"].includes(aiIntent ?? "")
       ? "trauma"
       : aiIntent;
+  const escalation = mergeClinicalEscalation(localState, aiOutput);
   const state: DentalAgentState = {
     ...localState,
     intent,
@@ -1042,14 +1080,16 @@ function mergeAiState(localState: DentalAgentState, aiOutput: DentalAgentAiOutpu
     consent: localState.consent,
     safetyScreened: localState.safetyScreened,
     missingClinicalData: localState.missingClinicalData,
-    triageLevel: localState.triageLevel,
-    triageLabel: localState.triageLabel,
     redFlags: localState.redFlags,
-    escalated: localState.escalated,
     bookingStatus: localState.bookingStatus,
     conversationStatus: localState.conversationStatus,
     location: localState.location,
     availability: localState.availability,
+    // Unica excepcion validada: triaje/escalado pueden subir via
+    // mergeClinicalEscalation, nunca bajar ni ser sustituidos sin validar.
+    triageLevel: escalation.triageLevel,
+    triageLabel: escalation.triageLabelText,
+    escalated: escalation.escalated,
     ready: false
   };
   return { ...state, ready: computeReady(state) };

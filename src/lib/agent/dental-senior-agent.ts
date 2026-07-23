@@ -1430,8 +1430,19 @@ function inferIntent(current: DentalIntentId | undefined, normalized: string, si
   return current;
 }
 
+// Hotfix dental-clinical-authority: subconjunto de redFlagPatterns (arriba)
+// que por si solo ya justifica EMERGENCY - reusado tal cual por
+// classifyAuthorizedRedFlagSignal (mas abajo) para que la IA nunca pueda
+// escalar con una senal que el motor local no reconoceria como emergencia.
+const EMERGENCY_RED_FLAG_LABELS = new Set([
+  "dificultad para respirar",
+  "dificultad para tragar o hablar",
+  "hinchazon en cuello, boca u ojo",
+  "sangrado no controlado"
+]);
+
 function getTriageLevel(intent: DentalIntentId | undefined, redFlags: string[], signals: string[]): TriageLevel {
-  if (redFlags.some(flag => ["dificultad para respirar", "dificultad para tragar o hablar", "hinchazon en cuello, boca u ojo", "sangrado no controlado"].includes(flag))) {
+  if (redFlags.some(flag => EMERGENCY_RED_FLAG_LABELS.has(flag))) {
     return "EMERGENCY";
   }
   if (redFlags.length > 0 || signals.includes("inflamación") || signals.includes("dolor intenso") || intent === "endodontics" || intent === "wisdom_tooth" || intent === "trauma") {
@@ -1486,7 +1497,31 @@ function getConfidence(intent: DentalIntentId | undefined, signals: string[], re
   return "Baja";
 }
 
-function triageLabel(level: TriageLevel) {
+// Hotfix dental-clinical-authority: orden de urgencia para comparar el
+// triaje local con una posible elevacion validada de la IA (mergeClinicalEscalation,
+// openai-dental-agent.ts) - la IA solo puede subir, nunca bajar.
+export const TRIAGE_URGENCY_ORDER: Record<TriageLevel, number> = {
+  ESTHETIC: 0,
+  ROUTINE: 1,
+  PRIORITY_72H: 2,
+  URGENT_24H: 3,
+  EMERGENCY: 4
+};
+
+// Hotfix dental-clinical-authority: valida una senal de alarma que la IA
+// reporte (aiOutput.redFlags) contra los MISMOS patrones deterministas que
+// usa el motor local (redFlagPatterns) - nunca se confia en la etiqueta o el
+// nivel que la IA declare por si solos, solo en si el texto realmente
+// coincide con una senal reconocida por codigo. Devuelve el nivel que esa
+// senal justificaria (o null si no coincide con ninguna).
+export function classifyAuthorizedRedFlagSignal(candidateText: string): "EMERGENCY" | "URGENT_24H" | null {
+  const normalized = normalize(candidateText);
+  const matched = redFlagPatterns.find(rule => rule.pattern.test(normalized));
+  if (!matched) return null;
+  return EMERGENCY_RED_FLAG_LABELS.has(matched.label) ? "EMERGENCY" : "URGENT_24H";
+}
+
+export function triageLabel(level: TriageLevel) {
   switch (level) {
     case "EMERGENCY":
       return "Emergencia inmediata";
