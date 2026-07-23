@@ -56,7 +56,8 @@ describe("routeDentalConversationTurn", () => {
   it("gives data erasure absolute priority over any other signal", () => {
     const result = routeDentalConversationTurn({
       latestPatientText: "hola",
-      state: { ...initialDentalAgentState, dataErasureRequested: true }
+      previousState: { ...initialDentalAgentState, dataErasureRequested: true },
+      nextState: { ...initialDentalAgentState, dataErasureRequested: true }
     });
     expect(result.conversationIntent).toBe("data_erasure");
   });
@@ -64,13 +65,15 @@ describe("routeDentalConversationTurn", () => {
   it("classifies managing an existing appointment as reschedule or cancel, never as a new booking", () => {
     const cancel = routeDentalConversationTurn({
       latestPatientText: "quiero cancelar mi cita",
-      state: initialDentalAgentState
+      previousState: initialDentalAgentState,
+      nextState: initialDentalAgentState
     });
     expect(cancel.conversationIntent).toBe("cancel_appointment");
 
     const reschedule = routeDentalConversationTurn({
       latestPatientText: "puedo cambiar mi cita para otro dia?",
-      state: initialDentalAgentState
+      previousState: initialDentalAgentState,
+      nextState: initialDentalAgentState
     });
     expect(reschedule.conversationIntent).toBe("reschedule_appointment");
   });
@@ -78,7 +81,8 @@ describe("routeDentalConversationTurn", () => {
   it("classifies picking a bare number from offered slots as select_slot", () => {
     const result = routeDentalConversationTurn({
       latestPatientText: "2",
-      state: offeredState()
+      previousState: offeredState(),
+      nextState: offeredState()
     });
     expect(result.conversationIntent).toBe("select_slot");
   });
@@ -86,14 +90,16 @@ describe("routeDentalConversationTurn", () => {
   it("classifies an ordinal slot pick as select_slot only when the assistant actually offered slots last turn", () => {
     const withContext = routeDentalConversationTurn({
       latestPatientText: "la segunda me viene bien",
-      state: offeredState(),
+      previousState: offeredState(),
+      nextState: offeredState(),
       lastAssistantMessage: "Te puedo proponer estos huecos: 1. jueves 10:00 2. viernes 11:00 3. lunes 10:00"
     });
     expect(withContext.conversationIntent).toBe("select_slot");
 
     const withoutContext = routeDentalConversationTurn({
       latestPatientText: "la segunda vez que vine me trataron genial",
-      state: offeredState(),
+      previousState: offeredState(),
+      nextState: offeredState(),
       lastAssistantMessage: "Perfecto, cuentame que necesitas."
     });
     expect(withoutContext.conversationIntent).not.toBe("select_slot");
@@ -105,7 +111,8 @@ describe("routeDentalConversationTurn", () => {
     // un simple agradecimiento de cierre.
     const result = routeDentalConversationTurn({
       latestPatientText: "gracias",
-      state: { ...initialDentalAgentState, intent: "reactivation" }
+      previousState: { ...initialDentalAgentState, intent: "reactivation" },
+      nextState: { ...initialDentalAgentState, intent: "reactivation" }
     });
     expect(result.conversationIntent).toBe("thanks");
   });
@@ -117,7 +124,8 @@ describe("routeDentalConversationTurn", () => {
     // inferIntent (dental-senior-agent.ts) en un turno previo del pipeline real.
     const result = routeDentalConversationTurn({
       latestPatientText: "cita para una limpieza",
-      state: { ...initialDentalAgentState, intent: "reactivation" }
+      previousState: { ...initialDentalAgentState, intent: "reactivation" },
+      nextState: { ...initialDentalAgentState, intent: "reactivation" }
     });
     expect(result.conversationIntent).toBe("book_appointment");
     expect(result.treatmentTopic).toBe("hygiene");

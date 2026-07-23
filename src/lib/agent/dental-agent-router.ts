@@ -104,29 +104,54 @@ const ORDINAL_SLOT_PATTERN = /(la primera|la segunda|la tercera|el primero|el se
  *      clinico, y es el ultimo recurso, no la fuente primaria.
  * treatmentTopic siempre sale del tema clinico real (normalizeDentalAgentState),
  * que es su fuente legitima - lo que se corrige aqui es conversationIntent, no eso.
+ *
+ * Bug real (revision PR #11, "Route slot picks before clearing offered
+ * options"): antes se pasaba un unico `state` = turn.state, es decir, el
+ * estado YA procesado por el motor local. Al elegir un hueco ("1"), el motor
+ * local ya selecciono la opcion, copio la disponibilidad y VACIO
+ * offeredAvailabilityOptions antes de que este enrutador viera el turno - asi
+ * que la deteccion de seleccion de hueco (extractSelectedAvailabilityOption)
+ * ya no encontraba nada que seleccionar, y el turno caia al ultimo recurso
+ * (mapConversationIntent), clasificando "confirm" en vez de "select_slot".
+ * Fix arquitectonico: se reciben AMBOS estados por separado.
+ *   - previousState (antes de procesar este mensaje): unica fuente valida
+ *     para señales que dependen de "que habia ofrecido/pendiente ANTES de
+ *     este mensaje" - aqui, exclusivamente la seleccion de hueco.
+ *   - nextState (turn.state, ya procesado): fuente para todo lo demas -
+ *     treatmentTopic/bookingStatus (deben reflejar el resultado de ESTE
+ *     turno, p.ej. bookingStatus ya PREBOOKED tras seleccionar), el borrado
+ *     de datos (debe detectarse en el mismo turno en que se pide, no un turno
+ *     tarde) y el ultimo recurso mapConversationIntent (debe ver el
+ *     consent/ready ya actualizados por este mismo mensaje).
+ * No se reconstruyen artificialmente las opciones tras vaciarlas: se lee el
+ * estado de antes, intacto, en vez de intentar deshacer la limpieza.
  */
 export function routeDentalConversationTurn(input: {
   latestPatientText: string;
-  state: DentalAgentState;
+  previousState: DentalAgentState;
+  nextState: DentalAgentState;
   lastAssistantMessage?: string;
 }): RoutedConversationFields {
-  const normalizedState = normalizeDentalAgentState(input.state);
-  const treatmentTopic = normalizedState.treatmentTopic;
-  const bookingStatus = normalizedState.bookingStatus;
+  const normalizedNextState = normalizeDentalAgentState(input.nextState);
+  const treatmentTopic = normalizedNextState.treatmentTopic;
+  const bookingStatus = normalizedNextState.bookingStatus;
   const conversationIntent = resolveConversationIntent(input);
-  const conversationStatus = deriveConversationStatus(input.state, bookingStatus, conversationIntent);
+  const conversationStatus = deriveConversationStatus(input.nextState, bookingStatus, conversationIntent);
 
   return { conversationIntent, treatmentTopic, bookingStatus, conversationStatus };
 }
 
 function resolveConversationIntent(input: {
   latestPatientText: string;
-  state: DentalAgentState;
+  previousState: DentalAgentState;
+  nextState: DentalAgentState;
   lastAssistantMessage?: string;
 }): ConversationIntent {
   const normalizedText = normalize(input.latestPatientText);
 
-  if (input.state.dataErasureRequested) {
+  // nextState: si ESTE mensaje pide el borrado, debe detectarse ya en este
+  // turno (dental-senior-agent.ts ya lo refleja en nextState.dataErasureRequested).
+  if (input.nextState.dataErasureRequested) {
     return "data_erasure";
   }
 
@@ -134,8 +159,11 @@ function resolveConversationIntent(input: {
     return /(cancel|anular)/.test(normalizedText) ? "cancel_appointment" : "reschedule_appointment";
   }
 
+  // previousState: las opciones ofrecidas ya estan vacias en nextState (el
+  // motor local las consumio al seleccionar) - solo previousState conserva lo
+  // que de verdad se ofrecio antes de este mensaje.
   const assistantOfferedSlots = Boolean(input.lastAssistantMessage && jumpsToBookingOptions(input.lastAssistantMessage));
-  const selectedSlot = extractSelectedAvailabilityOption(input.state, normalizedText);
+  const selectedSlot = extractSelectedAvailabilityOption(input.previousState, normalizedText);
   if (selectedSlot || (assistantOfferedSlots && ORDINAL_SLOT_PATTERN.test(normalizedText))) {
     return "select_slot";
   }
@@ -145,5 +173,8 @@ function resolveConversationIntent(input: {
     return textIntent;
   }
 
-  return mapConversationIntent(input.state);
+  // nextState: el ultimo recurso debe ver el consent/ready/intent ya
+  // actualizados por este mismo mensaje (p.ej. una aceptacion de consentimiento
+  // en este turno debe clasificar ya como provide_data, no un turno tarde).
+  return mapConversationIntent(input.nextState);
 }

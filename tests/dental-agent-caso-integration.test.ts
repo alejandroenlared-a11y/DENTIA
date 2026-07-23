@@ -12,7 +12,8 @@ import { initialDentalAgentState, type DentalAgentState } from "@/lib/agent/dent
 import {
   dentalAgentStateSchema,
   runOpenAiDentalAgentTurn,
-  type DentalAgentApiTurn
+  type DentalAgentApiTurn,
+  type DentalChatMessage
 } from "@/lib/agent/openai-dental-agent";
 
 const OPENAI_KEY_ENV = ["OPENAI", "API", "KEY"].join("_");
@@ -29,11 +30,15 @@ afterEach(() => {
   process.env.DENTAL_AGENT_SCHEMA_VERSION = ORIGINAL_ENV.schemaVersion;
 });
 
-async function turn(message: string, state: DentalAgentState): Promise<DentalAgentApiTurn> {
+async function turn(
+  message: string,
+  state: DentalAgentState,
+  history: DentalChatMessage[] = []
+): Promise<DentalAgentApiTurn> {
   delete process.env.LLM_PROVIDER;
   delete process.env[OPENAI_KEY_ENV];
   delete process.env.DENTAL_AGENT_SCHEMA_VERSION;
-  const result = await runOpenAiDentalAgentTurn({ latestPatientMessage: message, history: [], state });
+  const result = await runOpenAiDentalAgentTurn({ latestPatientMessage: message, history, state });
   expect(result.runtime).toBe("local");
   return result;
 }
@@ -134,7 +139,10 @@ describe("item 6 - una conversacion CLOSED solo se reabre ante intencion materia
       ready: false
     };
     const booked = await turn("1", offeredState);
-    expect(booked.conversationStatus).toBe("CLOSED");
+    // Fix real (PR #11, Problem 1): elegir hueco clasifica select_slot, no
+    // confirm - seleccionar no es un acto de cierre, asi que la conversacion
+    // sigue ACTIVE hasta un agradecimiento/cierre real tras la reserva.
+    expect(booked.conversationStatus).toBe("ACTIVE");
 
     let state = booked.state;
     for (const courtesy of ["Perfecto.", "Vale.", "Hasta luego."]) {
@@ -161,6 +169,68 @@ describe("CASO 6 - ubicacion", () => {
   });
 });
 
+describe("PR #11 Problem 1 - seleccion de hueco via el pipeline real (previousState vs nextState)", () => {
+  function slotsOfferedState(overrides: Partial<DentalAgentState> = {}): DentalAgentState {
+    return {
+      ...initialDentalAgentState,
+      intent: "prosthetics",
+      consent: true,
+      name: "Ana Lopez",
+      phone: "622111333",
+      email: "ana@example.com",
+      location: "Murcia centro",
+      availability: "",
+      offeredAvailabilityOptions: ["jueves, 23/07, 10:00", "viernes, 24/07, 11:00", "lunes, 27/07, 10:00"],
+      ready: false,
+      bookingStatus: "SLOTS_OFFERED",
+      ...overrides
+    };
+  }
+  const ASSISTANT_OFFER_MESSAGE =
+    "Te puedo proponer estos huecos: 1. jueves, 23/07, 10:00 2. viernes, 24/07, 11:00 3. lunes, 27/07, 10:00";
+
+  it('"1" selecciona exactamente la primera opcion, nunca se clasifica como confirm', async () => {
+    const state = slotsOfferedState();
+    const result = await turn("1", state);
+
+    expect(result.conversationIntent).toBe("select_slot");
+    expect(result.conversationIntent).not.toBe("confirm");
+    expect(result.state.availability).toBe(state.offeredAvailabilityOptions[0]);
+    expect(result.state.offeredAvailabilityOptions).toEqual([]);
+    expect(result.bookingStatus).not.toBe("SLOTS_OFFERED");
+    expect(result.bookingStatus).toBe("PREBOOKED");
+  });
+
+  it('"2" selecciona exactamente la segunda opcion', async () => {
+    const state = slotsOfferedState();
+    const result = await turn("2", state);
+
+    expect(result.conversationIntent).toBe("select_slot");
+    expect(result.state.availability).toBe(state.offeredAvailabilityOptions[1]);
+    expect(result.state.offeredAvailabilityOptions).toEqual([]);
+  });
+
+  it('"la tercera" clasifica select_slot solo cuando el ultimo mensaje de Clara realmente ofrecio huecos', async () => {
+    // Nota: el motor local deterministico (dental-senior-agent.ts) solo
+    // resuelve un numero suelto ("1"/"2"/"3") a una opcion concreta -
+    // extractSelectedAvailabilityOption no interpreta texto libre como "la
+    // tercera", y runDentalSeniorTurn no recibe el ultimo mensaje del
+    // asistente (eso es exclusivo del router, para conversationIntent). Por
+    // eso aqui solo se afirma la clasificacion, no la seleccion real de
+    // hueco - ampliar el motor local para resolver ordinales en texto libre
+    // seria un cambio de alcance mayor, no pedido por los comentarios P2.
+    const state = slotsOfferedState();
+    const history: DentalChatMessage[] = [{ role: "assistant", body: ASSISTANT_OFFER_MESSAGE }];
+
+    const withOffer = await turn("la tercera", state, history);
+    expect(withOffer.conversationIntent).toBe("select_slot");
+
+    const withoutOfferHistory: DentalChatMessage[] = [{ role: "assistant", body: "Perfecto, cuentame que necesitas." }];
+    const withoutOffer = await turn("la tercera", state, withoutOfferHistory);
+    expect(withoutOffer.conversationIntent).not.toBe("select_slot");
+  });
+});
+
 describe("CASO 7 a 10 - seleccion de hueco, cierre, agradecimiento y reapertura encadenados", () => {
   it("selecciona la opcion 1 exacta, conserva fecha, cierra y reabre solo al pedir cambio", async () => {
     const offeredState: DentalAgentState = {
@@ -178,7 +248,9 @@ describe("CASO 7 a 10 - seleccion de hueco, cierre, agradecimiento y reapertura 
 
     // CASO 7: Clara ofrecio 3 huecos, el paciente responde "1".
     const caso7 = await turn("1", offeredState);
-    expect(caso7.conversationIntent).toBe("confirm");
+    // Fix real (PR #11, Problem 1): antes se clasificaba "confirm" por bug de
+    // timing (el router veia el estado ya vaciado); ahora correctamente select_slot.
+    expect(caso7.conversationIntent).toBe("select_slot");
     expect(caso7.bookingStatus).toBe("PREBOOKED");
     expect(caso7.state.availability).toBe(offeredState.offeredAvailabilityOptions[0]);
     expect(caso7.state.offeredAvailabilityOptions).toEqual([]);

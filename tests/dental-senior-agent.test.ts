@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   buildDentalSummary,
+  computeBookingStatus,
+  hasSlotOfferPrerequisites,
   initialDentalAgentState,
   runDentalSeniorTurn,
   type DentalAgentState
@@ -863,5 +865,48 @@ describe("runDentalSeniorTurn", () => {
     // no debe disparar el aviso de idioma (ya cubierto por el motor normal).
     const mixed = runDentalSeniorTurn(initialDentalAgentState, "hello quiero i want cita por favor pleaaase tooth hurts mucho");
     expect(mixed.reply.toLowerCase()).not.toContain("solo puedo atenderte en español");
+  });
+});
+
+describe("hasSlotOfferPrerequisites / computeBookingStatus", () => {
+  // Fix real (revision PR #11, "Keep location-only states in data collection"):
+  // computeBookingStatus devolvia READY_TO_OFFER_SLOTS solo porque existia
+  // state.location, aunque siguieran faltando consent/nombre/email/telefono.
+  const withOnlyLocation: DentalAgentState = {
+    ...initialDentalAgentState,
+    intent: "prosthetics",
+    location: "Murcia centro"
+  };
+
+  it("no considera listo para ofrecer huecos solo por tener la sede", () => {
+    expect(hasSlotOfferPrerequisites(withOnlyLocation)).toBe(false);
+    expect(computeBookingStatus(withOnlyLocation)).not.toBe("READY_TO_OFFER_SLOTS");
+    expect(computeBookingStatus(withOnlyLocation)).toBe("COLLECTING_CONSENT");
+  });
+
+  it("tampoco esta listo si falta solo un dato administrativo (nombre, telefono o email)", () => {
+    const missingName = { ...withOnlyLocation, consent: true, phone: "611222333", email: "juan@example.com" };
+    expect(hasSlotOfferPrerequisites(missingName)).toBe(false);
+    expect(computeBookingStatus(missingName)).toBe("COLLECTING_PATIENT_DATA");
+
+    const missingPhone = { ...missingName, name: "Juan Perez", phone: "" };
+    expect(hasSlotOfferPrerequisites(missingPhone)).toBe(false);
+    expect(computeBookingStatus(missingPhone)).toBe("COLLECTING_PATIENT_DATA");
+
+    const missingEmail = { ...missingPhone, phone: "611222333", email: "" };
+    expect(hasSlotOfferPrerequisites(missingEmail)).toBe(false);
+    expect(computeBookingStatus(missingEmail)).toBe("COLLECTING_PATIENT_DATA");
+  });
+
+  it("esta listo para ofrecer huecos solo con consent + nombre completo + telefono + email + sede", () => {
+    const complete: DentalAgentState = {
+      ...withOnlyLocation,
+      consent: true,
+      name: "Juan Perez",
+      phone: "611222333",
+      email: "juan@example.com"
+    };
+    expect(hasSlotOfferPrerequisites(complete)).toBe(true);
+    expect(computeBookingStatus(complete)).toBe("READY_TO_OFFER_SLOTS");
   });
 });

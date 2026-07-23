@@ -241,7 +241,7 @@ export async function runOpenAiDentalAgentTurn(input: {
   clinicContext?: string;
 }): Promise<DentalAgentApiTurn> {
   const turn = await runOpenAiDentalAgentTurnInternal(input);
-  return attachConversationFields(turn, input.latestPatientMessage, lastAssistantMessageOf(input.history));
+  return attachConversationFields(turn, input.latestPatientMessage, input.state, lastAssistantMessageOf(input.history));
 }
 
 async function runOpenAiDentalAgentTurnInternal(input: {
@@ -316,7 +316,7 @@ async function runGeminiDentalAgentTurn(input: {
   clinicContext?: string;
 }): Promise<DentalAgentApiTurn> {
   const turn = await runGeminiDentalAgentTurnInternal(input);
-  return attachConversationFields(turn, input.latestPatientMessage, lastAssistantMessageOf(input.history));
+  return attachConversationFields(turn, input.latestPatientMessage, input.state, lastAssistantMessageOf(input.history));
 }
 
 async function runGeminiDentalAgentTurnInternal(input: {
@@ -972,11 +972,17 @@ function logConversationClassificationShadow(
 function attachConversationFields(
   turn: DentalAgentApiTurn & { aiSelfReportedFields?: AiSelfReportedConversationFields },
   latestPatientMessage: string,
+  previousState: DentalAgentState,
   lastAssistantMessage: string | undefined
 ): DentalAgentApiTurn {
+  // Bug real (PR #11): antes solo se pasaba turn.state (ya procesado) al
+  // enrutador, asi que seleccionar un hueco ("1") no se detectaba como
+  // select_slot (el motor local ya habia vaciado offeredAvailabilityOptions).
+  // Ver el comentario largo en dental-agent-router.ts para el porque de cada uso.
   const routed = routeDentalConversationTurn({
     latestPatientText: latestPatientMessage,
-    state: turn.state,
+    previousState,
+    nextState: turn.state,
     lastAssistantMessage
   });
   logConversationClassificationShadow(routed, turn.aiSelfReportedFields, resolveDentalAgentSchemaVersion());

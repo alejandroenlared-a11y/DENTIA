@@ -1196,6 +1196,26 @@ export function hasConcreteAvailability(availability: string) {
   return hasDay && hasTime;
 }
 
+// Unica fuente de verdad para "estan todos los datos administrativos listos
+// para ofrecer huecos" (consent + nombre completo + telefono + email + sede).
+// Bug real (revision PR #11, "Keep location-only states in data collection"):
+// computeBookingStatus devolvia READY_TO_OFFER_SLOTS solo porque existia
+// state.location, aunque siguieran faltando consentimiento/nombre/email/
+// telefono - el estado persistido decia "listo para ofrecer huecos" cuando el
+// siguiente paso real seguia siendo pedir esos datos. Funcion unica, reusada
+// tambien por canOfferAvailabilityOptions, para que ambos sitios nunca puedan
+// desincronizarse.
+export function hasSlotOfferPrerequisites(state: DentalAgentState): boolean {
+  return Boolean(
+    state.intent &&
+    state.consent &&
+    hasFullName(state.name) &&
+    state.phone &&
+    state.email &&
+    state.location
+  );
+}
+
 // Unica fuente de verdad para derivar bookingStatus a partir de los datos ya
 // presentes en el estado (consent/nombre/telefono/sede/disponibilidad/ready).
 // Reusada tal cual por dental-agent-migration.ts (mapBookingStatus) para que
@@ -1206,7 +1226,7 @@ export function computeBookingStatus(state: DentalAgentState): BookingStatus {
   if (state.ready && hasConcreteAvailability(state.availability)) return "PREBOOKED";
   if (state.availability) return "SLOT_SELECTED";
   if (state.offeredAvailabilityOptions.length > 0) return "SLOTS_OFFERED";
-  if (state.location) return "READY_TO_OFFER_SLOTS";
+  if (hasSlotOfferPrerequisites(state)) return "READY_TO_OFFER_SLOTS";
   if (state.consent) return "COLLECTING_PATIENT_DATA";
   if (state.intent) return "COLLECTING_CONSENT";
   return "IDLE";
@@ -1295,15 +1315,7 @@ function fallbackAvailabilityOptions(period: string) {
 }
 
 function canOfferAvailabilityOptions(state: DentalAgentState) {
-  return Boolean(
-    state.intent &&
-    state.consent &&
-    hasFullName(state.name) &&
-    state.phone &&
-    state.email &&
-    state.location &&
-    !state.availability
-  );
+  return hasSlotOfferPrerequisites(state) && !state.availability;
 }
 
 function completeDentalState(state: DentalAgentState): DentalAgentState {
