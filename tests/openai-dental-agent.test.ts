@@ -1425,7 +1425,7 @@ describe("runDentalAgentTurn", () => {
     expect(result.state.ready).toBe(false);
   });
 
-  it("escalates when Gemini detects an emergency the local engine missed", async () => {
+  it("hotfix dental-clinical-authority: no escala solo porque Gemini devuelva escalated/triageLevel EMERGENCY - el motor local es la unica autoridad", async () => {
     process.env.LLM_PROVIDER = "gemini";
     process.env.GEMINI_API_KEY = "gemini-test-key";
     process.env.GEMINI_MODEL = "gemini-test-model";
@@ -1465,7 +1465,18 @@ describe("runDentalAgentTurn", () => {
       state: initialDentalAgentState
     });
 
-    expect(result.state.escalated).toBe(true);
+    // Hotfix (fallo confirmado en produccion): antes la IA podia forzar
+    // escalated/triageLevel/safetyScreened/missingClinicalData a su antojo
+    // (aqui, como "red de seguridad" para emergencias que el motor local se
+    // saltara), pero ese mismo mecanismo era la causa raiz de que la IA
+    // pudiera marcar safetyScreened=true y vaciar missingClinicalData para
+    // saltarse la pregunta de seguridad obligatoria y pasar directo a
+    // diagnostico + consentimiento. mergeAiState ya no acepta estos campos
+    // desde aiOutput bajo ninguna circunstancia - localState (el motor
+    // deterministico) es la unica autoridad. Un mensaje ambiguo como este,
+    // sin red flags/señales que el motor local reconozca, ya NO escala solo
+    // porque la IA diga que es una emergencia.
+    expect(result.state.escalated).toBe(false);
   });
 
   it("does not force escalated or block ready when nothing triggers escalation and Gemini agrees", async () => {
@@ -1520,5 +1531,68 @@ describe("runDentalAgentTurn", () => {
 
     expect(result.state.escalated).toBe(false);
     expect(result.state.ready).toBe(true);
+  });
+
+  it("hotfix dental-clinical-authority: repite el fallo real de produccion - 'me duele al morder' ya no permite diagnostico prematuro ni salta la pregunta de seguridad", async () => {
+    delete process.env.LLM_PROVIDER;
+    const openAiKeyEnvName = ["OPENAI", "API", "KEY"].join("_");
+    process.env[openAiKeyEnvName] = "test-key";
+    process.env.OPENAI_MODEL = "gpt-test";
+
+    // Fallo real reportado en produccion: el proveedor real devolvia esto -
+    // diagnostico prematuro (caries/filtracion de empaste) y saltaba directo
+    // a pedir consentimiento, marcando safetyScreened=true y vaciando
+    // missingClinicalData para evitar que el guardrail (preparePatientReply)
+    // detectara que la pregunta de seguridad obligatoria no se hizo.
+    const output = {
+      reply:
+        "Podria ser caries o filtracion de empaste, conviene revisarlo con calma.",
+      intent: "caries_restoration",
+      intentCode: "CARIES_MORDER",
+      treatmentNeed: "Restauracion",
+      budget: "desde 60 EUR",
+      estimatedValue: 6000,
+      escalated: false,
+      consent: true,
+      name: "",
+      phone: "",
+      location: "",
+      availability: "",
+      triageLevel: "ROUTINE",
+      triageLabel: "Rutina",
+      clinicalReading: "Caries o filtracion de empaste probable.",
+      likelyCauses: ["caries", "filtracion de empaste"],
+      detectedSignals: [],
+      redFlags: [],
+      missingClinicalData: [],
+      confidence: "Alta",
+      safetyScreened: true
+    };
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => ({ output_text: JSON.stringify(output) })
+    } as Response);
+
+    const result = await runOpenAiDentalAgentTurn({
+      latestPatientMessage: "Me duele al morder.",
+      history: [],
+      state: initialDentalAgentState
+    });
+
+    // El motor local (localState) es la unica autoridad: para caries_restoration
+    // la pregunta de seguridad general (fiebre/hinchazon/pus/abrir boca/tragar)
+    // no pasa por missingClinicalData (ver nextStep, dental-senior-agent.ts) -
+    // safetyScreened se mantiene false pase lo que pase en aiOutput, y el
+    // nuevo guardrail isMandatorySafetyScreenQuestion (guardrails.ts) compara
+    // localReply/aiReply directamente para descartar el diagnostico prematuro.
+    expect(result.state.safetyScreened).toBe(false);
+    expect(result.state.consent).toBe(false);
+    const reply = result.reply.toLowerCase();
+    expect(reply).not.toContain("caries");
+    expect(reply).not.toContain("filtracion de empaste");
+    expect(reply).not.toContain("filtración de empaste");
+    expect(reply).not.toContain("aceptas que guardemos");
+    expect(reply).toContain("?");
   });
 });
