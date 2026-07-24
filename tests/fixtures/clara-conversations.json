@@ -203,7 +203,9 @@
       { "type": "stateEquals", "field": "intent", "value": "caries_restoration", "weight": 3 },
       { "type": "stateEquals", "field": "triageLevel", "value": "PRIORITY_72H", "weight": 2 },
       { "type": "stateEquals", "field": "escalated", "value": false, "weight": 3 },
-      { "type": "replyIncludes", "value": "empaste", "weight": 2 }
+      { "type": "stateEquals", "field": "safetyScreened", "value": false, "weight": 2 },
+      { "type": "replyIncludes", "value": "fiebre", "weight": 2 },
+      { "type": "replyExcludes", "value": "empaste", "weight": 2 }
     ]
   },
   {

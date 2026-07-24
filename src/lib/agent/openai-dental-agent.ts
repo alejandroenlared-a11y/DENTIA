@@ -10,7 +10,6 @@ import {
   TRIAGE_URGENCY_ORDER,
   triageLabel,
   type DentalAgentState,
-  type DentalIntentId,
   type TriageLevel
 } from "@/lib/agent/dental-senior-agent";
 import { preparePatientReply } from "@/lib/agent/guardrails";
@@ -1078,26 +1077,33 @@ function mergeClinicalEscalation(
 }
 
 function mergeAiState(localState: DentalAgentState, aiOutput: DentalAgentAiOutput): DentalAgentState {
-  const aiIntent = aiOutput.intent === "unknown" ? localState.intent : (aiOutput.intent as DentalIntentId);
-  const intent =
-    localState.intent === "trauma" && ["urgent_pain", "endodontics", "caries_restoration"].includes(aiIntent ?? "")
-      ? "trauma"
-      : aiIntent;
   const escalation = mergeClinicalEscalation(localState, aiOutput);
   const state: DentalAgentState = {
     ...localState,
-    intent,
-    intentCode: aiOutput.intentCode || localState.intentCode || PENDING_INTENT,
-    treatmentNeed: aiOutput.treatmentNeed || localState.treatmentNeed,
     budget: aiOutput.budget || localState.budget,
     estimatedValue: aiOutput.estimatedValue,
     name: localState.name || aiOutput.name,
     phone: localState.phone || aiOutput.phone,
     email: localState.email || aiOutput.email,
-    clinicalReading: aiOutput.clinicalReading,
-    likelyCauses: unique([...localState.likelyCauses, ...aiOutput.likelyCauses]),
-    detectedSignals: unique([...localState.detectedSignals, ...aiOutput.detectedSignals]),
-    confidence: aiOutput.confidence,
+    // Codex (revision PR #13 sobre a720519): mergeAiState dejaba que la IA
+    // sustituyera intent/intentCode/treatmentNeed/clinicalReading/
+    // likelyCauses/detectedSignals/confidence (union o reemplazo directo del
+    // aiOutput) - un intent inventado, señales alucinadas o una lectura
+    // clinica incompatible con lo que el motor local detecto de verdad
+    // podian colarse en el estado persistido. Estos campos son
+    // deterministicos igual que consent/safetyScreened/redFlags de abajo:
+    // la IA no tiene autoridad sobre ninguno, se conservan SIEMPRE desde
+    // localState. Lo que la IA proponga en aiOutput para estos campos se
+    // descarta por completo (no se registra ni como shadow metadata: no
+    // hay ningun consumidor que lo necesite hoy, y persistirlo sin uso real
+    // seria superficie sin proposito).
+    intent: localState.intent,
+    intentCode: localState.intentCode,
+    treatmentNeed: localState.treatmentNeed,
+    clinicalReading: localState.clinicalReading,
+    likelyCauses: localState.likelyCauses,
+    detectedSignals: localState.detectedSignals,
+    confidence: localState.confidence,
     // Autoridad exclusiva del motor deterministico - la IA nunca las toca:
     consent: localState.consent,
     safetyScreened: localState.safetyScreened,
@@ -1138,6 +1144,3 @@ function computeReady(state: DentalAgentState) {
   );
 }
 
-function unique(values: string[]) {
-  return Array.from(new Set(values.map(value => value.trim()).filter(Boolean)));
-}

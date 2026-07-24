@@ -77,7 +77,9 @@ describe("runDentalSeniorTurn", () => {
     expect(turn.state.redFlags).toEqual([]);
     expect(turn.state.detectedSignals).toContain("sensibilidad al frio/calor");
     expect(turn.state.detectedSignals).toContain("dolor al morder");
-    expect(turn.reply).toContain("empaste");
+    expect(turn.state.safetyScreened).toBe(false);
+    expect(turn.reply).not.toContain("empaste");
+    expect(turn.reply).toContain("pus");
   });
 
   it("does not mark an urgent inflamed moving tooth as ready without clinic, day and time", () => {
@@ -1410,5 +1412,71 @@ describe("PR #13 P2 (revision sobre 3ace5b8): lastAssistantAction solo represent
     const result = runDentalSeniorTurn(initialDentalAgentState, "¿Dónde estáis?");
     expect(result.state.lastAssistantAction).toBe("");
     expect(result.state.lastQuestionKey).toBe("");
+  });
+});
+
+describe("PR #13 blocker 2: safetyScreened exige las 5 senales de la pregunta general", () => {
+  it("'Me duele una muela y no tengo fiebre ni hinchazón' -> solo 2 de 5 senales resueltas, sigue preguntando pus/abrir/tragar, sin oferta de cita", () => {
+    const turn = runDentalSeniorTurn(initialDentalAgentState, "Me duele una muela y no tengo fiebre ni hinchazón");
+
+    expect(turn.state.safetyScreened).toBe(false);
+    expect(turn.state.appointmentHelpAccepted).toBe(false);
+    expect(turn.state.consent).toBe(false);
+    expect(turn.reply).toContain("pus");
+    expect(turn.reply.toLowerCase()).not.toContain("aceptas que guardemos");
+    expect(turn.reply.toLowerCase()).not.toContain("quieres que te ayude a solicitar una cita");
+  });
+
+  it("completando las 5 senales (fiebre/hinchazon/pus/abrir/tragar, todas negadas) si marca safetyScreened", () => {
+    const first = runDentalSeniorTurn(initialDentalAgentState, "Me duele una muela y no tengo fiebre ni hinchazón");
+    const second = runDentalSeniorTurn(
+      first.state,
+      "No tengo pus ni me cuesta abrir la boca ni tragar",
+      first.reply
+    );
+
+    expect(second.state.safetyScreened).toBe(true);
+  });
+
+  it("una red flag afirmada corta el flujo a EMERGENCY sin exigir las 5 senales", () => {
+    const turn = runDentalSeniorTurn(initialDentalAgentState, "No puedo respirar bien y tengo hinchazon en el ojo");
+
+    expect(turn.state.triageLevel).toBe("EMERGENCY");
+    expect(turn.state.safetyScreened).toBe(true);
+  });
+});
+
+describe("PR #13 blocker 3: resolveClinicalTermPolarity procesa todas las apariciones de una señal", () => {
+  it("'No tenía hinchazón y ahora tengo hinchazón en el ojo' -> swelling afirmada (mencion actual gana sobre la historica), red flag ocular, EMERGENCY", () => {
+    const unit = extractAffirmedAndNegatedClinicalSignals("No tenía hinchazón y ahora tengo hinchazón en el ojo");
+    expect(unit.affirmed).toContain("swelling");
+    expect(unit.negated).not.toContain("swelling");
+
+    const turn = runDentalSeniorTurn(initialDentalAgentState, "No tenía hinchazón y ahora tengo hinchazón en el ojo");
+    expect(turn.state.redFlags.length).toBeGreaterThan(0);
+    expect(turn.state.triageLevel).toBe("EMERGENCY");
+    expect(turn.state.escalated).toBe(true);
+  });
+
+  it("'Puedo respirar, pero ahora me cuesta respirar' -> breathingDifficulty afirmada, EMERGENCY", () => {
+    const unit = extractAffirmedAndNegatedClinicalSignals("Puedo respirar, pero ahora me cuesta respirar");
+    expect(unit.affirmed).toContain("breathingDifficulty");
+    expect(unit.negated).not.toContain("breathingDifficulty");
+
+    const turn = runDentalSeniorTurn(initialDentalAgentState, "Puedo respirar, pero ahora me cuesta respirar");
+    expect(turn.state.triageLevel).toBe("EMERGENCY");
+    expect(turn.state.escalated).toBe(true);
+  });
+
+  it("'Puedo tragar, aunque ahora me cuesta tragar' -> swallowingDifficulty afirmada", () => {
+    const unit = extractAffirmedAndNegatedClinicalSignals("Puedo tragar, aunque ahora me cuesta tragar");
+    expect(unit.affirmed).toContain("swallowingDifficulty");
+    expect(unit.negated).not.toContain("swallowingDifficulty");
+  });
+
+  it("'Antes me dolía, pero ahora no me duele' -> pain negado en el estado actual (la mencion posterior gana)", () => {
+    const unit = extractAffirmedAndNegatedClinicalSignals("Antes me dolía, pero ahora no me duele");
+    expect(unit.negated).toContain("pain");
+    expect(unit.affirmed).not.toContain("pain");
   });
 });

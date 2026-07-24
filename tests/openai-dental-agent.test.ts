@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { initialDentalAgentState } from "@/lib/agent/dental-senior-agent";
+import { initialDentalAgentState, runDentalSeniorTurn } from "@/lib/agent/dental-senior-agent";
 import { runDentalAgentTurn, runOpenAiDentalAgentTurn } from "@/lib/agent/openai-dental-agent";
 
 // Forma real de la respuesta de la Generative Language API (generateContent).
@@ -177,7 +177,9 @@ describe("runDentalAgentTurn", () => {
     expect(result.runtime).toBe("local");
     expect(result.fallbackReason).toContain("OPENAI_API_KEY");
     expect(result.state.intent).toBe("caries_restoration");
-    expect(result.reply).toContain("empaste");
+    expect(result.state.safetyScreened).toBe(false);
+    expect(result.reply).not.toContain("empaste");
+    expect(result.reply).toContain("pus");
   });
 
   it("uses a valid structured OpenAI response and keeps CRM-ready state", async () => {
@@ -387,13 +389,18 @@ describe("runDentalAgentTurn", () => {
     });
 
     expect(result.runtime).toBe("gemini");
-    // Hotfix dental-negation-context (Problema 1): tras el cribado, Clara
-    // ofrece ayuda con la cita ANTES de pedir consentimiento - nunca pide
-    // datos de contacto directamente en este turno.
-    expect(result.reply).toContain("Quieres que te ayude a solicitar una cita");
+    // Codex (revision PR #13 sobre a720519): "no tengo fiebre ni hinchazon"
+    // solo resuelve 2 de las 5 senales del cribado (falta pus/abrir/tragar).
+    // El aiOutput.safetyScreened=true de Gemini se descarta (mergeAiState
+    // bloquea el campo a localState) - Clara sigue preguntando por el resto
+    // del cribado y NUNCA ofrece ayuda con la cita ni pide datos/consentimiento
+    // en este turno.
+    expect(result.state.safetyScreened).toBe(false);
+    expect(result.reply).not.toContain("Quieres que te ayude a solicitar una cita");
     expect(result.reply).not.toContain("Aceptas que guardemos tus datos");
     expect(result.reply.toLowerCase()).not.toContain("me podrias indicar tu nombre");
     expect(result.reply.toLowerCase()).not.toContain("murcia o elche");
+    expect(result.reply).toContain("pus");
   });
 
   it("does not let Gemini ask consent before safety triage for a moving tooth", async () => {
@@ -1988,5 +1995,114 @@ describe("runDentalAgentTurn", () => {
     expect(result.reply).toContain("urgencias");
     expect(result.state.consent).toBe(false);
     expect(result.state.bookingStatus).toBe("IDLE");
+  });
+});
+
+describe("PR #13 blocker 1: mergeAiState bloquea campos clinicos deterministas (la IA nunca los sustituye)", () => {
+  const message = "Me duele una muela con frio y al morder, no tengo fiebre ni hinchazon.";
+  const baseOutput = {
+    reply: "Parece un problema de encias, conviene revisar periodoncia con prioridad.",
+    escalated: false,
+    consent: false,
+    name: "",
+    phone: "",
+    location: "",
+    availability: "",
+    triageLevel: "PRIORITY_72H",
+    triageLabel: "Prioridad 48-72h",
+    redFlags: [] as string[],
+    missingClinicalData: [] as string[],
+    safetyScreened: true
+  };
+
+  function mockOpenAiOutput(output: Record<string, unknown>) {
+    delete process.env.LLM_PROVIDER;
+    const openAiKeyEnvName = ["OPENAI", "API", "KEY"].join("_");
+    process.env[openAiKeyEnvName] = "test-key";
+    process.env.OPENAI_MODEL = "gpt-test";
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => ({ output_text: JSON.stringify(output) })
+    } as Response);
+  }
+
+  it("ignora un intent/intentCode/treatmentNeed distinto propuesto por el LLM - conserva el del motor local", async () => {
+    const localState = runDentalSeniorTurn(initialDentalAgentState, message).state;
+    mockOpenAiOutput({
+      ...baseOutput,
+      intent: "periodontics",
+      intentCode: "PERIODONCIA_ENCIAS",
+      treatmentNeed: "Periodoncia",
+      budget: "desde 90 EUR",
+      estimatedValue: 22000,
+      clinicalReading: "Inflamacion gingival compatible con periodontitis.",
+      likelyCauses: ["periodontitis", "sarro subgingival"],
+      detectedSignals: ["sangrado de encias"],
+      confidence: "Alta"
+    });
+
+    const result = await runOpenAiDentalAgentTurn({
+      latestPatientMessage: message,
+      history: [],
+      state: initialDentalAgentState
+    });
+
+    expect(result.state.intent).toBe(localState.intent);
+    expect(result.state.intent).not.toBe("periodontics");
+    expect(result.state.intentCode).toBe(localState.intentCode);
+    expect(result.state.treatmentNeed).toBe(localState.treatmentNeed);
+  });
+
+  it("descarta detectedSignals inventadas por el LLM - conserva solo las del motor local", async () => {
+    const localState = runDentalSeniorTurn(initialDentalAgentState, message).state;
+    mockOpenAiOutput({
+      ...baseOutput,
+      intent: "caries_restoration",
+      intentCode: "CARIES_RESTAURACION",
+      treatmentNeed: "Empaste / conservadora",
+      budget: "desde 65 EUR",
+      estimatedValue: 11000,
+      clinicalReading: localState.clinicalReading,
+      likelyCauses: localState.likelyCauses,
+      detectedSignals: ["sangrado activo", "fractura visible", "dolor pulsante nocturno"],
+      confidence: localState.confidence
+    });
+
+    const result = await runOpenAiDentalAgentTurn({
+      latestPatientMessage: message,
+      history: [],
+      state: initialDentalAgentState
+    });
+
+    expect(result.state.detectedSignals).toEqual(localState.detectedSignals);
+    expect(result.state.detectedSignals).not.toContain("fractura visible");
+    expect(result.state.detectedSignals).not.toContain("sangrado activo");
+  });
+
+  it("descarta clinicalReading/likelyCauses/confidence incompatibles propuestos por el LLM - conserva los del motor local", async () => {
+    const localState = runDentalSeniorTurn(initialDentalAgentState, message).state;
+    mockOpenAiOutput({
+      ...baseOutput,
+      intent: "caries_restoration",
+      intentCode: "CARIES_RESTAURACION",
+      treatmentNeed: "Empaste / conservadora",
+      budget: "desde 65 EUR",
+      estimatedValue: 11000,
+      clinicalReading: "Sospecha de tumor odontogenico, derivar a cirugia maxilofacial urgente.",
+      likelyCauses: ["neoplasia odontogenica"],
+      detectedSignals: localState.detectedSignals,
+      confidence: "Alta"
+    });
+
+    const result = await runOpenAiDentalAgentTurn({
+      latestPatientMessage: message,
+      history: [],
+      state: initialDentalAgentState
+    });
+
+    expect(result.state.clinicalReading).toBe(localState.clinicalReading);
+    expect(result.state.likelyCauses).toEqual(localState.likelyCauses);
+    expect(result.state.confidence).toBe(localState.confidence);
+    expect(result.state.clinicalReading).not.toContain("tumor");
   });
 });

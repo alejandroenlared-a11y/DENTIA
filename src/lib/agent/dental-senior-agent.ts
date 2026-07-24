@@ -516,18 +516,31 @@ function resolveClinicalTermPolarity(normalized: string, termPattern: RegExp): C
     .split(CLAUSE_SPLIT_PATTERN)
     .map(clause => clause.trim())
     .filter(Boolean);
+  // Codex (revision PR #13 sobre a720519): comprobar solo la PRIMERA
+  // coincidencia de cada clausula perdia menciones repetidas dentro de la
+  // MISMA clausula ("No tenia hinchazon y ahora tengo hinchazon en el ojo"
+  // - una sola clausula, sin coma/punto/pero que la separe - solo miraba la
+  // primera "hinchazon", la del "no tenia", ignorando la segunda mencion
+  // afirmada). El patron se reconstruye con flag "g" para recorrer TODAS
+  // las apariciones de la señal en cada clausula, no solo la primera.
+  const globalTermPattern = new RegExp(termPattern.source, termPattern.flags.includes("g") ? termPattern.flags : `${termPattern.flags}g`);
   let sawNegated = false;
   for (const clause of clauses) {
-    const match = termPattern.exec(clause);
-    if (!match) continue;
     const markers = findSignalSegmentMarkers(clause);
-    if (resolveSignalPolarityAt(markers, match.index)) {
-      sawNegated = true;
-    } else {
-      // Afirmada en cualquier clausula del mensaje gana de inmediato: una
-      // negacion en otra clausula ("no tengo fiebre, pero si tengo dolor")
-      // nunca puede anular una afirmacion real de la misma señal.
-      return "affirmed";
+    globalTermPattern.lastIndex = 0;
+    let match: RegExpExecArray | null;
+    while ((match = globalTermPattern.exec(clause))) {
+      if (resolveSignalPolarityAt(markers, match.index)) {
+        sawNegated = true;
+      } else {
+        // Afirmada en cualquier mencion (de esta clausula o de otra) gana de
+        // inmediato: una negacion anterior - en otra clausula ("no tengo
+        // fiebre, pero si tengo dolor") o una mencion historica anterior en
+        // la MISMA clausula ("no tenia X... ahora tengo X") - nunca puede
+        // anular una afirmacion real y mas reciente de la misma señal.
+        return "affirmed";
+      }
+      if (match[0].length === 0) globalTermPattern.lastIndex += 1;
     }
   }
   return sawNegated ? "negated" : "unknown";
@@ -558,17 +571,42 @@ export function extractAffirmedAndNegatedClinicalSignals(message: string): Clini
     else if (polarity === "negated") negated.add(key);
   }
 
-  // tragar/respirar/abrir: reglas dedicadas sobre el mensaje completo (su via
-  // libre real, "puedo respirar", ya contiene la palabra sin negacion previa
-  // que el escaneo por clausula pudiera usar de forma fiable).
+  // tragar/respirar/abrir: reglas dedicadas por clausula (su via libre real,
+  // "puedo respirar", ya contiene la palabra sin negacion previa que el
+  // escaneo generico de marcadores pudiera reutilizar de forma fiable - por
+  // eso quedan fuera del motor de resolveClinicalTermPolarity). Codex
+  // (revision PR #13 sobre a720519): comprobar el mensaje ENTERO de un tiron
+  // (allClear primero, afirmado solo si allClear no matcheaba en ningun
+  // sitio) hacia que "Puedo respirar, pero ahora me cuesta respirar" se
+  // quedara en "sin dificultad" solo porque la primera clausula decia
+  // "puedo respirar" - la mencion mas reciente (afirmada) debe ganar sobre
+  // la historica. Se evalua clausula a clausula: afirmado en CUALQUIER
+  // clausula gana siempre, igual que el resto de señales.
   const difficultyKeys = Object.keys(DIFFICULTY_SIGNAL_RULES) as Array<keyof typeof DIFFICULTY_SIGNAL_RULES>;
+  const clausesForDifficulty = normalized
+    .split(CLAUSE_SPLIT_PATTERN)
+    .map(clause => clause.trim())
+    .filter(Boolean);
   for (const key of difficultyKeys) {
     const rules = DIFFICULTY_SIGNAL_RULES[key];
-    if (rules.allClear.test(normalized)) {
-      negated.add(key);
-    } else if (rules.affirmed.test(normalized)) {
-      affirmed.add(key);
+    let sawAffirmedClause = false;
+    let sawAllClearClause = false;
+    for (const clause of clausesForDifficulty) {
+      // allClear se comprueba PRIMERO dentro de cada clausula (igual que
+      // antes se comprobaba primero en el mensaje completo): el patron
+      // "afirmado" es deliberadamente amplio ("dificultad.*respirar" no
+      // excluye el "no tengo" que lo precede) y depende de que allClear
+      // desambigue primero una clausula que en realidad es una negacion
+      // ("no tengo dificultad para respirar" NO debe leerse como afirmada
+      // solo porque contiene "dificultad...respirar").
+      if (rules.allClear.test(clause)) {
+        sawAllClearClause = true;
+      } else if (rules.affirmed.test(clause)) {
+        sawAffirmedClause = true;
+      }
     }
+    if (sawAffirmedClause) affirmed.add(key);
+    else if (sawAllClearClause) negated.add(key);
   }
 
   const signalKeys = [...simpleKeys, ...difficultyKeys];
@@ -861,13 +899,14 @@ export function runDentalSeniorTurn(current: DentalAgentState, rawText: string, 
     patientMessage: text,
     lastQuestionKey: (current.lastQuestionKey || "") as LastQuestionKey
   });
+  const affirmedClinicalSignals = new Set(clinicalAnswer.affirmed);
   const messageRedFlags = filterOutNegatedLabels(
-    detectLabels(normalized, redFlagPatterns),
+    detectLabels(normalized, redFlagPatterns, affirmedClinicalSignals, REDFLAG_LABEL_TO_SIGNAL_KEY),
     clinicalAnswer.negated,
     REDFLAG_LABEL_TO_SIGNAL_KEY
   );
   const messageSignals = filterOutNegatedLabels(
-    detectLabels(normalized, signalPatterns),
+    detectLabels(normalized, signalPatterns, affirmedClinicalSignals, SIGNAL_LABEL_TO_SIGNAL_KEY),
     clinicalAnswer.negated,
     SIGNAL_LABEL_TO_SIGNAL_KEY
   );
@@ -956,14 +995,22 @@ export function runDentalSeniorTurn(current: DentalAgentState, rawText: string, 
   // solo mencionados de pasada - "no tengo fiebre ni hinchazon" (ambos)
   // sigue completando el cribado sin haber preguntado antes; "no tengo
   // fiebre" (solo uno) ya no.
-  const hasFeverEvidence = clinicalAnswer.affirmed.includes("fever") || clinicalAnswer.negated.includes("fever");
-  const hasSwellingEvidence = clinicalAnswer.affirmed.includes("swelling") || clinicalAnswer.negated.includes("swelling");
+  // Codex (revision PR #13 sobre a720519): fiebre+hinchazon resueltas NO
+  // bastan - la pregunta real cubre fiebre, hinchazon, pus, dificultad para
+  // abrir Y dificultad para tragar. "Me duele una muela y no tengo fiebre ni
+  // hinchazon" negaba solo dos de las cinco y ya marcaba el cribado como
+  // completo, saltandose pus/abrir/tragar. Debe exigir las CINCO señales de
+  // safety_screen_general genuinamente resueltas (afirmadas o negadas),
+  // reusando la misma lista que QUESTION_SIGNAL_MAP para no duplicarla.
+  const hasAllSafetyScreenEvidence = QUESTION_SIGNAL_MAP.safety_screen_general.every(
+    key => clinicalAnswer.affirmed.includes(key) || clinicalAnswer.negated.includes(key)
+  );
   const safetyScreened =
     current.safetyScreened ||
     clinicalAnswer.resolvesSafetyScreen ||
     redFlags.length > 0 ||
     (!isAnsweringBleedingQuestion &&
-      (intent === "trauma" ? detectTraumaSafetyScreen(normalized, redFlags) : hasFeverEvidence && hasSwellingEvidence)) ||
+      (intent === "trauma" ? detectTraumaSafetyScreen(normalized, redFlags) : hasAllSafetyScreenEvidence)) ||
     patientDeescalates;
   // Hotfix dental-negation-context (Problema 2): sangrado leve/abundante +
   // golpe si/no resuelto es un requisito PREVIO al cribado general, nunca lo
@@ -2281,9 +2328,29 @@ export function triageLabel(level: TriageLevel) {
   }
 }
 
-function detectLabels(normalized: string, rules: Array<{ label: string; pattern: RegExp }>) {
+// Codex (revision PR #13 sobre a720519, blocker 3): isNegatedLabel (mas abajo)
+// es un regex de UNA sola coincidencia sobre el mensaje COMPLETO - en
+// "Puedo respirar, pero ahora me cuesta respirar" reconocia la mencion
+// historica ("puedo respirar") como negacion y descartaba la etiqueta antes
+// de que filterOutNegatedLabels (que si usa el motor por clausula, ya
+// corregido) pudiera actuar - esa funcion solo puede QUITAR etiquetas ya
+// presentes, nunca recuperar una que detectLabels descarto primero. Si el
+// motor correcto (extractAffirmedAndNegatedClinicalSignals, via
+// clinicalAnswer.affirmed) ya determino que la señal esta afirmada, esa
+// conclusion gana siempre sobre el regex de frase cerrada.
+function detectLabels(
+  normalized: string,
+  rules: Array<{ label: string; pattern: RegExp }>,
+  affirmedSignals: Set<ClinicalSignalKey>,
+  labelToSignalKey: Record<string, ClinicalSignalKey>
+) {
   return rules
-    .filter(rule => rule.pattern.test(normalized) && !isNegatedLabel(rule.label, normalized))
+    .filter(rule => {
+      if (!rule.pattern.test(normalized)) return false;
+      const signalKey = labelToSignalKey[rule.label];
+      if (signalKey && affirmedSignals.has(signalKey)) return true;
+      return !isNegatedLabel(rule.label, normalized);
+    })
     .map(rule => rule.label);
 }
 
