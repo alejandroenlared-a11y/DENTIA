@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { evaluateRealLlmGate, summarizeLlmObservations, type LlmTurnObservation } from "../scripts/lib/clara-llm-report";
+import {
+  evaluateRealLlmGate,
+  parseStrictPercentageEnv,
+  summarizeLlmObservations,
+  type LlmTurnObservation
+} from "../scripts/lib/clara-llm-report";
 
 const baseInput = {
   requestedProvider: "gemini",
@@ -161,5 +166,88 @@ describe("evaluateRealLlmGate (Bloqueante 5): geminiFreeformTurns cuenta como de
     const summary = summarizeLlmObservations(buildObservations(0, 1), baseInput);
     expect(summary.geminiTurns).toBe(0);
     expect(summary.geminiFreeformTurns).toBe(1);
+  });
+});
+
+// Codex (Bloqueante 6 - "MAX_FALLBACK_PERCENTAGE invalido nunca puede
+// relajar en silencio la puerta REQUIRE_REAL_LLM=1"): Number.parseFloat("abc")
+// da NaN, y `degradedPercentage > NaN` es SIEMPRE false en JS - la version
+// anterior dejaba pasar la puerta estricta con cualquier variable corrupta.
+describe("parseStrictPercentageEnv", () => {
+  it("variable ausente -> usa el valor por defecto documentado", () => {
+    const result = parseStrictPercentageEnv("MAX_FALLBACK_PERCENTAGE", undefined, 0);
+    expect(result).toEqual({ valid: true, value: 0, wasProvided: false });
+  });
+
+  it("variable vacia (solo espacios) -> usa el valor por defecto documentado", () => {
+    const result = parseStrictPercentageEnv("MAX_FALLBACK_PERCENTAGE", "   ", 7);
+    expect(result).toEqual({ valid: true, value: 7, wasProvided: false });
+  });
+
+  it.each([
+    ["0", 0],
+    ["100", 100],
+    ["5.5", 5.5],
+    ["  42  ", 42]
+  ])("numero valido en [0,100] '%s' -> aceptado (%s)", (rawValue, expected) => {
+    const result = parseStrictPercentageEnv("MAX_FALLBACK_PERCENTAGE", rawValue, 0);
+    expect(result.valid).toBe(true);
+    if (result.valid) expect(result.value).toBe(expected);
+  });
+
+  it.each(["abc", "NaN", "Infinity", "-Infinity", "-1", "101", "5abc"])(
+    "'%s' -> invalido, nunca se trata como numero valido",
+    rawValue => {
+      const result = parseStrictPercentageEnv("MAX_FALLBACK_PERCENTAGE", rawValue, 0);
+      expect(result.valid).toBe(false);
+      if (!result.valid) {
+        expect(Number.isNaN(result.value)).toBe(true);
+        expect(result.rawValue).toBe(rawValue);
+      }
+    }
+  );
+
+  it("un valor invalido nunca relaja la puerta REQUIRE_REAL_LLM=1 (regresion del bug NaN)", () => {
+    const summary = summarizeLlmObservations(
+      [
+        { runtime: "local", model: "x", fallbackReason: "Gemini API 429" },
+        { runtime: "gemini", model: "gemini-3.1-flash-lite" }
+      ],
+      baseInput
+    );
+    expect(summary.degradedPercentage).toBe(50);
+
+    const percentageResult = parseStrictPercentageEnv("MAX_FALLBACK_PERCENTAGE", "abc", 0);
+    expect(percentageResult.valid).toBe(false);
+    // Simula exactamente lo que evaluate-clara-llm.ts hace hoy: nunca pasa el
+    // NaN crudo a evaluateRealLlmGate, cae al valor por defecto seguro (0).
+    const maxFallbackPercentage = percentageResult.valid ? percentageResult.value : 0;
+    expect(Number.isNaN(maxFallbackPercentage)).toBe(false);
+
+    const gate = evaluateRealLlmGate(summary, { criticalFailures: 0, conversations: [] }, {
+      requireReal: true,
+      maxFallbackPercentage
+    });
+    expect(gate.ok).toBe(false);
+    expect(gate.reasons.some(reason => reason.includes("Turnos degradados"))).toBe(true);
+  });
+
+  it("mutacion de referencia: pasar NaN crudo (bug original) SI aprueba la puerta incorrectamente", () => {
+    const summary = summarizeLlmObservations(
+      [
+        { runtime: "local", model: "x", fallbackReason: "Gemini API 429" },
+        { runtime: "gemini", model: "gemini-3.1-flash-lite" }
+      ],
+      baseInput
+    );
+    const rawNaN = Number.parseFloat("abc");
+    const gate = evaluateRealLlmGate(summary, { criticalFailures: 0, conversations: [] }, {
+      requireReal: true,
+      maxFallbackPercentage: rawNaN
+    });
+    // Documenta el bug que Bloqueante 6 corrige: degradedPercentage > NaN es
+    // siempre false, asi que el chequeo de umbral por si solo no lo atrapa -
+    // por eso parseStrictPercentageEnv debe interceptarlo ANTES de llegar aqui.
+    expect(gate.reasons.some(reason => reason.includes("Turnos degradados"))).toBe(false);
   });
 });

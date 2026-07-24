@@ -6,8 +6,7 @@ import {
   hasSlotOfferPrerequisites,
   initialDentalAgentState,
   resolveAnswerToLastClinicalQuestion,
-  resolveAppointmentHelpDecision,
-  resolveAppointmentHelpReconsideration,
+  resolveOrderedAppointmentDecision,
   runDentalSeniorTurn,
   type DentalAgentState
 } from "@/lib/agent/dental-senior-agent";
@@ -1288,7 +1287,7 @@ describe("PR #13 P2 (revision sobre f334ecb): lastQuestionKey solo representa pr
 // appointment acceptance"): distingue aceptacion explicita, rechazo directo,
 // y negacion de una condicion distinta ("Si, pero no puedo esta semana" no
 // es un rechazo).
-describe("PR #13 P2 (revision sobre f334ecb): resolveAppointmentHelpDecision", () => {
+describe("PR #13 P2 (revision sobre f334ecb): resolveOrderedAppointmentDecision (initial_offer)", () => {
   it.each([
     ["Sí", "ACCEPTED"],
     ["Sí, ayúdame", "ACCEPTED"],
@@ -1304,7 +1303,7 @@ describe("PR #13 P2 (revision sobre f334ecb): resolveAppointmentHelpDecision", (
     ["No necesito que me ayudes", "DECLINED"],
     ["No, si ya llamaré yo", "DECLINED"]
   ])("%s -> %s", (message, expected) => {
-    expect(resolveAppointmentHelpDecision(message)).toBe(expected);
+    expect(resolveOrderedAppointmentDecision(message, { mode: "initial_offer" })).toBe(expected);
   });
 
   it("Caso E: 'Si, pero no puedo esta semana' tras la oferta - acepta la ayuda, solo pide consentimiento, no cierra la conversacion", () => {
@@ -1349,11 +1348,11 @@ describe("PR #13 P2 (revision sobre f334ecb): resolveAppointmentHelpDecision", (
 
 // Codex P2 ("Allow declined patients to reopen booking"): un rechazo
 // (appointmentHelpDeclined=true) no puede ser sticky para siempre.
-// resolveAppointmentHelpDecision solo actua el turno INMEDIATAMENTE
-// siguiente a la oferta (lastAssistantAction === "OFFER_APPOINTMENT_HELP");
-// varios turnos despues esa bandera ya no aplica, por eso hace falta
-// resolveAppointmentHelpReconsideration, independiente de lastAssistantAction.
-describe("Codex P2 (Allow declined patients to reopen booking): resolveAppointmentHelpReconsideration", () => {
+// resolveOrderedAppointmentDecision en modo "initial_offer" solo actua el
+// turno INMEDIATAMENTE siguiente a la oferta (lastAssistantAction ===
+// "OFFER_APPOINTMENT_HELP"); varios turnos despues esa bandera ya no aplica,
+// por eso hace falta el modo "reconsideration", independiente de lastAssistantAction.
+describe("Codex P2 (Allow declined patients to reopen booking): resolveOrderedAppointmentDecision (reconsideration)", () => {
   function buildDeclinedState(): DentalAgentState {
     const first = runDentalSeniorTurn(initialDentalAgentState, "Me duele al morder.");
     const second = runDentalSeniorTurn(first.state, "No, nada de eso.");
@@ -1381,13 +1380,15 @@ describe("Codex P2 (Allow declined patients to reopen booking): resolveAppointme
     ["No necesito que me ayudéis", "DECLINED"]
   ])("%s -> %s", (message, expected) => {
     const declinedState = buildDeclinedState();
-    expect(resolveAppointmentHelpReconsideration({ message, currentState: declinedState })).toBe(expected);
+    expect(resolveOrderedAppointmentDecision(message, { mode: "reconsideration", currentState: declinedState })).toBe(
+      expected
+    );
   });
 
   it("no reabre si appointmentHelpDeclined es false (nunca se rechazo)", () => {
     expect(
-      resolveAppointmentHelpReconsideration({
-        message: "Quiero cita",
+      resolveOrderedAppointmentDecision("Quiero cita", {
+        mode: "reconsideration",
         currentState: { appointmentHelpDeclined: false }
       })
     ).toBe("UNKNOWN");
@@ -1541,7 +1542,9 @@ describe("Codex P2 (Bloqueante 2): 'ayudame' exige contexto de cita para reabrir
     ["Sí, ayúdame", "UNKNOWN"]
   ])("%s -> %s", (message, expected) => {
     const declinedState = buildDeclinedState();
-    expect(resolveAppointmentHelpReconsideration({ message, currentState: declinedState })).toBe(expected);
+    expect(resolveOrderedAppointmentDecision(message, { mode: "reconsideration", currentState: declinedState })).toBe(
+      expected
+    );
   });
 
   it("'Sí, ayúdame' sin contexto no reabre end-to-end: declined sigue true, no pide consentimiento", () => {
@@ -1575,7 +1578,9 @@ describe("Codex P2 (Bloqueante 3): la ultima decision explicita del mensaje gana
     ["No quería cita antes; ahora quiero información sobre precios", "UNKNOWN"]
   ])("%s -> %s", (message, expected) => {
     const declinedState = buildDeclinedState();
-    expect(resolveAppointmentHelpReconsideration({ message, currentState: declinedState })).toBe(expected);
+    expect(resolveOrderedAppointmentDecision(message, { mode: "reconsideration", currentState: declinedState })).toBe(
+      expected
+    );
   });
 });
 
@@ -1942,5 +1947,224 @@ describe("FINAL-DENTIA-CLOSEOUT: elipsis clinica temporal (resolveEllipticalTemp
     const unit = extractAffirmedAndNegatedClinicalSignals("Tenía hinchazón, pero ahora ya no tengo fiebre");
     expect(unit.negated).toContain("fever");
     expect(unit.negated).not.toContain("swelling");
+  });
+});
+
+// Codex (ronda de cierre, Bloqueante 1 - "un prefijo conversacional nunca
+// cancela contenido clinico posterior"): resolveAnswerToLastClinicalQuestion
+// escaneaba el mensaje ENTERO anclado al inicio (^), asi que "Si, no puedo"
+// (empieza por "si") caia en la rama NEGADA antes de ver "no puedo". Ahora
+// escanea sin anclar, con prioridad incapacidad > dificultad > capacidad >
+// acuse de recibo corto.
+describe("Codex (ronda de cierre, Bloqueante 1): prefijo conversacional no cancela contenido clinico posterior", () => {
+  it.each([
+    ["Sí, no puedo", "affirmed"],
+    ["Vale, no puedo", "affirmed"],
+    ["Sí, me cuesta", "affirmed"],
+    ["De acuerdo, me cuesta bastante", "affirmed"],
+    ["Sí, no puedo abrir", "affirmed"],
+    ["Sí, puedo abrir bien", "negated"],
+    ["No puedo", "affirmed"],
+    ["Sí", "negated"]
+  ])("trauma_opening_only: '%s' -> openingDifficulty %s", (message, expected) => {
+    const result = resolveAnswerToLastClinicalQuestion({ patientMessage: message, lastQuestionKey: "trauma_opening_only" });
+    if (expected === "affirmed") {
+      expect(result.affirmed).toContain("openingDifficulty");
+    } else {
+      expect(result.negated).toContain("openingDifficulty");
+    }
+  });
+
+  it.each([
+    ["Sí, no puedo", "affirmed"],
+    ["Vale, no puedo", "affirmed"],
+    ["Sí, me cuesta", "affirmed"],
+    ["De acuerdo, me cuesta bastante", "affirmed"],
+    ["No puedo", "affirmed"],
+    ["Sí", "negated"]
+  ])("trauma_swallowing_only: '%s' -> swallowingDifficulty %s", (message, expected) => {
+    const result = resolveAnswerToLastClinicalQuestion({
+      patientMessage: message,
+      lastQuestionKey: "trauma_swallowing_only"
+    });
+    if (expected === "affirmed") {
+      expect(result.affirmed).toContain("swallowingDifficulty");
+    } else {
+      expect(result.negated).toContain("swallowingDifficulty");
+    }
+  });
+
+  it("swallowingDifficulty=true via 'Sí, no puedo' cierra el cribado, escala con prioridad y corta el flujo administrativo normal", () => {
+    const first = runDentalSeniorTurn(initialDentalAgentState, "Me di un golpe en el diente");
+    expect(first.state.lastQuestionKey).toBe("trauma_initial");
+    const second = runDentalSeniorTurn(first.state, "Puedo abrir bien");
+    expect(second.state.lastQuestionKey).toBe("trauma_swallowing_only");
+    const third = runDentalSeniorTurn(second.state, "Sí, no puedo");
+    // "Si, no puedo" no repite la palabra "tragar" en el mensaje, asi que no
+    // dispara el detector de red flags basado en frase literal (arquitectura
+    // preexistente, fuera del alcance de Bloqueante 1) - pero SI cierra el
+    // cribado correctamente (no se queda preguntando de nuevo) y escala con
+    // prioridad en vez de ofrecer el flujo administrativo normal de cita.
+    expect(third.state.safetyScreened).toBe(true);
+    expect(third.state.escalated).toBe(true);
+    expect(third.state.triageLevel).toBe("URGENT_24H");
+    expect(third.reply.toLowerCase()).toContain("prioridad");
+    expect(third.reply.toLowerCase()).not.toContain("quieres que te ayude a solicitar una cita");
+  });
+});
+
+// Codex (ronda de cierre, Bloqueante 2 - "una respuesta ambigua nunca es
+// 'todo correcto'"): "No" aislado a la pregunta compuesta trauma_initial
+// ("Puedes abrir la boca y tragar bien?") no dice CUAL capacidad falla -
+// queda ambigua, pide aclaracion explicita, nunca marca ambas como resueltas.
+describe("Codex (ronda de cierre, Bloqueante 2): respuesta ambigua a la pregunta compuesta pide aclaracion", () => {
+  it("'No' a trauma_initial: ambiguo, no niega, no afirma, no resuelve el cribado", () => {
+    const result = resolveAnswerToLastClinicalQuestion({ patientMessage: "No", lastQuestionKey: "trauma_initial" });
+    expect(result.affirmed).not.toContain("openingDifficulty");
+    expect(result.affirmed).not.toContain("swallowingDifficulty");
+    expect(result.negated).not.toContain("openingDifficulty");
+    expect(result.negated).not.toContain("swallowingDifficulty");
+    expect(result.ambiguous).toContain("openingDifficulty");
+    expect(result.ambiguous).toContain("swallowingDifficulty");
+    expect(result.resolvesSafetyScreen).toBe(false);
+  });
+
+  it.each([
+    ["Me cuesta tragar", ["swallowingDifficulty"], []],
+    ["Solo abrir la boca", ["openingDifficulty"], ["swallowingDifficulty"]],
+    ["No, puedo hacer ambas cosas bien", [], ["openingDifficulty", "swallowingDifficulty"]],
+    ["No tengo ningún problema para abrir ni tragar", [], ["openingDifficulty", "swallowingDifficulty"]]
+  ])("trauma_capacity_clarification: '%s'", (message, expectedAffirmed, expectedNegated) => {
+    const result = resolveAnswerToLastClinicalQuestion({
+      patientMessage: message,
+      lastQuestionKey: "trauma_capacity_clarification"
+    });
+    for (const key of expectedAffirmed) expect(result.affirmed).toContain(key);
+    for (const key of expectedNegated) expect(result.negated).toContain(key);
+  });
+
+  it("end-to-end: golpe -> 'No' (ambiguo) -> Clara pide aclaracion exacta, no ofrece cita, no pide consentimiento", () => {
+    const first = runDentalSeniorTurn(initialDentalAgentState, "Me di un golpe en el diente");
+    const second = runDentalSeniorTurn(first.state, "No");
+    expect(second.state.safetyScreened).toBe(false);
+    expect(second.state.lastQuestionKey).toBe("trauma_capacity_clarification");
+    expect(second.reply).toBe("Para asegurarme: ¿te cuesta abrir la boca, tragar o ambas cosas?");
+    expect(second.reply.toLowerCase()).not.toContain("quieres que te ayude");
+    expect(second.reply.toLowerCase()).not.toContain("aceptas");
+  });
+
+  it("end-to-end: tras la aclaracion, 'No, puedo hacer ambas cosas bien' cierra el cribado (intent trauma siempre escala con prioridad, nunca queda en bucle)", () => {
+    const first = runDentalSeniorTurn(initialDentalAgentState, "Me di un golpe en el diente");
+    const second = runDentalSeniorTurn(first.state, "No");
+    const third = runDentalSeniorTurn(second.state, "No, puedo hacer ambas cosas bien");
+    // intent="trauma" siempre escala con prioridad (comportamiento preexistente,
+    // fuera del alcance de Bloqueante 2) - lo que Bloqueante 2 garantiza es que
+    // el cribado se cierra correctamente (no se repite la pregunta) y que
+    // ninguna capacidad quedo marcada por adivinanza.
+    expect(third.state.safetyScreened).toBe(true);
+    expect(third.state.triageLevel).not.toBe("EMERGENCY");
+    expect(third.reply.toLowerCase()).toContain("prioridad");
+    expect(third.reply).not.toBe("Para asegurarme: ¿te cuesta abrir la boca, tragar o ambas cosas?");
+  });
+});
+
+// Codex (ronda de cierre, Bloqueante 3 - auditoria de consistencia): mismos
+// casos que la seccion "elipsis clinica temporal" de arriba, pero con
+// menciones EXPLICITAS en ambas clausulas (no elipsis) - deben resolverse por
+// el motor compartido resolveClinicalTermPolarity (ultima mencion gana), no
+// por un parser paralelo.
+describe("Codex (ronda de cierre, Bloqueante 3): la ultima mencion explicita gana, sin return prematuro", () => {
+  it("'Tenía fiebre, pero ahora no tengo fiebre' -> fever negada (mencion explicita en ambas clausulas, sin elipsis)", () => {
+    const unit = extractAffirmedAndNegatedClinicalSignals("Tenía fiebre, pero ahora no tengo fiebre");
+    expect(unit.negated).toContain("fever");
+    expect(unit.affirmed).not.toContain("fever");
+  });
+
+  it("'No tenía fiebre, pero ahora tengo fiebre' -> fever afirmada (actual)", () => {
+    const unit = extractAffirmedAndNegatedClinicalSignals("No tenía fiebre, pero ahora tengo fiebre");
+    expect(unit.affirmed).toContain("fever");
+    expect(unit.negated).not.toContain("fever");
+  });
+
+  it("'Tenía hinchazón, pero ahora no tengo hinchazón' -> swelling negada (mencion explicita en ambas clausulas, sin elipsis)", () => {
+    const unit = extractAffirmedAndNegatedClinicalSignals("Tenía hinchazón, pero ahora no tengo hinchazón");
+    expect(unit.negated).toContain("swelling");
+    expect(unit.affirmed).not.toContain("swelling");
+  });
+
+  it("'No tenía hinchazón, pero ahora tengo hinchazón en el ojo' -> swelling afirmada + red flag ocular + EMERGENCY", () => {
+    const unit = extractAffirmedAndNegatedClinicalSignals("No tenía hinchazón, pero ahora tengo hinchazón en el ojo");
+    expect(unit.affirmed).toContain("swelling");
+    const turn = runDentalSeniorTurn(initialDentalAgentState, "No tenía hinchazón, pero ahora tengo hinchazón en el ojo");
+    expect(turn.state.redFlags).toContain("hinchazon en cuello, boca u ojo");
+    expect(turn.state.triageLevel).toBe("EMERGENCY");
+  });
+
+  it("'Antes podía tragar, pero ahora me cuesta tragar' -> swallowingDifficulty afirmada", () => {
+    const unit = extractAffirmedAndNegatedClinicalSignals("Antes podía tragar, pero ahora me cuesta tragar");
+    expect(unit.affirmed).toContain("swallowingDifficulty");
+  });
+
+  it("'Antes me costaba tragar, pero ahora puedo tragar bien' -> swallowingDifficulty negada", () => {
+    const unit = extractAffirmedAndNegatedClinicalSignals("Antes me costaba tragar, pero ahora puedo tragar bien");
+    expect(unit.negated).toContain("swallowingDifficulty");
+  });
+
+  it("'Antes me dolía, ahora no me duele' -> pain negado", () => {
+    const unit = extractAffirmedAndNegatedClinicalSignals("Antes me dolía, ahora no me duele");
+    expect(unit.negated).toContain("pain");
+  });
+
+  it("'No me dolía antes, pero ahora me duele mucho' -> pain afirmado", () => {
+    const unit = extractAffirmedAndNegatedClinicalSignals("No me dolía antes, pero ahora me duele mucho");
+    expect(unit.affirmed).toContain("pain");
+  });
+
+  it("'Puedo respirar, pero ahora me cuesta respirar' -> breathingDifficulty afirmada, EMERGENCY (ya cubierto arriba, se repite via extraccion directa)", () => {
+    const unit = extractAffirmedAndNegatedClinicalSignals("Puedo respirar, pero ahora me cuesta respirar");
+    expect(unit.affirmed).toContain("breathingDifficulty");
+  });
+
+  it("'Me cuesta respirar, pero ahora puedo respirar bien' -> orden inverso, breathingDifficulty negada (fix de insensibilidad al orden en DIFFICULTY_SIGNAL_RULES)", () => {
+    const unit = extractAffirmedAndNegatedClinicalSignals("Me cuesta respirar, pero ahora puedo respirar bien");
+    expect(unit.negated).toContain("breathingDifficulty");
+    expect(unit.affirmed).not.toContain("breathingDifficulty");
+  });
+});
+
+// Codex (ronda de cierre, Bloqueante 4/5): resolveOrderedAppointmentDecision
+// es la unica fuente de verdad para la oferta inicial ("initial_offer") y la
+// reconsideracion/reapertura ("reconsideration") - "ahora no" ya no es un
+// rechazo global incondicional; solo lo es cuando es TODA la clausula ("no"/
+// "ahora no" exactos) o cuando niega explicitamente la propia cita/reserva.
+describe("Codex (ronda de cierre, Bloqueante 4/5): 'ahora no' no es un rechazo global; la ultima clausula inequivoca gana", () => {
+  it.each([
+    ["Sí, aunque ahora no puedo por las mañanas", "ACCEPTED"],
+    ["Quiero reservar, pero ahora no tengo mi agenda", "ACCEPTED"],
+    ["No quiero cita, pero ahora sí quiero cita", "ACCEPTED"],
+    ["Sí, pero ahora no puedo esta semana", "ACCEPTED"],
+    ["Ahora no quiero cita", "DECLINED"],
+    ["Prefiero no pedir cita ahora", "DECLINED"],
+    ["No quiero que me ayudes con la reserva", "DECLINED"],
+    ["Mejor no reservamos", "DECLINED"],
+    ["Ahora no, gracias", "DECLINED"],
+    ["Sí quiero cita, pero mejor no", "DECLINED"],
+    ["Quiero información sobre precios", "UNKNOWN"]
+  ])("initial_offer: '%s' -> %s", (message, expected) => {
+    expect(resolveOrderedAppointmentDecision(message, { mode: "initial_offer" })).toBe(expected);
+  });
+
+  it.each([
+    ["Antes no quería, pero al final quiero reservar", "ACCEPTED"],
+    ["No, gracias, aunque pensándolo mejor sí quiero cita", "ACCEPTED"],
+    ["Quería reservar, aunque finalmente prefiero que no", "DECLINED"],
+    ["Ahora no quiero cita", "DECLINED"],
+    ["Quiero información sobre precios", "UNKNOWN"],
+    ["Sí, en Murcia", "UNKNOWN"]
+  ])("reconsideration: '%s' -> %s", (message, expected) => {
+    const declinedState: Pick<DentalAgentState, "appointmentHelpDeclined"> = { appointmentHelpDeclined: true };
+    expect(resolveOrderedAppointmentDecision(message, { mode: "reconsideration", currentState: declinedState })).toBe(
+      expected
+    );
   });
 });

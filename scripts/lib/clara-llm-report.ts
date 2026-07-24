@@ -151,6 +151,35 @@ export function buildLlmSummaryMarkdown(summary: LlmRunSummary): string[] {
   );
 }
 
+export type StrictPercentageParseResult =
+  | { valid: true; value: number; wasProvided: boolean }
+  | { valid: false; value: number; wasProvided: true; rawValue: string; name: string };
+
+// Codex (Bloqueante 6 - "un MAX_FALLBACK_PERCENTAGE invalido nunca puede
+// relajar en silencio la puerta REQUIRE_REAL_LLM=1"): Number.parseFloat("abc")
+// da NaN, y `degradedPercentage > NaN` es SIEMPRE false en JS - un valor
+// corrupto en la variable de entorno hacia que evaluateRealLlmGate aprobara
+// la puerta sin importar cuanto fallback hubiera realmente. Fuente unica de
+// verdad para parsear cualquier variable de entorno de tipo "porcentaje
+// estricto" (0-100, numero finito): vacio/ausente usa el valor por defecto
+// documentado; cualquier otra cosa debe ser un numero finito valido en ese
+// rango, o se marca invalido explicitamente - nunca se devuelve NaN como si
+// fuera un valor valido.
+export function parseStrictPercentageEnv(name: string, rawValue: string | undefined, defaultValue: number): StrictPercentageParseResult {
+  if (rawValue === undefined || rawValue.trim() === "") {
+    return { valid: true, value: defaultValue, wasProvided: false };
+  }
+  const trimmed = rawValue.trim();
+  // Number.parseFloat("5abc") === 5 (ignora el sufijo basura) - Number(trimmed)
+  // es estricto (NaN ante cualquier caracter sobrante), asi que "5abc"/"NaN"/
+  // "Infinity" quedan invalidos aqui en vez de colarse como 5/NaN/Infinity.
+  const parsed = Number(trimmed);
+  if (!Number.isFinite(parsed) || parsed < 0 || parsed > 100) {
+    return { valid: false, value: NaN, wasProvided: true, rawValue: trimmed, name };
+  }
+  return { valid: true, value: parsed, wasProvided: true };
+}
+
 export type RealLlmGateResult = { ok: boolean; reasons: string[] };
 
 // Fase 3.1/3.3 (FINAL-DENTIA-CLOSEOUT): con REQUIRE_REAL_LLM=1 activo, un

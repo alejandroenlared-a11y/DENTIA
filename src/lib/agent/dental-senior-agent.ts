@@ -524,26 +524,27 @@ function resolveClinicalTermPolarity(normalized: string, termPattern: RegExp): C
   // afirmada). El patron se reconstruye con flag "g" para recorrer TODAS
   // las apariciones de la señal en cada clausula, no solo la primera.
   const globalTermPattern = new RegExp(termPattern.source, termPattern.flags.includes("g") ? termPattern.flags : `${termPattern.flags}g`);
-  let sawNegated = false;
+  // Codex (Bloqueante 3 - "la ultima mencion explicita gana, nunca la
+  // primera"): la version anterior devolvia "affirmed" en cuanto encontraba
+  // la PRIMERA mencion no negada, sin llegar a examinar el resto del mensaje
+  // - "Tenia fiebre, pero ahora no tengo fiebre" quedaba "affirmed" desde la
+  // primera clausula (sin marcador propio, se asume afirmada por defecto),
+  // sin nunca ver la negacion real de la clausula siguiente. Ahora se
+  // recorren TODAS las clausulas y TODAS las menciones en orden textual, y
+  // cada mencion resuelta SUSTITUYE al veredicto anterior - la ultima
+  // mencion explicita del mensaje es la que decide, nunca hay return
+  // temprano.
+  let lastPolarity: ClinicalTermPolarity = "unknown";
   for (const clause of clauses) {
     const markers = findSignalSegmentMarkers(clause);
     globalTermPattern.lastIndex = 0;
     let match: RegExpExecArray | null;
     while ((match = globalTermPattern.exec(clause))) {
-      if (resolveSignalPolarityAt(markers, match.index)) {
-        sawNegated = true;
-      } else {
-        // Afirmada en cualquier mencion (de esta clausula o de otra) gana de
-        // inmediato: una negacion anterior - en otra clausula ("no tengo
-        // fiebre, pero si tengo dolor") o una mencion historica anterior en
-        // la MISMA clausula ("no tenia X... ahora tengo X") - nunca puede
-        // anular una afirmacion real y mas reciente de la misma señal.
-        return "affirmed";
-      }
+      lastPolarity = resolveSignalPolarityAt(markers, match.index) ? "negated" : "affirmed";
       if (match[0].length === 0) globalTermPattern.lastIndex += 1;
     }
   }
-  return sawNegated ? "negated" : "unknown";
+  return lastPolarity;
 }
 
 function isClinicalTermAffirmed(normalized: string, termPattern: RegExp): boolean {
@@ -689,24 +690,30 @@ export function extractAffirmedAndNegatedClinicalSignals(message: string): Clini
     .filter(Boolean);
   for (const key of difficultyKeys) {
     const rules = DIFFICULTY_SIGNAL_RULES[key];
-    let sawAffirmedClause = false;
-    let sawAllClearClause = false;
+    // Codex (Bloqueante 3, auditoria - consistencia con resolveClinicalTermPolarity):
+    // la version anterior dejaba ganar a "sawAffirmedClause" sobre
+    // "sawAllClearClause" sin importar el ORDEN en que aparecian ("cualquier
+    // clausula afirmada, alguna vez, gana siempre") - solo funcionaba en los
+    // casos existentes porque la clausula afirmada resultaba ser, por
+    // casualidad, la ultima del mensaje. Se sustituye por la misma regla que
+    // el resto del motor de polaridad: la ULTIMA clausula resuelta (en orden
+    // textual) es la que decide, sin importar si es allClear o affirmed.
+    let lastPolarity: "affirmed" | "negated" | null = null;
     for (const clause of clausesForDifficulty) {
-      // allClear se comprueba PRIMERO dentro de cada clausula (igual que
-      // antes se comprobaba primero en el mensaje completo): el patron
+      // allClear se comprueba PRIMERO dentro de cada clausula: el patron
       // "afirmado" es deliberadamente amplio ("dificultad.*respirar" no
       // excluye el "no tengo" que lo precede) y depende de que allClear
       // desambigue primero una clausula que en realidad es una negacion
       // ("no tengo dificultad para respirar" NO debe leerse como afirmada
       // solo porque contiene "dificultad...respirar").
       if (rules.allClear.test(clause)) {
-        sawAllClearClause = true;
+        lastPolarity = "negated";
       } else if (rules.affirmed.test(clause)) {
-        sawAffirmedClause = true;
+        lastPolarity = "affirmed";
       }
     }
-    if (sawAffirmedClause) affirmed.add(key);
-    else if (sawAllClearClause) negated.add(key);
+    if (lastPolarity === "affirmed") affirmed.add(key);
+    else if (lastPolarity === "negated") negated.add(key);
   }
 
   // Elipsis clinica temporal (ver resolveEllipticalTemporalSignals arriba) -
@@ -780,6 +787,13 @@ export const LAST_QUESTION_KEY_VALUES = [
   "trauma_initial",
   "trauma_opening_only",
   "trauma_swallowing_only",
+  // Codex (Bloqueante 2 - "una respuesta ambigua no es 'todo correcto'"):
+  // clave dedicada para la pregunta de aclaracion que sigue a un "No" aislado
+  // sobre trauma_initial ("Puedes abrir la boca y tragar bien?", compuesta) -
+  // nunca se reutiliza trauma_opening_only/trauma_swallowing_only porque esas
+  // dos asumen que ya se sabe CUAL capacidad se esta preguntando; esta
+  // pregunta pide al paciente que lo precise el mismo.
+  "trauma_capacity_clarification",
   "bleeding_severity_or_impact",
   ""
 ] as const;
@@ -791,8 +805,14 @@ const QUESTION_SIGNAL_MAP: Record<Exclude<LastQuestionKey, "">, ClinicalSignalKe
   trauma_initial: ["trauma", "openingDifficulty", "swallowingDifficulty"],
   trauma_opening_only: ["openingDifficulty"],
   trauma_swallowing_only: ["swallowingDifficulty"],
+  trauma_capacity_clarification: ["openingDifficulty", "swallowingDifficulty"],
   bleeding_severity_or_impact: ["bleedingUncontrolled", "trauma"]
 };
+
+// Codex (Bloqueante 2): texto exacto de la pregunta de aclaracion - unica
+// fuente de verdad, reusada por nextStep() (para mostrarla) y por los tests
+// (para verificar que se muestra literalmente).
+export const TRAUMA_CAPACITY_CLARIFICATION_QUESTION = "Para asegurarme: ¿te cuesta abrir la boca, tragar o ambas cosas?";
 
 export type ResolvedClinicalAnswer = {
   affirmed: ClinicalSignalKey[];
@@ -804,6 +824,15 @@ export type ResolvedClinicalAnswer = {
   resolvesSafetyScreen: boolean;
   resolvesBleedingDifferential: boolean;
 };
+
+// Codex (Bloqueante 1): vocabulario de prioridad para respuestas CORTAS (sin
+// el verbo+sustantivo completo, ej. "abrir"/"tragar") a una pregunta de
+// capacidad - reusado por el escaneo no anclado de resolveAnswerToLastClinicalQuestion.
+// Orden de prioridad clinica (nunca alterar): incapacidad explicita >
+// dificultad explicita > capacidad explicita > acuse de recibo corto.
+const CAPACITY_INCAPACITY_PATTERN = /\b(no puedo|no consigo|me resulta imposible|soy incapaz)\b/;
+const CAPACITY_DIFFICULTY_PATTERN = /\b(me cuesta|con dificultad|apenas puedo|puedo muy poco)\b/;
+const CAPACITY_EXPLICIT_CAPACITY_PATTERN = /\b(puedo bien|sin problema|con normalidad|puedo)\b/;
 
 // Fuente unica de verdad para interpretar una respuesta a la ULTIMA pregunta
 // clinica/de seguridad hecha (lastQuestionKey persistido en el estado). No
@@ -837,8 +866,15 @@ export function resolveAnswerToLastClinicalQuestion(input: {
   // "no" desnudo contesta que NO puede, es decir CONFIRMA la dificultad.
   const isTraumaCapacityQuestion =
     input.lastQuestionKey === "trauma_opening_only" || input.lastQuestionKey === "trauma_swallowing_only";
+  // Codex (Bloqueante 2 - "una respuesta ambigua no es 'todo correcto'"):
+  // trauma_initial es una pregunta COMPUESTA ("Puedes abrir la boca y tragar
+  // bien?") - un "no" aislado no dice CUAL de las dos capacidades falla (ni
+  // si fallan ambas). Tambien queda excluida del bare-denial generico: nunca
+  // se adivina, se pide aclaracion explicita mas abajo.
+  const isTraumaInitialQuestion = input.lastQuestionKey === "trauma_initial";
+  const isTraumaCapacityClarification = input.lastQuestionKey === "trauma_capacity_clarification";
 
-  if (expectedSignals.length > 0 && isBareDenial(normalized) && !isTraumaCapacityQuestion) {
+  if (expectedSignals.length > 0 && isBareDenial(normalized) && !isTraumaCapacityQuestion && !isTraumaInitialQuestion) {
     for (const key of expectedSignals) negated.add(key);
   }
 
@@ -851,11 +887,73 @@ export function resolveAnswerToLastClinicalQuestion(input: {
     // respuesta corta sin verbo propio ("No", "No puedo", "Me cuesta",
     // "Si") solo tiene sentido en el contexto de esta pregunta concreta.
     if (!affirmed.has(capacitySignal) && !negated.has(capacitySignal)) {
-      const trimmed = normalized.trim();
-      if (/^(no|no puedo|me cuesta)\b/.test(trimmed)) {
+      // Codex (Bloqueante 1 - "un prefijo conversacional nunca cancela
+      // contenido clinico posterior"): la version anterior anclaba ambos
+      // regex al INICIO del mensaje completo (/^(no|no puedo|me cuesta)\b/
+      // vs /^(si|vale|puedo)\b/), asi que "Si, no puedo" (empieza por "si")
+      // caia en la rama NEGADA antes de llegar nunca a ver el "no puedo"
+      // real mas adelante. Ahora se escanea el mensaje entero (sin anclar)
+      // en orden de prioridad clinica: incapacidad explicita > dificultad
+      // explicita > capacidad explicita > solo entonces, acuse de recibo
+      // corto sin contenido clinico propio (si/no/vale). Un prefijo
+      // conversacional (si/vale/de acuerdo) nunca decide por si solo si mas
+      // adelante hay contenido clinico explicito.
+      if (CAPACITY_INCAPACITY_PATTERN.test(normalized) || CAPACITY_DIFFICULTY_PATTERN.test(normalized)) {
         affirmed.add(capacitySignal);
-      } else if (/^(si|vale|puedo)\b/.test(trimmed)) {
+      } else if (CAPACITY_EXPLICIT_CAPACITY_PATTERN.test(normalized)) {
         negated.add(capacitySignal);
+      } else {
+        const trimmed = normalized.trim();
+        if (/^no\b/.test(trimmed)) {
+          affirmed.add(capacitySignal);
+        } else if (/^(si|vale|dale|ok|de acuerdo)\b/.test(trimmed)) {
+          negated.add(capacitySignal);
+        }
+      }
+    }
+  }
+
+  // Codex (Bloqueante 2): union mutable de "ambiguous" - devuelta al final
+  // junto con la de extractAffirmedAndNegatedClinicalSignals (elipsis
+  // temporal). Nunca se resta de aqui: una señal ambigua para esta pregunta
+  // nunca puede confirmarse por inferencia en otro sitio del mismo turno.
+  const ambiguous = new Set(extraction.ambiguous);
+
+  if (isTraumaInitialQuestion || isTraumaCapacityClarification) {
+    const capacityKeys: ClinicalSignalKey[] = ["openingDifficulty", "swallowingDifficulty"];
+    const unresolvedCapacityKeys = capacityKeys.filter(key => !affirmed.has(key) && !negated.has(key));
+
+    if (isTraumaInitialQuestion && isBareDenial(normalized) && unresolvedCapacityKeys.length > 0) {
+      // "No" aislado a la pregunta compuesta: NUNCA se interpreta como que
+      // ambas capacidades estan bien (regla D) - queda ambigua, sin marcar
+      // resolvesSafetyScreen, hasta que el paciente precise cual.
+      for (const key of unresolvedCapacityKeys) ambiguous.add(key);
+    }
+
+    if (isTraumaCapacityClarification && unresolvedCapacityKeys.length > 0) {
+      const mentionsOpeningTopic = /\b(abrir|boca)\b/.test(normalized);
+      const mentionsSwallowingTopic = /\btragar\b/.test(normalized);
+      const mentionsBothWord = /\b(ambas cosas|las dos|los dos)\b/.test(normalized);
+      const mentionsExclusive = /\b(solo|solamente|unicamente)\b/.test(normalized);
+      const deniesBothProblem =
+        /(no tengo ningun problema|sin ningun problema|ningun problema|puedo hacer (ambas cosas|las dos|los dos)|puedo con (ambas cosas|las dos|los dos))/.test(
+          normalized
+        );
+
+      if (mentionsBothWord || (mentionsOpeningTopic && mentionsSwallowingTopic)) {
+        if (deniesBothProblem) {
+          for (const key of unresolvedCapacityKeys) negated.add(key);
+        }
+      } else if (mentionsOpeningTopic && !mentionsSwallowingTopic) {
+        if (unresolvedCapacityKeys.includes("openingDifficulty")) affirmed.add("openingDifficulty");
+        if (mentionsExclusive && unresolvedCapacityKeys.includes("swallowingDifficulty")) {
+          negated.add("swallowingDifficulty");
+        }
+      } else if (mentionsSwallowingTopic && !mentionsOpeningTopic) {
+        if (unresolvedCapacityKeys.includes("swallowingDifficulty")) affirmed.add("swallowingDifficulty");
+        if (mentionsExclusive && unresolvedCapacityKeys.includes("openingDifficulty")) {
+          negated.add("openingDifficulty");
+        }
       }
     }
   }
@@ -895,7 +993,7 @@ export function resolveAnswerToLastClinicalQuestion(input: {
   return {
     affirmed: [...affirmed],
     negated: [...negated],
-    ambiguous: extraction.ambiguous,
+    ambiguous: [...ambiguous],
     resolvesSafetyScreen,
     resolvesBleedingDifferential
   };
@@ -910,10 +1008,29 @@ function identifyNextClinicalQuestionKey(
     DentalAgentState,
     "intent" | "redFlags" | "safetyScreened" | "missingClinicalData" | "escalated" | "bleedingDifferentialResolved"
   >,
-  latestPatientText: string
+  latestPatientText: string,
+  // string (no LastQuestionKey): current.lastQuestionKey viaja como string
+  // simple en DentalAgentState (ver "Defensa en profundidad" en
+  // resolveAnswerToLastClinicalQuestion) - solo se compara con === contra
+  // literales fijos aqui, nunca se indexa, asi que un valor corrupto es
+  // inofensivo (simplemente no coincide con ninguno).
+  previousQuestionKey: string
 ): LastQuestionKey {
   if (state.intent === "trauma" && state.redFlags.length === 0 && !state.safetyScreened) {
     const normalized = normalize(latestPatientText);
+    // Codex (Bloqueante 2 - "una respuesta ambigua no es 'todo correcto'"):
+    // si la pregunta anterior era la compuesta (o su propia aclaracion) y la
+    // respuesta es una negacion desnuda sin mencionar ninguna de las dos
+    // capacidades, no se adivina - se repite/mantiene la peticion de
+    // aclaracion explicita en vez de avanzar como si estuviera resuelto.
+    const wasAskedCapacityQuestion =
+      previousQuestionKey === "trauma_initial" || previousQuestionKey === "trauma_capacity_clarification";
+    const isAmbiguousBareAnswer =
+      wasAskedCapacityQuestion &&
+      isBareDenial(normalized) &&
+      !mentionsOpeningAnswer(normalized) &&
+      !mentionsSwallowingAnswer(normalized);
+    if (isAmbiguousBareAnswer) return "trauma_capacity_clarification";
     // PR #13 (Codex - "Swap the trauma follow-up question keys"): la clave
     // persistida debe describir la pregunta que nextStep VA A MOSTRAR este
     // turno, no la que el paciente acaba de responder. Si ya contesto sobre
@@ -1212,25 +1329,24 @@ export function runDentalSeniorTurn(current: DentalAgentState, rawText: string, 
   // siguiente con resolveAnswerToLastClinicalQuestion.
   const lastQuestionKey = identifyNextClinicalQuestionKey(
     { intent, redFlags, safetyScreened, missingClinicalData, escalated, bleedingDifferentialResolved },
-    text
+    text,
+    current.lastQuestionKey
   );
   // Hotfix dental-negation-context (Problema 1): interpreta "si"/"no, gracias"
   // segun si Clara ACABA de ofrecer ayuda para pedir cita (current.lastAssistantAction),
   // no por texto suelto sin contexto - sticky una vez aceptado o declinado.
   const offeredAppointmentHelpLastTurn = current.lastAssistantAction === "OFFER_APPOINTMENT_HELP";
-  const appointmentHelpDecision = offeredAppointmentHelpLastTurn ? resolveAppointmentHelpDecision(text) : "UNKNOWN";
-  // Codex P2: si el rechazo ya quedo fijado en un turno anterior (no en
-  // este), lastAssistantAction ya no es OFFER_APPOINTMENT_HELP - solo
-  // resolveAppointmentHelpReconsideration (independiente de esa bandera)
-  // puede revertirlo con una peticion explicita posterior.
-  const appointmentHelpReconsideration =
-    !offeredAppointmentHelpLastTurn && current.appointmentHelpDeclined
-      ? resolveAppointmentHelpReconsideration({ message: text, currentState: current })
+  // Codex (Bloqueantes 3/4/5): fuente unica resolveOrderedAppointmentDecision
+  // para la respuesta inmediata a la oferta Y la reconsideracion posterior -
+  // si el rechazo ya quedo fijado en un turno anterior (lastAssistantAction
+  // ya no es OFFER_APPOINTMENT_HELP), solo el modo "reconsideration" puede
+  // revertirlo con una peticion explicita posterior.
+  const appointmentHelpDecision = offeredAppointmentHelpLastTurn
+    ? resolveOrderedAppointmentDecision(text, { mode: "initial_offer" })
+    : current.appointmentHelpDeclined
+      ? resolveOrderedAppointmentDecision(text, { mode: "reconsideration", currentState: current })
       : "UNKNOWN";
-  const appointmentHelpAccepted =
-    current.appointmentHelpAccepted ||
-    appointmentHelpDecision === "ACCEPTED" ||
-    appointmentHelpReconsideration === "ACCEPTED";
+  const appointmentHelpAccepted = current.appointmentHelpAccepted || appointmentHelpDecision === "ACCEPTED";
   const appointmentHelpDeclined =
     !appointmentHelpAccepted && (current.appointmentHelpDeclined || appointmentHelpDecision === "DECLINED");
   const lastAssistantAction = identifyLastAssistantAction({
@@ -1342,7 +1458,9 @@ export function runDentalSeniorTurn(current: DentalAgentState, rawText: string, 
   // respuesta final, ninguno de los dos campos se persiste como si se
   // hubiera mostrado.
   const nominalCandidateText =
-    lastAssistantAction === "EMERGENCY_GUIDANCE" ? EMERGENCY_GUIDANCE_REPLY : nextStep(nextState, text);
+    lastAssistantAction === "EMERGENCY_GUIDANCE"
+      ? EMERGENCY_GUIDANCE_REPLY
+      : nextStep(nextState, text, current.lastQuestionKey);
   const displayed = deriveDisplayedTurnContext({
     finalReply: reply,
     nominalLastAssistantAction: lastAssistantAction,
@@ -1547,7 +1665,7 @@ function buildDentalReply(state: DentalAgentState, previous: DentalAgentState, l
   const intro = isNewIntent
     ? buildIntro(state, profile, latestPatientText, cameFromBudget)
     : [detectSuitabilityAnswer(normalize(latestPatientText)), buildAck(state, previous)].filter(Boolean).join(" ");
-  const question = intro.trim().endsWith("?") ? "" : nextStep(state, latestPatientText);
+  const question = intro.trim().endsWith("?") ? "" : nextStep(state, latestPatientText, previous.lastQuestionKey);
   const reply = [intro, question].filter(Boolean).join("\n\n").trim();
   return reply || "Cuentame un poco mas para orientarte bien.";
 }
@@ -1840,9 +1958,20 @@ function pendingSafetyScreenQuestion(state: DentalAgentState): boolean {
   return state.intent === "periodontics" && state.redFlags.length === 0 && state.bleedingDifferentialResolved;
 }
 
-function nextStep(state: DentalAgentState, latestPatientText: string) {
+function nextStep(state: DentalAgentState, latestPatientText: string, previousQuestionKey: string) {
   if (state.intent === "trauma" && state.redFlags.length === 0 && !state.safetyScreened) {
     const normalized = normalize(latestPatientText);
+    // Codex (Bloqueante 2): misma condicion 1:1 que identifyNextClinicalQuestionKey
+    // (ver comentario alli) - un "no" desnudo tras la pregunta compuesta (o su
+    // propia aclaracion) pide precision, nunca avanza como si estuviera resuelto.
+    const wasAskedCapacityQuestion =
+      previousQuestionKey === "trauma_initial" || previousQuestionKey === "trauma_capacity_clarification";
+    const isAmbiguousBareAnswer =
+      wasAskedCapacityQuestion &&
+      isBareDenial(normalized) &&
+      !mentionsOpeningAnswer(normalized) &&
+      !mentionsSwallowingAnswer(normalized);
+    if (isAmbiguousBareAnswer) return TRAUMA_CAPACITY_CLARIFICATION_QUESTION;
     if (mentionsSwallowingAnswer(normalized) && !mentionsOpeningAnswer(normalized)) {
       return "Y puedes abrir la boca bien?";
     }
@@ -2740,7 +2869,7 @@ function wasAskedForConsent(state: DentalAgentState): boolean {
   // no pregunta NADA (ver mas arriba: "return ''" cuando declined y sin
   // consentimiento) - asi que un "vale"/"si"/"de acuerdo" en ese turno (que
   // puede estar reabriendo la ayuda con la cita via
-  // resolveAppointmentHelpReconsideration) nunca esta contestando una
+  // resolveOrderedAppointmentDecision en modo "reconsideration") nunca esta contestando una
   // pregunta de privacidad que Clara jamas mostro. Sin esto,
   // acceptsConsent() marcaria consent=true en el MISMO turno que reabre la
   // oferta, saltandose la pregunta de privacidad real.
@@ -2862,129 +2991,103 @@ function acceptsExplicitConsent(normalized: string) {
   return /\b(acepto|autorizo|consiento)\b.{0,50}\b(datos|guardar|guarde|gestionarla|gestionarlo|cita)\b/.test(normalized);
 }
 
-// PR #13 (Codex - "Treat unrelated negations as appointment acceptance"): la
-// version anterior (declinesAppointmentHelp) trataba CUALQUIER "no" en el
-// mensaje como rechazo de la oferta entera, aunque fuera una condicion
-// distinta ("Si, pero no puedo esta semana" - el "no" niega la
-// disponibilidad de esta semana, no la ayuda en si). Reemplazada por una
-// resolucion determinista con alcance LOCAL: primero comprueba frases de
-// rechazo explicito fijas (no dependen de contexto), luego evalua clausula a
-// clausula (separadas por coma/punto/pero/aunque) si el "no" niega la propia
-// oferta (quiero cita/necesito ayuda) en su misma clausula, o si es solo una
-// condicion aparte (dia, franja, disponibilidad) que no cancela una
-// aceptacion ya vista en otra clausula.
-const APPOINTMENT_HELP_CLAUSE_SPLIT_PATTERN = /[.,;!¡¿?]+|\bpero\b|\baunque\b/;
+// Codex (Bloqueantes 3/4/5 - fuente unica de decision de cita): antes existian
+// DOS parsers distintos - uno para la respuesta INMEDIATA a "Quieres que te
+// ayude a solicitar una cita?" (con return prematuro en la primera clausula,
+// "No, si ya llamare yo" -> DECLINED sin mirar el resto) y otro para la
+// RECONSIDERACION varios turnos despues (ya con recorrido completo de
+// clausulas). Ambos se sustituyen por resolveOrderedAppointmentDecision:
+// misma logica de "clausula a clausula, la ultima inequivoca gana",
+// parametrizada por `mode` solo donde el contexto realmente cambia el
+// significado de un acuse de recibo desnudo (un "si"/"ayudame" sueltos SI
+// contestan la oferta que Clara ACABA de hacer; en una reconsideracion sin
+// oferta activa exigen mencionar cita/reserva explicitamente - Bloqueante 2).
+const APPOINTMENT_DECISION_CLAUSE_SPLIT_PATTERN = /[.,;:!¡¿?]+|\bpero\b|\baunque\b/;
 
-// Idiomas de rechazo fijos cuyo significado no cambia por contexto - ganan
-// siempre, sin depender de en que clausula caigan.
-const EXPLICIT_APPOINTMENT_DECLINE_PHRASES =
-  /(prefiero que no|\bahora no\b|no necesito (que me )?ayud\w*|no quiero (una |la )?cita|no,? gracias|no me hace falta|no hace falta,? gracias)/;
+// Idiomas de rechazo fijos cuyo significado no depende del contexto ni de la
+// clausula en que caigan. Bloqueante 4: "\bahora no\b" se retira de aqui -
+// "ahora no" DENTRO de una condicion mas larga ("ahora no puedo esta
+// semana"/"ahora no puedo hablar") no es un rechazo de la cita, solo indica
+// disponibilidad; el rechazo real de "ahora no" desnudo (nada mas en la
+// clausula) lo cubre APPOINTMENT_BARE_DECLINE_PATTERN mas abajo.
+const APPOINTMENT_EXPLICIT_DECLINE_PHRASES =
+  /(prefiero que no|no necesito (que me )?ayud\w*|no quiero (una |la )?cita|no,? gracias|ahora no,? gracias|no me hace falta|no hace falta,? gracias|\bmejor no\b|sigo sin querer)/;
 
-// Palabras/frases que expresan la oferta en si (pedir/aceptar ayuda con la
-// cita) - si aparecen NEGADAS en su propia clausula, es un rechazo de la
-// oferta, no de una condicion aparte.
-const APPOINTMENT_OFFER_KEYWORD_PATTERN = /\b(quiero cita|necesito (que me )?ayud\w*|ayudame|ayudeme|me ayudas)\b/;
+// Clausula que es un rechazo desnudo completo (nada mas en la clausula) -
+// "No, si ya llamare yo" -> la clausula "si ya llamare yo" NO es un acuse de
+// recibo (tiene mas palabras detras de "si"), asi que solo "no"/"ahora no"
+// EXACTOS deciden aqui; cualquier condicion con mas contenido ("ahora no
+// puedo esta semana") se trata como neutra, nunca como rechazo.
+const APPOINTMENT_BARE_DECLINE_PATTERN = /^(no|ahora no)$/;
 
-// Acuse de recibo afirmativo al PRINCIPIO de una clausula ("Si", "Vale",
-// "Dale", "Ok", "De acuerdo") - aceptacion explicita de la oferta.
-const APPOINTMENT_ACCEPT_ACK_PATTERN = /^(si|vale|dale|ok|de acuerdo)\b/;
-
-export type AppointmentHelpDecision = "ACCEPTED" | "DECLINED" | "UNKNOWN";
-
-export function resolveAppointmentHelpDecision(message: string): AppointmentHelpDecision {
-  const normalized = normalize(message).trim();
-  if (!normalized) return "UNKNOWN";
-
-  if (EXPLICIT_APPOINTMENT_DECLINE_PHRASES.test(normalized)) return "DECLINED";
-
-  const clauses = normalized
-    .split(APPOINTMENT_HELP_CLAUSE_SPLIT_PATTERN)
-    .map(clause => clause.trim())
-    .filter(Boolean);
-
-  let sawAccept = false;
-  for (const clause of clauses) {
-    // Clausula que es un "no" desnudo (nada mas) - rechazo explicito, no una
-    // condicion sobre otra cosa ("No, si ya llamare yo" -> primera clausula
-    // "no" ya decide el rechazo, sin importar lo que diga la siguiente).
-    if (/^no$/.test(clause)) return "DECLINED";
-    // "no" negando la propia oferta dentro de la MISMA clausula ("no quiero
-    // cita", "no necesito que me ayudes") - decision final, nunca se acepta
-    // pase lo que pase en otra clausula del mismo mensaje.
-    if (/\bno\b/.test(clause) && APPOINTMENT_OFFER_KEYWORD_PATTERN.test(clause)) return "DECLINED";
-    if (APPOINTMENT_ACCEPT_ACK_PATTERN.test(clause)) sawAccept = true;
-    if (APPOINTMENT_OFFER_KEYWORD_PATTERN.test(clause) && !/\bno\b/.test(clause)) sawAccept = true;
-  }
-  return sawAccept ? "ACCEPTED" : "UNKNOWN";
-}
-
-// Codex P2 ("Allow declined patients to reopen booking"): un rechazo previo
-// de la ayuda con la cita (appointmentHelpDeclined) no puede ser irreversible.
-// resolveAppointmentHelpDecision() solo se ejecuta el turno INMEDIATAMENTE
-// siguiente a la oferta (lastAssistantAction === "OFFER_APPOINTMENT_HELP"),
-// asi que un cambio de opinion varios turnos despues quedaba UNKNOWN y el
-// rechazo se volvia sticky para siempre. Esta funcion es independiente de
-// lastAssistantAction: solo reabre con intencion EXPLICITA de pedir/reservar
-// cita o de que Clara ayude con ella - un "si" administrativo suelto
-// (ubicacion, telefono, "entiendo", precio) no reabre nada.
-const APPOINTMENT_RECONSIDERATION_CLAUSE_SPLIT_PATTERN = /[.,;:!¡¿?]+|\bpero\b|\baunque\b/;
-
-// "mejor no" es un idioma de rechazo fijo ("he cambiado de opinion: mejor
-// no") que no encaja en la clausula-"no"-desnuda porque va precedido de otra
-// palabra en la misma clausula.
-const APPOINTMENT_RECONSIDERATION_DECLINE_PHRASES = /\bmejor no\b/;
-
-// Codex P2 (Bloqueante 2 - "'Ayudame' solo reabre con contexto de cita"):
-// "ayud*" SIN contexto de cita/reserva no puede reabrir - "Ayudame con el
-// precio"/"Ayudame a entender el dolor"/"Necesito ayuda" no hablan de una
-// cita. Solo cuenta como intencion explicita si el verbo de ayuda aparece
-// pegado (hasta 25 caracteres) a una palabra de cita/reserva/agenda, o si el
-// mensaje ya usa una frase fija de pedir/reservar/solicitar/gestionar cita.
-// Deliberadamente NO incluye "quiero"/"si" sueltos (ver casos "quiero saber
-// el precio", "si, en Murcia") para no reabrir por una respuesta puramente
-// administrativa.
-const APPOINTMENT_REOPEN_KEYWORD_PATTERN =
+// Intencion explicita de pedir/reservar cita o de que Clara ayude con ella -
+// exige que "ayud*" aparezca pegado (hasta 25 caracteres) a una palabra de
+// cita/reserva/agenda, o una frase fija de pedir/reservar/solicitar/gestionar
+// cita. Deliberadamente NO incluye "quiero"/"si" sueltos (ver casos "quiero
+// saber el precio", "si, en Murcia") para no reabrir por una respuesta
+// puramente administrativa. Compartido por los dos modos.
+const APPOINTMENT_CONTEXT_KEYWORD_PATTERN =
   /(quiero (una |la )?cita\b|pedir (una |la )?cita\b|solicitar (una |la )?cita\b|reservar (una |la )?cita\b|necesito (una |la )?cita\b|quiero reservar\b|gestion\w*.{0,15}\bcita\b|ayud\w*.{0,25}\b(cita|reserva\w*|agendar|hora)\b|\b(cita|reserva\w*|agendar|hora)\b.{0,25}ayud\w*)/;
 
-export type AppointmentHelpReconsideration = "ACCEPTED" | "DECLINED" | "UNKNOWN";
+// Solo validos cuando el mensaje contesta la oferta que Clara ACABA de
+// hacer (mode="initial_offer"): un acuse de recibo desnudo ("Si"/"Vale"/
+// "Ahora si") o "ayud*" en cualquier parte de la clausula ya contestan esa
+// pregunta concreta sin necesidad de repetir "cita". EXACTO (no solo
+// prefijo) para que "si ya llamare yo" (clausula con mas contenido detras de
+// "si") no se confunda con un acuse de recibo real.
+const APPOINTMENT_BARE_ACK_PATTERN = /^(si|vale|dale|ok|de acuerdo|ahora si)$/;
+const APPOINTMENT_BARE_AYUDA_PATTERN = /\bayud\w*\b/;
 
-type ClauseVerdict = "ACCEPTED" | "DECLINED" | null;
+export type AppointmentDecisionMode = "initial_offer" | "reconsideration";
+export type AppointmentDecision = "ACCEPTED" | "DECLINED" | "UNKNOWN";
 
-function classifyAppointmentReconsiderationClause(clause: string): ClauseVerdict {
-  if (/^no$/.test(clause)) return "DECLINED";
-  if (EXPLICIT_APPOINTMENT_DECLINE_PHRASES.test(clause) || APPOINTMENT_RECONSIDERATION_DECLINE_PHRASES.test(clause)) {
-    return "DECLINED";
+function classifyAppointmentClause(clause: string, mode: AppointmentDecisionMode): AppointmentDecision | null {
+  if (APPOINTMENT_BARE_DECLINE_PATTERN.test(clause)) return "DECLINED";
+  if (APPOINTMENT_EXPLICIT_DECLINE_PHRASES.test(clause)) return "DECLINED";
+  const hasContextKeyword = APPOINTMENT_CONTEXT_KEYWORD_PATTERN.test(clause);
+  const hasNegation = /\bno\b/.test(clause);
+  // "no" + intencion explicita de cita en la MISMA clausula ("no quiero
+  // cita", "no necesito que me ayudes con la reserva") - rechazo final.
+  if (hasNegation && hasContextKeyword) return "DECLINED";
+  if (hasContextKeyword) return "ACCEPTED";
+  // "no" sin mencion de cita/reserva ("no puedo esta semana", "no puedo
+  // hablar ahora") es una condicion aparte (disponibilidad, horario), nunca
+  // un rechazo ni una aceptacion - neutra, no toca el veredicto.
+  if (hasNegation) return null;
+  if (mode === "initial_offer") {
+    if (APPOINTMENT_BARE_ACK_PATTERN.test(clause)) return "ACCEPTED";
+    if (APPOINTMENT_BARE_AYUDA_PATTERN.test(clause)) return "ACCEPTED";
   }
-  if (/\bno\b/.test(clause) && APPOINTMENT_REOPEN_KEYWORD_PATTERN.test(clause)) return "DECLINED";
-  if (APPOINTMENT_REOPEN_KEYWORD_PATTERN.test(clause)) return "ACCEPTED";
   return null;
 }
 
-// Codex P2 (Bloqueante 3 - "La ultima decision explicita del mensaje debe
-// ganar"): la version anterior devolvia DECLINED en cuanto encontraba
-// CUALQUIER frase de rechazo en el mensaje completo, antes de mirar el resto
-// de clausulas ("No quiero cita, pero ahora si quiero cita" quedaba
-// DECLINED por la primera parte). Ahora se recorren las clausulas en orden
-// textual y cada clausula inequivoca (aceptacion o rechazo) SUSTITUYE al
-// veredicto anterior - la ultima clausula inequivoca del mensaje gana
-// siempre. Una clausula que no dice nada claro (ni acepta ni rechaza
-// explicitamente) no toca el veredicto ya visto.
-export function resolveAppointmentHelpReconsideration(params: {
-  message: string;
-  currentState: Pick<DentalAgentState, "appointmentHelpDeclined">;
-}): AppointmentHelpReconsideration {
-  if (!params.currentState.appointmentHelpDeclined) return "UNKNOWN";
-  const normalized = normalize(params.message).trim();
+// Fuente unica de verdad para decisiones de cita: respuesta inmediata a la
+// oferta ("Quieres que te ayude a solicitar una cita?"), reconsideracion tras
+// un rechazo previo, o reapertura varios turnos despues - las tres pasan por
+// aqui. Recorre las clausulas en ORDEN TEXTUAL; cada clausula inequivoca
+// (aceptacion o rechazo) SUSTITUYE al veredicto anterior - la ultima
+// clausula inequivoca del mensaje gana siempre (Bloqueante 3/5). Nunca
+// devuelve en la primera coincidencia.
+export function resolveOrderedAppointmentDecision(
+  message: string,
+  context:
+    | { mode: "initial_offer" }
+    | { mode: "reconsideration"; currentState: Pick<DentalAgentState, "appointmentHelpDeclined"> }
+): AppointmentDecision {
+  if (context.mode === "reconsideration" && !context.currentState.appointmentHelpDeclined) {
+    return "UNKNOWN";
+  }
+  const normalized = normalize(message).trim();
   if (!normalized) return "UNKNOWN";
 
   const clauses = normalized
-    .split(APPOINTMENT_RECONSIDERATION_CLAUSE_SPLIT_PATTERN)
+    .split(APPOINTMENT_DECISION_CLAUSE_SPLIT_PATTERN)
     .map(clause => clause.trim())
     .filter(Boolean);
 
-  let lastVerdict: ClauseVerdict = null;
+  let lastVerdict: AppointmentDecision | null = null;
   for (const clause of clauses) {
-    const verdict = classifyAppointmentReconsiderationClause(clause);
+    const verdict = classifyAppointmentClause(clause, context.mode);
     if (verdict) lastVerdict = verdict;
   }
   return lastVerdict ?? "UNKNOWN";

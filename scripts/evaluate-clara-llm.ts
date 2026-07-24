@@ -6,6 +6,7 @@ import { loadFixtures, printReport, writeMarkdownReport } from "./lib/clara-repo
 import {
   buildLlmSummaryMarkdown,
   evaluateRealLlmGate,
+  parseStrictPercentageEnv,
   summarizeLlmObservations,
   type LlmTurnObservation
 } from "./lib/clara-llm-report";
@@ -35,6 +36,26 @@ const runTurn: ClaraTurnRunner = async (state, message, historySoFar) => {
 };
 
 async function main() {
+  const requireReal = process.env.REQUIRE_REAL_LLM === "1";
+  // Codex (Bloqueante 6 - "validar la config ANTES de ejecutar nada"): un
+  // MAX_FALLBACK_PERCENTAGE corrupto debe cortar la ejecucion antes de gastar
+  // llamadas reales al LLM, no despues - se valida como primer paso de main(),
+  // antes de tocar fixtures o el runner.
+  const percentageResult = parseStrictPercentageEnv("MAX_FALLBACK_PERCENTAGE", process.env.MAX_FALLBACK_PERCENTAGE, 0);
+  if (!percentageResult.valid) {
+    // Nunca se imprime rawValue si pudiera contener un secreto - esta
+    // variable es exclusivamente un porcentaje numerico, nunca una credencial,
+    // asi que mostrarla tal cual no expone nada sensible.
+    const message = `${percentageResult.name} invalido: "${percentageResult.rawValue}". Debe ser un numero finito entre 0 y 100.`;
+    if (requireReal) {
+      console.error(`REQUIRE_REAL_LLM=1: configuracion invalida, no se ejecuta la evaluacion. ${message}`);
+      process.exitCode = 1;
+      return;
+    }
+    console.warn(`AVISO: ${message} Se usa el valor por defecto seguro (0%).`);
+  }
+  const maxFallbackPercentage = percentageResult.valid ? percentageResult.value : 0;
+
   const fixtureDir = resolve(process.cwd(), "tests/fixtures");
   const reportPath = resolve(process.cwd(), "reports/clara-evaluation-llm.md");
   const jsonReportPath = resolve(process.cwd(), "reports/clara-evaluation-llm.json");
@@ -42,8 +63,6 @@ async function main() {
 
   const result = await evaluateClaraConversationsWithRunner(fixtures, runTurn);
 
-  const requireReal = process.env.REQUIRE_REAL_LLM === "1";
-  const maxFallbackPercentage = Number.parseFloat(process.env.MAX_FALLBACK_PERCENTAGE ?? "0");
   const summary = summarizeLlmObservations(observations, {
     requestedProvider: process.env.LLM_PROVIDER === "gemini" ? "gemini" : "openai",
     primaryModelConfigured:
