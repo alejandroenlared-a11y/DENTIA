@@ -674,6 +674,19 @@ export function resolveAnswerToLastClinicalQuestion(input: {
     const bleedingLevel = resolveBleedingLevel(normalized);
     if (bleedingLevel === "leve") negated.add("bleedingUncontrolled");
     if (bleedingLevel === "abundante") affirmed.add("bleedingUncontrolled");
+    // PR #13 (Codex - "Treat contextual 'no' as answering the impact
+    // part"): esta pregunta es compuesta (intensidad + golpe). Un "no" al
+    // PRINCIPIO del mensaje junto con una intensidad valida responde a la
+    // parte del golpe ("no, es poco" = "no [hubo golpe], es poco"), aunque
+    // el texto nunca mencione la palabra "golpe" - el motor generico de
+    // señales no tiene nada que resolver ahi porque no hay ninguna palabra
+    // clave de trauma que negar. Sin intensidad valida, o sin el "no"
+    // inicial, trauma se queda sin resolver (nunca se inventa una negacion:
+    // "Es poco"/"Leve"/"Es abundante" solos NO activan esta regla). Gateado
+    // estrictamente a esta pregunta - no se aplica a ninguna otra.
+    if (bleedingLevel && /^no\b/.test(normalized.trim())) {
+      negated.add("trauma");
+    }
   }
 
   // Hotfix dental-negation-context (Problema 2): resolver sangrado leve/
@@ -744,22 +757,45 @@ function identifyNextClinicalQuestionKey(
   return "";
 }
 
-// PR #13 (Codex - "Persist clinical keys only for displayed questions"):
-// identifyNextClinicalQuestionKey (arriba) solo sabe que pregunta clinica
+// PR #13 (Codex - "Persist clinical keys only for displayed questions" +
+// "Persist actions only after the shown reply is known"): identifyNextClinicalQuestionKey
+// e identifyLastAssistantAction (mas abajo) solo saben que pregunta/accion
 // TOCARIA hacer segun el estado, no si buildDentalReply realmente la mostro
 // este turno - una rama administrativa anterior en su cascada (direccion,
-// equipo, precio, tarjeta sanitaria...) puede ganar y devolver un texto
-// totalmente distinto. Unica fuente de verdad: la clave candidata solo se
-// persiste si su texto candidato (nextStep, misma logica exacta que
-// identifyNextClinicalQuestionKey) aparece literalmente en la respuesta
-// final. No se busca solo un "?" - se compara el texto concreto mostrado.
-function deriveDisplayedQuestionContext(params: {
+// equipo, precio, tarjeta sanitaria, aparcamiento...) puede ganar y devolver
+// un texto totalmente distinto. Unica fuente de verdad para AMBOS campos:
+// el texto candidato (nextStep para todo excepto EMERGENCY, que usa su
+// propia constante fija ya que buildDentalReply nunca llama a nextStep en
+// ese caso) debe aparecer literalmente en la respuesta final. No se busca
+// solo un "?" ni palabras vagas como "si"/"cita" - se compara el texto
+// concreto que la rama correspondiente de buildDentalReply produciria.
+function asksToChooseLocation(reply: string): boolean {
+  const normalized = normalize(reply);
+  return /murcia o (a )?elche|elche o (a )?murcia/.test(normalized);
+}
+
+function deriveDisplayedTurnContext(params: {
   finalReply: string;
-  candidateQuestionKey: LastQuestionKey;
-  candidateQuestionText: string;
-}): LastQuestionKey {
-  if (!params.candidateQuestionKey || !params.candidateQuestionText) return "";
-  return params.finalReply.includes(params.candidateQuestionText) ? params.candidateQuestionKey : "";
+  nominalLastAssistantAction: LastAssistantAction;
+  nominalQuestionKey: LastQuestionKey;
+  candidateText: string;
+}): { lastAssistantAction: LastAssistantAction; lastQuestionKey: LastQuestionKey } {
+  if (params.finalReply.includes(params.candidateText)) {
+    return { lastAssistantAction: params.nominalLastAssistantAction, lastQuestionKey: params.nominalQuestionKey };
+  }
+  // La accion/pregunta nominal no se mostro de verdad este turno. Si en vez
+  // de eso gano una pregunta administrativa que pide elegir sede (Murcia/
+  // Elche - aparcamiento, reactivacion...), se refleja como ASK_LOCATION
+  // (misma semantica real: elegir sede) para que una respuesta corta
+  // posterior ("Si, en Murcia") se interprete como eleccion de sede y no
+  // como si se hubiera aceptado una oferta de cita nunca mostrada. Cualquier
+  // otra rama administrativa (direccion, equipo, precio, tarjeta
+  // sanitaria...) queda en un valor neutro y seguro: nunca conserva una
+  // accion clinica o de reserva que no se enseño.
+  if (asksToChooseLocation(params.finalReply)) {
+    return { lastAssistantAction: "ASK_LOCATION", lastQuestionKey: "" };
+  }
+  return { lastAssistantAction: "", lastQuestionKey: "" };
 }
 
 // Los labels de redFlagPatterns/signalPatterns que corresponden 1:1 a una
@@ -1067,25 +1103,31 @@ export function runDentalSeniorTurn(current: DentalAgentState, rawText: string, 
   };
 
   const reply = buildDentalReply(nextState, current, text);
-  // PR #13 (Codex - "Persist clinical keys only for displayed questions"):
-  // lastQuestionKey se calculo arriba (identifyNextClinicalQuestionKey) ANTES
-  // de saber si buildDentalReply realmente iba a mostrar esa pregunta - una
-  // rama administrativa anterior en la cascada (direccion, equipo, precio,
-  // tarjeta sanitaria, gestion de citas, informacion de la clinica...) puede
-  // ganar y devolver un texto totalmente distinto ("Me duele una muela,
-  // donde estais?" solo muestra la direccion). Si la pregunta candidata
-  // (nextStep, misma logica que identifyNextClinicalQuestionKey) no aparece
-  // literalmente en la respuesta final, no se persiste como si se hubiera
-  // preguntado - evita que "no, nada de eso" en el turno siguiente resuelva
-  // un cribado que nunca se mostro.
-  const candidateQuestionText = lastQuestionKey ? nextStep(nextState, text) : "";
-  const displayedLastQuestionKey = deriveDisplayedQuestionContext({
+  // PR #13 (Codex - "Persist clinical keys only for displayed questions" +
+  // "Persist actions only after the shown reply is known"): lastQuestionKey
+  // y lastAssistantAction se calcularon arriba a partir del flujo NOMINAL
+  // (identifyNextClinicalQuestionKey / identifyLastAssistantAction), ANTES
+  // de saber si buildDentalReply realmente iba a mostrar esa pregunta/accion
+  // este turno - una rama administrativa anterior en la cascada (direccion,
+  // equipo, precio, tarjeta sanitaria, aparcamiento, gestion de citas...)
+  // puede ganar y devolver un texto totalmente distinto ("Me duele una
+  // muela, donde estais?" solo muestra la direccion; una pregunta sobre
+  // aparcamiento puede ganar sobre una oferta de ayuda con la cita ya
+  // calculada). Si el texto candidato (nextStep, misma logica que ambas
+  // funciones de identificacion; o la constante fija de EMERGENCY, que
+  // buildDentalReply nunca pasa por nextStep) no aparece literalmente en la
+  // respuesta final, ninguno de los dos campos se persiste como si se
+  // hubiera mostrado.
+  const nominalCandidateText =
+    lastAssistantAction === "EMERGENCY_GUIDANCE" ? EMERGENCY_GUIDANCE_REPLY : nextStep(nextState, text);
+  const displayed = deriveDisplayedTurnContext({
     finalReply: reply,
-    candidateQuestionKey: lastQuestionKey,
-    candidateQuestionText
+    nominalLastAssistantAction: lastAssistantAction,
+    nominalQuestionKey: lastQuestionKey,
+    candidateText: nominalCandidateText
   });
-  if (displayedLastQuestionKey !== nextState.lastQuestionKey) {
-    nextState = { ...nextState, lastQuestionKey: displayedLastQuestionKey };
+  if (displayed.lastAssistantAction !== nextState.lastAssistantAction || displayed.lastQuestionKey !== nextState.lastQuestionKey) {
+    nextState = { ...nextState, lastAssistantAction: displayed.lastAssistantAction, lastQuestionKey: displayed.lastQuestionKey };
   }
   return {
     state: nextState,
@@ -1132,6 +1174,13 @@ const PRICE_FORWARD_INTENTS: DentalIntentId[] = ["implant_price", "whitening", "
 
 // El paciente pidio presupuesto pero aun no sabemos de que tratamiento.
 const BUDGET_PENDING_INTENT = "PRESUPUESTO_PENDIENTE";
+
+// Extraido a constante (antes literal inline) para que
+// deriveDisplayedTurnContext pueda comprobar si esta respuesta exacta es la
+// que realmente se mostro, igual que hace con el texto candidato de
+// nextStep para el resto de acciones/preguntas.
+const EMERGENCY_GUIDANCE_REPLY =
+  "Esto no puede esperar: acude a urgencias ahora mismo. Si notas dificultad para respirar o tragar, o la hinchazón empeora, no esperes y ve directamente a un servicio de urgencias.";
 
 function buildDentalReply(state: DentalAgentState, previous: DentalAgentState, latestPatientText: string) {
   const paymentSafetyReply = buildPaymentSafetyReply(latestPatientText);
@@ -1217,7 +1266,7 @@ function buildDentalReply(state: DentalAgentState, previous: DentalAgentState, l
   // el estado (para que recepcion los vea), pero la respuesta visible nunca
   // los solicita ni los confirma.
   if (state.triageLevel === "EMERGENCY") {
-    return "Esto no puede esperar: acude a urgencias ahora mismo. Si notas dificultad para respirar o tragar, o la hinchazón empeora, no esperes y ve directamente a un servicio de urgencias.";
+    return EMERGENCY_GUIDANCE_REPLY;
   }
 
   if (state.ready) {

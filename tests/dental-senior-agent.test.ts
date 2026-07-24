@@ -1312,3 +1312,103 @@ describe("PR #13 P2 (revision sobre f334ecb): resolveAppointmentHelpDecision", (
     expect(third.state.appointmentHelpAccepted).toBe(false);
   });
 });
+
+// PR #13 (Codex, revision sobre 3ace5b8 - "Treat contextual 'no' as
+// answering the impact part"): la pregunta de sangrado/golpe es compuesta
+// (intensidad + golpe). Un "no" al principio junto con una intensidad valida
+// responde tambien a la parte del golpe, aunque el texto nunca mencione la
+// palabra "golpe".
+describe("PR #13 P2 (revision sobre 3ace5b8): 'no' contextual resuelve la parte del golpe en bleeding_severity_or_impact", () => {
+  function bleedingQuestionState() {
+    const t1 = runDentalSeniorTurn(initialDentalAgentState, "se me mueve una muela");
+    const t2 = runDentalSeniorTurn(t1.state, "sangrado");
+    expect(t2.state.lastQuestionKey).toBe("bleeding_severity_or_impact");
+    return t2.state;
+  }
+
+  it("Caso A: 'No, es poco' -> leve, trauma=false, avanza al cribado general, no diagnostica ni ofrece cita", () => {
+    const base = bleedingQuestionState();
+    const result = runDentalSeniorTurn(base, "No, es poco");
+    expect(result.state.bleedingDifferentialResolved).toBe(true);
+    expect(result.reply).not.toContain("ha empezado tras un golpe");
+    expect(result.reply.toLowerCase()).toContain("fiebre");
+    expect(result.reply.toLowerCase()).not.toContain("podria ser");
+    expect(result.reply.toLowerCase()).not.toContain("aceptas");
+  });
+
+  it("Caso B: 'No, es abundante' -> abundante, trauma=false, no repite la pregunta de golpe", () => {
+    const base = bleedingQuestionState();
+    const result = runDentalSeniorTurn(base, "No, es abundante");
+    expect(result.state.bleedingDifferentialResolved).toBe(true);
+    expect(result.reply).not.toContain("ha empezado tras un golpe");
+  });
+
+  it("Caso C: 'Es poco' (sin 'no') -> trauma sigue sin resolver, conserva la pregunta pendiente, no inventa una negacion", () => {
+    const base = bleedingQuestionState();
+    const result = runDentalSeniorTurn(base, "Es poco");
+    expect(result.state.bleedingDifferentialResolved).toBe(false);
+  });
+
+  it("Caso D: 'No me he dado ningún golpe, sangra poco' -> trauma=false, leve, diferencial completo", () => {
+    const base = bleedingQuestionState();
+    const result = runDentalSeniorTurn(base, "No me he dado ningún golpe, sangra poco");
+    expect(result.state.bleedingDifferentialResolved).toBe(true);
+  });
+
+  it("'Leve' y 'Es abundante' solos (sin 'no') tampoco resuelven trauma", () => {
+    const base = bleedingQuestionState();
+    expect(runDentalSeniorTurn(base, "Leve").state.bleedingDifferentialResolved).toBe(false);
+    expect(runDentalSeniorTurn(base, "Es abundante").state.bleedingDifferentialResolved).toBe(false);
+  });
+});
+
+// PR #13 (Codex, revision sobre 3ace5b8 - "Persist actions only after the
+// shown reply is known"): lastAssistantAction debe derivarse de la respuesta
+// final realmente mostrada, igual que lastQuestionKey - una rama
+// administrativa (aparcamiento, direccion...) puede ganar sobre la accion
+// nominal (OFFER_APPOINTMENT_HELP/ASK_PRIVACY_CONSENT/etc calculada solo a
+// partir del estado).
+describe("PR #13 P2 (revision sobre 3ace5b8): lastAssistantAction solo representa acciones realmente mostradas", () => {
+  function screenedReadyForOfferState() {
+    const t1 = runDentalSeniorTurn(initialDentalAgentState, "se me mueve una muela");
+    const t2 = runDentalSeniorTurn(t1.state, "sangrado");
+    const t3 = runDentalSeniorTurn(t2.state, "leve, sin golpe");
+    const t4 = runDentalSeniorTurn(t3.state, "no tengo fiebre, hinchazon ni pus y puedo abrir la boca y tragar bien");
+    expect(t4.state.lastAssistantAction).toBe("OFFER_APPOINTMENT_HELP");
+    return t4.state;
+  }
+
+  it("Caso E: una pregunta de aparcamiento gana sobre la oferta de cita nominal - lastAssistantAction refleja ASK_LOCATION, 'Si, en Murcia' elige sede sin saltar al consentimiento", () => {
+    const screened = screenedReadyForOfferState();
+    const parking = runDentalSeniorTurn(screened, "¿Tenéis aparcamiento?");
+    expect(parking.state.lastAssistantAction).not.toBe("OFFER_APPOINTMENT_HELP");
+    expect(parking.state.lastAssistantAction).not.toBe("ASK_PRIVACY_CONSENT");
+    expect(parking.state.lastAssistantAction).toBe("ASK_LOCATION");
+
+    const chosen = runDentalSeniorTurn(parking.state, "Si, en Murcia");
+    expect(chosen.state.location).toBe("Murcia centro");
+    expect(chosen.state.appointmentHelpAccepted).toBe(false);
+    expect(chosen.state.consent).toBe(false);
+  });
+
+  it("Caso F: la oferta de cita SI mostrada de verdad conserva OFFER_APPOINTMENT_HELP - 'Si' avanza a consentimiento", () => {
+    const screened = screenedReadyForOfferState();
+    const accepted = runDentalSeniorTurn(screened, "Si");
+    expect(accepted.state.lastAssistantAction).toBe("ASK_PRIVACY_CONSENT");
+    expect(accepted.state.appointmentHelpAccepted).toBe(true);
+  });
+
+  it("Caso G: la pregunta de consentimiento SI mostrada de verdad - 'Acepto' cambia consent a true", () => {
+    const screened = screenedReadyForOfferState();
+    const accepted = runDentalSeniorTurn(screened, "Si");
+    expect(accepted.state.lastAssistantAction).toBe("ASK_PRIVACY_CONSENT");
+    const consented = runDentalSeniorTurn(accepted.state, "Acepto");
+    expect(consented.state.consent).toBe(true);
+  });
+
+  it("Caso H: direcciones sin ninguna pregunta - no persiste una accion clinica o de reserva nunca mostrada", () => {
+    const result = runDentalSeniorTurn(initialDentalAgentState, "¿Dónde estáis?");
+    expect(result.state.lastAssistantAction).toBe("");
+    expect(result.state.lastQuestionKey).toBe("");
+  });
+});
