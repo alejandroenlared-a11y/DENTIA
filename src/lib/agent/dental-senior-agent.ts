@@ -705,8 +705,15 @@ function identifyNextClinicalQuestionKey(
 ): LastQuestionKey {
   if (state.intent === "trauma" && state.redFlags.length === 0 && !state.safetyScreened) {
     const normalized = normalize(latestPatientText);
-    if (mentionsSwallowingAnswer(normalized) && !mentionsOpeningAnswer(normalized)) return "trauma_swallowing_only";
-    if (mentionsOpeningAnswer(normalized) && !mentionsSwallowingAnswer(normalized)) return "trauma_opening_only";
+    // PR #13 (Codex - "Swap the trauma follow-up question keys"): la clave
+    // persistida debe describir la pregunta que nextStep VA A MOSTRAR este
+    // turno, no la que el paciente acaba de responder. Si ya contesto sobre
+    // tragar (y no sobre abrir), nextStep pregunta por ABRIR a continuacion
+    // - la clave debe ser trauma_opening_only, no trauma_swallowing_only (y
+    // viceversa). Las condiciones deben coincidir 1:1 con nextStep (mas
+    // abajo) para que ambas nunca diverjan.
+    if (mentionsSwallowingAnswer(normalized) && !mentionsOpeningAnswer(normalized)) return "trauma_opening_only";
+    if (mentionsOpeningAnswer(normalized) && !mentionsSwallowingAnswer(normalized)) return "trauma_swallowing_only";
     return "trauma_initial";
   }
   if (
@@ -735,6 +742,24 @@ function identifyNextClinicalQuestionKey(
     return "safety_screen_general";
   }
   return "";
+}
+
+// PR #13 (Codex - "Persist clinical keys only for displayed questions"):
+// identifyNextClinicalQuestionKey (arriba) solo sabe que pregunta clinica
+// TOCARIA hacer segun el estado, no si buildDentalReply realmente la mostro
+// este turno - una rama administrativa anterior en su cascada (direccion,
+// equipo, precio, tarjeta sanitaria...) puede ganar y devolver un texto
+// totalmente distinto. Unica fuente de verdad: la clave candidata solo se
+// persiste si su texto candidato (nextStep, misma logica exacta que
+// identifyNextClinicalQuestionKey) aparece literalmente en la respuesta
+// final. No se busca solo un "?" - se compara el texto concreto mostrado.
+function deriveDisplayedQuestionContext(params: {
+  finalReply: string;
+  candidateQuestionKey: LastQuestionKey;
+  candidateQuestionText: string;
+}): LastQuestionKey {
+  if (!params.candidateQuestionKey || !params.candidateQuestionText) return "";
+  return params.finalReply.includes(params.candidateQuestionText) ? params.candidateQuestionKey : "";
 }
 
 // Los labels de redFlagPatterns/signalPatterns que corresponden 1:1 a una
@@ -945,11 +970,10 @@ export function runDentalSeniorTurn(current: DentalAgentState, rawText: string, 
   // segun si Clara ACABA de ofrecer ayuda para pedir cita (current.lastAssistantAction),
   // no por texto suelto sin contexto - sticky una vez aceptado o declinado.
   const offeredAppointmentHelpLastTurn = current.lastAssistantAction === "OFFER_APPOINTMENT_HELP";
-  const appointmentHelpAccepted =
-    current.appointmentHelpAccepted || (offeredAppointmentHelpLastTurn && acceptsAppointmentHelp(normalized));
+  const appointmentHelpDecision = offeredAppointmentHelpLastTurn ? resolveAppointmentHelpDecision(text) : "UNKNOWN";
+  const appointmentHelpAccepted = current.appointmentHelpAccepted || appointmentHelpDecision === "ACCEPTED";
   const appointmentHelpDeclined =
-    !appointmentHelpAccepted &&
-    (current.appointmentHelpDeclined || (offeredAppointmentHelpLastTurn && declinesAppointmentHelp(normalized)));
+    !appointmentHelpAccepted && (current.appointmentHelpDeclined || appointmentHelpDecision === "DECLINED");
   const lastAssistantAction = identifyLastAssistantAction({
     intent,
     redFlags,
@@ -1043,6 +1067,26 @@ export function runDentalSeniorTurn(current: DentalAgentState, rawText: string, 
   };
 
   const reply = buildDentalReply(nextState, current, text);
+  // PR #13 (Codex - "Persist clinical keys only for displayed questions"):
+  // lastQuestionKey se calculo arriba (identifyNextClinicalQuestionKey) ANTES
+  // de saber si buildDentalReply realmente iba a mostrar esa pregunta - una
+  // rama administrativa anterior en la cascada (direccion, equipo, precio,
+  // tarjeta sanitaria, gestion de citas, informacion de la clinica...) puede
+  // ganar y devolver un texto totalmente distinto ("Me duele una muela,
+  // donde estais?" solo muestra la direccion). Si la pregunta candidata
+  // (nextStep, misma logica que identifyNextClinicalQuestionKey) no aparece
+  // literalmente en la respuesta final, no se persiste como si se hubiera
+  // preguntado - evita que "no, nada de eso" en el turno siguiente resuelva
+  // un cribado que nunca se mostro.
+  const candidateQuestionText = lastQuestionKey ? nextStep(nextState, text) : "";
+  const displayedLastQuestionKey = deriveDisplayedQuestionContext({
+    finalReply: reply,
+    candidateQuestionKey: lastQuestionKey,
+    candidateQuestionText
+  });
+  if (displayedLastQuestionKey !== nextState.lastQuestionKey) {
+    nextState = { ...nextState, lastQuestionKey: displayedLastQuestionKey };
+  }
   return {
     state: nextState,
     reply: asksIdentity ? `${IDENTITY_DISCLOSURE} ${reply}`.trim() : reply
@@ -2506,16 +2550,60 @@ function acceptsExplicitConsent(normalized: string) {
   return /\b(acepto|autorizo|consiento)\b.{0,50}\b(datos|guardar|guarde|gestionarla|gestionarlo|cita)\b/.test(normalized);
 }
 
-// Hotfix dental-negation-context (Problema 1): interpreta la respuesta a la
-// oferta de ayuda con la cita. declinesAppointmentHelp se comprueba primero
-// (una negacion explicita nunca se confunde con una aceptacion).
-function declinesAppointmentHelp(normalized: string) {
-  return /\bno\b/.test(normalized);
-}
+// PR #13 (Codex - "Treat unrelated negations as appointment acceptance"): la
+// version anterior (declinesAppointmentHelp) trataba CUALQUIER "no" en el
+// mensaje como rechazo de la oferta entera, aunque fuera una condicion
+// distinta ("Si, pero no puedo esta semana" - el "no" niega la
+// disponibilidad de esta semana, no la ayuda en si). Reemplazada por una
+// resolucion determinista con alcance LOCAL: primero comprueba frases de
+// rechazo explicito fijas (no dependen de contexto), luego evalua clausula a
+// clausula (separadas por coma/punto/pero/aunque) si el "no" niega la propia
+// oferta (quiero cita/necesito ayuda) en su misma clausula, o si es solo una
+// condicion aparte (dia, franja, disponibilidad) que no cancela una
+// aceptacion ya vista en otra clausula.
+const APPOINTMENT_HELP_CLAUSE_SPLIT_PATTERN = /[.,;!¡¿?]+|\bpero\b|\baunque\b/;
 
-function acceptsAppointmentHelp(normalized: string) {
-  if (declinesAppointmentHelp(normalized)) return false;
-  return /(\bsi\b|\bvale\b|\bdale\b|\bok\b|de acuerdo|ayudame|ayudeme|quiero cita|porfavor|por favor)/.test(normalized);
+// Idiomas de rechazo fijos cuyo significado no cambia por contexto - ganan
+// siempre, sin depender de en que clausula caigan.
+const EXPLICIT_APPOINTMENT_DECLINE_PHRASES =
+  /(prefiero que no|\bahora no\b|no necesito (que me )?ayud\w*|no quiero (una |la )?cita|no,? gracias|no me hace falta|no hace falta,? gracias)/;
+
+// Palabras/frases que expresan la oferta en si (pedir/aceptar ayuda con la
+// cita) - si aparecen NEGADAS en su propia clausula, es un rechazo de la
+// oferta, no de una condicion aparte.
+const APPOINTMENT_OFFER_KEYWORD_PATTERN = /\b(quiero cita|necesito (que me )?ayud\w*|ayudame|ayudeme|me ayudas)\b/;
+
+// Acuse de recibo afirmativo al PRINCIPIO de una clausula ("Si", "Vale",
+// "Dale", "Ok", "De acuerdo") - aceptacion explicita de la oferta.
+const APPOINTMENT_ACCEPT_ACK_PATTERN = /^(si|vale|dale|ok|de acuerdo)\b/;
+
+export type AppointmentHelpDecision = "ACCEPTED" | "DECLINED" | "UNKNOWN";
+
+export function resolveAppointmentHelpDecision(message: string): AppointmentHelpDecision {
+  const normalized = normalize(message).trim();
+  if (!normalized) return "UNKNOWN";
+
+  if (EXPLICIT_APPOINTMENT_DECLINE_PHRASES.test(normalized)) return "DECLINED";
+
+  const clauses = normalized
+    .split(APPOINTMENT_HELP_CLAUSE_SPLIT_PATTERN)
+    .map(clause => clause.trim())
+    .filter(Boolean);
+
+  let sawAccept = false;
+  for (const clause of clauses) {
+    // Clausula que es un "no" desnudo (nada mas) - rechazo explicito, no una
+    // condicion sobre otra cosa ("No, si ya llamare yo" -> primera clausula
+    // "no" ya decide el rechazo, sin importar lo que diga la siguiente).
+    if (/^no$/.test(clause)) return "DECLINED";
+    // "no" negando la propia oferta dentro de la MISMA clausula ("no quiero
+    // cita", "no necesito que me ayudes") - decision final, nunca se acepta
+    // pase lo que pase en otra clausula del mismo mensaje.
+    if (/\bno\b/.test(clause) && APPOINTMENT_OFFER_KEYWORD_PATTERN.test(clause)) return "DECLINED";
+    if (APPOINTMENT_ACCEPT_ACK_PATTERN.test(clause)) sawAccept = true;
+    if (APPOINTMENT_OFFER_KEYWORD_PATTERN.test(clause) && !/\bno\b/.test(clause)) sawAccept = true;
+  }
+  return sawAccept ? "ACCEPTED" : "UNKNOWN";
 }
 
 // Hotfix dental-negation-context (Problema 3): replica la secuencia completa

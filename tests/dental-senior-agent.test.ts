@@ -6,6 +6,7 @@ import {
   hasSlotOfferPrerequisites,
   initialDentalAgentState,
   resolveAnswerToLastClinicalQuestion,
+  resolveAppointmentHelpDecision,
   runDentalSeniorTurn,
   type DentalAgentState
 } from "@/lib/agent/dental-senior-agent";
@@ -1177,5 +1178,137 @@ describe("PR #13 P1/P2 (revision sobre 6511e78): polaridad por señal reutilizad
     expect(turn.reply.toLowerCase()).not.toContain("aceptas");
     expect(turn.reply).toContain("fiebre");
     expect(extractAffirmedAndNegatedClinicalSignals("Me duele una muela y no tengo fiebre").negated).toContain("fever");
+  });
+});
+
+// PR #13 (Codex, revision sobre f334ecb - "Swap the trauma follow-up
+// question keys"): la clave persistida debe describir la pregunta que
+// nextStep ACABA DE MOSTRAR este turno, no la que el paciente acaba de
+// responder. Antes del fix, responder tragar hacia que se preguntara por
+// abrir la boca pero se persistiera trauma_swallowing_only (la pregunta ya
+// respondida), asi que "Si, puedo abrir bien" se interpretaba como
+// respuesta a tragar en vez de a abrir, y el flujo podia alternar
+// indefinidamente.
+describe("PR #13 P2 (revision sobre f334ecb): claves opening/swallowing de trauma no intercambiadas", () => {
+  it("Caso A: tras responder tragar, Clara pregunta por abrir - lastQuestionKey representa opening, no vuelve a preguntar ninguna de las dos", () => {
+    const first = runDentalSeniorTurn(initialDentalAgentState, "Me he dado un golpe en una muela y se mueve");
+    expect(first.state.intent).toBe("trauma");
+
+    const second = runDentalSeniorTurn(first.state, "Puedo tragar bien");
+    expect(second.reply).toContain("abrir la boca");
+    expect(second.reply).not.toContain("tragar");
+    expect(second.state.lastQuestionKey).toBe("trauma_opening_only");
+
+    const third = runDentalSeniorTurn(second.state, "Si, puedo abrir bien");
+    expect(third.state.safetyScreened).toBe(true);
+    expect(third.reply).not.toContain("Y puedes abrir la boca bien?");
+    expect(third.reply).not.toContain("Y puedes tragar bien?");
+  });
+
+  it("Caso B: tras responder abrir, Clara pregunta por tragar - lastQuestionKey representa swallowing", () => {
+    const first = runDentalSeniorTurn(initialDentalAgentState, "Me he dado un golpe en una muela y se mueve");
+    const second = runDentalSeniorTurn(first.state, "Puedo abrir bien");
+    expect(second.reply).toContain("tragar");
+    expect(second.reply).not.toContain("abrir la boca");
+    expect(second.state.lastQuestionKey).toBe("trauma_swallowing_only");
+
+    const third = runDentalSeniorTurn(second.state, "Si, puedo tragar bien");
+    expect(third.state.safetyScreened).toBe(true);
+  });
+});
+
+// PR #13 (Codex, revision sobre f334ecb - "Persist clinical keys only for
+// displayed questions"): lastQuestionKey solo puede persistirse si la
+// pregunta clinica candidata aparece REALMENTE en la respuesta final -
+// buildDentalReply tiene ramas administrativas (direccion, equipo, precio,
+// tarjeta sanitaria...) que pueden ganar y devolver un texto totalmente
+// distinto en el mismo turno donde, en teoria, tocaria preguntar seguridad.
+describe("PR #13 P2 (revision sobre f334ecb): lastQuestionKey solo representa preguntas realmente mostradas", () => {
+  it("Caso C: 'Me duele una muela, donde estais?' solo muestra la direccion - no persiste safety_screen_general, un 'no, nada de eso' posterior no lo resuelve", () => {
+    const first = runDentalSeniorTurn(initialDentalAgentState, "Me duele una muela, ¿dónde estáis?");
+    expect(first.reply).toContain("Murcia");
+    expect(first.reply.toLowerCase()).not.toContain("fiebre");
+    expect(first.state.intent).toBe("urgent_pain");
+    expect(first.state.safetyScreened).toBe(false);
+    expect(first.state.lastQuestionKey).toBe("");
+
+    const second = runDentalSeniorTurn(first.state, "No, nada de eso");
+    expect(second.state.safetyScreened).toBe(false);
+    // Retoma la pregunta clinica real este turno (coherente, no la da por
+    // resuelta de un cribado que nunca se mostro).
+    expect(second.reply.toLowerCase()).toContain("fiebre");
+    expect(second.state.lastQuestionKey).toBe("safety_screen_general");
+  });
+
+  it("Caso D: 'Me duele una muela' SI muestra la pregunta de seguridad real - 'No, nada de eso' la resuelve con normalidad (no rompe el caso legitimo)", () => {
+    const first = runDentalSeniorTurn(initialDentalAgentState, "Me duele una muela");
+    expect(first.reply.toLowerCase()).toContain("fiebre");
+    expect(first.state.lastQuestionKey).toBe("safety_screen_general");
+
+    const second = runDentalSeniorTurn(first.state, "No, nada de eso");
+    expect(second.state.safetyScreened).toBe(true);
+  });
+});
+
+// PR #13 (Codex, revision sobre f334ecb - "Treat unrelated negations as
+// appointment acceptance"): distingue aceptacion explicita, rechazo directo,
+// y negacion de una condicion distinta ("Si, pero no puedo esta semana" no
+// es un rechazo).
+describe("PR #13 P2 (revision sobre f334ecb): resolveAppointmentHelpDecision", () => {
+  it.each([
+    ["Sí", "ACCEPTED"],
+    ["Sí, ayúdame", "ACCEPTED"],
+    ["Sí, pero no puedo esta semana", "ACCEPTED"],
+    ["Vale, aunque no puedo por las mañanas", "ACCEPTED"],
+    ["Quiero cita, pero no el lunes", "ACCEPTED"],
+    ["Sí, no tengo preferencia de hora", "ACCEPTED"],
+    ["No", "DECLINED"],
+    ["No, gracias", "DECLINED"],
+    ["Prefiero que no", "DECLINED"],
+    ["No quiero cita", "DECLINED"],
+    ["Ahora no", "DECLINED"],
+    ["No necesito que me ayudes", "DECLINED"],
+    ["No, si ya llamaré yo", "DECLINED"]
+  ])("%s -> %s", (message, expected) => {
+    expect(resolveAppointmentHelpDecision(message)).toBe(expected);
+  });
+
+  it("Caso E: 'Si, pero no puedo esta semana' tras la oferta - acepta la ayuda, solo pide consentimiento, no cierra la conversacion", () => {
+    const first = runDentalSeniorTurn(initialDentalAgentState, "Me duele al morder.");
+    const second = runDentalSeniorTurn(first.state, "No, nada de eso.");
+    expect(second.state.lastAssistantAction).toBe("OFFER_APPOINTMENT_HELP");
+
+    const third = runDentalSeniorTurn(second.state, "Si, pero no puedo esta semana");
+    expect(third.state.appointmentHelpAccepted).toBe(true);
+    expect(third.state.appointmentHelpDeclined).toBe(false);
+    expect(third.reply).toContain("Aceptas");
+    expect(third.reply).not.toContain("Quieres que te ayude a solicitar una cita");
+  });
+
+  it("Caso F: 'No, gracias' tras la oferta - rechaza, no pide consentimiento, cierre breve", () => {
+    const first = runDentalSeniorTurn(initialDentalAgentState, "Me duele al morder.");
+    const second = runDentalSeniorTurn(first.state, "No, nada de eso.");
+
+    const third = runDentalSeniorTurn(second.state, "No, gracias");
+    expect(third.state.appointmentHelpDeclined).toBe(true);
+    expect(third.reply.toLowerCase()).not.toContain("aceptas");
+  });
+
+  it("Caso G: 'Quiero cita, pero no el lunes' - acepta, la restriccion de lunes no se interpreta como rechazo", () => {
+    const first = runDentalSeniorTurn(initialDentalAgentState, "Me duele al morder.");
+    const second = runDentalSeniorTurn(first.state, "No, nada de eso.");
+
+    const third = runDentalSeniorTurn(second.state, "Quiero cita, pero no el lunes");
+    expect(third.state.appointmentHelpAccepted).toBe(true);
+    expect(third.state.appointmentHelpDeclined).toBe(false);
+  });
+
+  it("Caso H: 'No, si ya llamare yo' - rechaza", () => {
+    const first = runDentalSeniorTurn(initialDentalAgentState, "Me duele al morder.");
+    const second = runDentalSeniorTurn(first.state, "No, nada de eso.");
+
+    const third = runDentalSeniorTurn(second.state, "No, si ya llamaré yo");
+    expect(third.state.appointmentHelpDeclined).toBe(true);
+    expect(third.state.appointmentHelpAccepted).toBe(false);
   });
 });
