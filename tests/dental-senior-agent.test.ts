@@ -532,6 +532,37 @@ describe("runDentalSeniorTurn", () => {
     expect(turn.reply).not.toContain("Aquí sigo");
   });
 
+  // Codex (cierre de pre-reserva, Caso B): tras la pre-reserva, un
+  // acuse de recibo breve ("Todo ok") solo cierra la conversacion - nunca
+  // crea otra cita, ni cambia fecha, hora, doctor, gabinete o prioridad, ni
+  // dice "confirmada" (la clinica es quien confirma de verdad).
+  it("Caso B: 'Todo ok' tras la pre-reserva solo cierra - no crea otra cita ni cambia fecha/hora/prioridad", () => {
+    const readyState: DentalAgentState = {
+      ...initialDentalAgentState,
+      intent: "prosthetics",
+      intentCode: "PROTESIS_CORONA_DESCEMENTADA",
+      treatmentNeed: "Corona / prótesis fija",
+      consent: true,
+      name: "Alex Test",
+      phone: "611222333",
+      email: "alex@example.com",
+      location: "Elche - Altabix",
+      availability: "lunes, 27 de julio a las 10:00",
+      ready: true,
+      closureAcknowledged: true
+    };
+
+    const turn = runDentalSeniorTurn(readyState, "Todo ok");
+
+    expect(turn.reply.toLowerCase()).not.toContain("confirmada");
+    expect(turn.reply.toLowerCase()).not.toContain("huecos");
+    expect(turn.state.availability).toBe(readyState.availability);
+    expect(turn.state.location).toBe(readyState.location);
+    expect(turn.state.intent).toBe(readyState.intent);
+    expect(turn.state.offeredAvailabilityOptions).toEqual([]);
+    expect(turn.state.escalated).toBe(false);
+  });
+
   it("still asks the general alarm safety-screen question when a pain intent narrows to caries_restoration", () => {
     // Bug real (produccion): "me duele una muela" (urgent_pain) + "al morder"
     // reclasifica a caries_restoration, que no estaba en la lista de intents

@@ -22,6 +22,13 @@ describe("detectSchedulingRequest", () => {
     expect(detectSchedulingRequest("Puedo cambiarlo para otro dia?")).toBe("reschedule");
   });
 
+  // Codex (cierre de pre-reserva, Caso C): tras la pre-reserva, "Quiero
+  // cambiarla" debe reabrir SOLO el flujo de cambio, nunca crear una cita
+  // nueva por su cuenta ni tratarse como cierre generico.
+  it("Caso C: 'Quiero cambiarla' tras la pre-reserva reabre el flujo de cambio", () => {
+    expect(detectSchedulingRequest("Quiero cambiarla")).toBe("reschedule");
+  });
+
   it("detects a query about the appointment date", () => {
     expect(detectSchedulingRequest("Para cuando es??")).toBe("query");
     expect(detectSchedulingRequest("Que dia es la cita")).toBe("query");

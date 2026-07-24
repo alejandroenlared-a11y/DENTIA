@@ -14,6 +14,11 @@ const RESCHEDULE_PATTERNS = [
   /no\s+me\s+viene\s+bien/i,
   /me\s+viene\s+mal/i,
   /puedo\s+cambiar(lo|la|los|las)?\b/i,
+  // Codex (cierre de pre-reserva, Caso C): "Quiero cambiarla" tras la
+  // pre-reserva - sin "de dia/fecha/hora" ni la palabra "cita" - caia fuera
+  // de todos los patrones anteriores y se trataba como cierre generico en
+  // vez de reabrir el flujo de cambio.
+  /quiero\s+cambiar(lo|la|los|las)?\b/i,
   /cambiar(lo|la)?\s+de\s+(dia|fecha|hora)/i,
   /hay\s+otro\s+dia/i,
   /otro\s+dia\s+(o\s+)?(hora|horario)/i
