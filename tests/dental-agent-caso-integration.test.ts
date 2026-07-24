@@ -570,6 +570,36 @@ describe("PR #13 P1: hinchazon en el ojo se conserva pese a negar fiebre en la m
     expect(reply2).not.toContain("franja");
     expect(t2.state.consent).toBe(false);
   });
+
+  // Revision de Codex sobre 6511e78 (P1 "Preserve red flags after unrelated
+  // denial" + P2 "Don't drop pain intents after unrelated denials"): "con X"
+  // no se reconocia como marcador afirmativo (solo "sin" quedaba como
+  // marcador de la clausula) y dolor/duele se resolvia con un regex de
+  // negacion de clausula completa independiente en vez del mismo motor de
+  // polaridad por señal.
+  it('8. "Sin fiebre y con hinchazón en el ojo" -> EMERGENCY via el pipeline real, sin consentimiento ni reserva ("con X" como marcador afirmativo)', async () => {
+    const result = await turn("Sin fiebre y con hinchazón en el ojo", initialDentalAgentState);
+
+    expect(result.state.redFlags).toContain("hinchazon en cuello, boca u ojo");
+    expect(result.state.triageLevel).toBe("EMERGENCY");
+    expect(result.reply.toLowerCase()).toContain("urgencias");
+    expect(result.reply.toLowerCase()).not.toContain("aceptas");
+    expect(result.state.consent).toBe(false);
+    expect(result.state.bookingStatus).toBe("IDLE");
+    expect(result.state.ready).toBe(false);
+  });
+
+  it('9. "Me duele una muela y no tengo fiebre" -> inicia triaje de dolor via el pipeline real, sin diagnostico ni consentimiento', async () => {
+    const result = await turn("Me duele una muela y no tengo fiebre", initialDentalAgentState);
+
+    expect(result.state.intent).toBe("urgent_pain");
+    const reply = result.reply.toLowerCase();
+    expect(reply).not.toContain("que necesitas");
+    expect(reply).not.toContain("podria ser");
+    expect(reply).not.toContain("aceptas");
+    expect(reply).toContain("fiebre");
+    expect(result.state.consent).toBe(false);
+  });
 });
 
 // PR #13 (comentario P2 de Codex): un lastQuestionKey invalido persistido en

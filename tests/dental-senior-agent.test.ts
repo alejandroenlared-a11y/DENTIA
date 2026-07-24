@@ -1078,3 +1078,104 @@ describe("PR #13 P1: negacion de alcance local (extractAffirmedAndNegatedClinica
     expect(result.affirmed).not.toContain("swelling");
   });
 });
+
+// PR #13 (Codex, revision sobre 6511e78): "Preserve red flags after unrelated
+// denial" (P1) y "Don't drop pain intents after unrelated denials" (P2) - la
+// negacion/afirmacion sigue sin alcance local cuando el marcador afirmativo
+// es "con X" (no reconocido) o cuando la señal es "dolor"/"duele" (resuelta
+// por un regex de negacion de CLAUSULA COMPLETA independiente en
+// mentionsUrgentAlarmWithoutNegation, en vez de reutilizar el mismo motor de
+// marcadores por señal). Los 11 casos numerados de la ficha se cubren aqui.
+describe("PR #13 P1/P2 (revision sobre 6511e78): polaridad por señal reutilizada para dolor y para 'con X'", () => {
+  it("1. 'Sin fiebre y con hinchazón en el ojo' -> fever negada, swelling afirmada ('con' es marcador afirmativo)", () => {
+    const result = extractAffirmedAndNegatedClinicalSignals("Sin fiebre y con hinchazón en el ojo");
+    expect(result.negated).toContain("fever");
+    expect(result.affirmed).toContain("swelling");
+    expect(result.negated).not.toContain("swelling");
+  });
+
+  it("2. 'No tengo fiebre y tengo hinchazón en el ojo' -> fever negada, swelling afirmada (regresion P1 original)", () => {
+    const result = extractAffirmedAndNegatedClinicalSignals("No tengo fiebre y tengo hinchazón en el ojo");
+    expect(result.negated).toContain("fever");
+    expect(result.affirmed).toContain("swelling");
+  });
+
+  it("3. 'Me duele una muela y no tengo fiebre' -> dolor afirmado, fiebre negada (la negacion de fiebre no anula el dolor)", () => {
+    const result = extractAffirmedAndNegatedClinicalSignals("Me duele una muela y no tengo fiebre");
+    expect(result.affirmed).toContain("pain");
+    expect(result.negated).toContain("fever");
+    expect(result.negated).not.toContain("pain");
+  });
+
+  it("4. 'No tengo fiebre y me duele una muela' -> mismo resultado que el caso 3 (orden invertido)", () => {
+    const result = extractAffirmedAndNegatedClinicalSignals("No tengo fiebre y me duele una muela");
+    expect(result.affirmed).toContain("pain");
+    expect(result.negated).toContain("fever");
+    expect(result.negated).not.toContain("pain");
+  });
+
+  it("5. 'No me duele la muela y tengo fiebre' -> pain negado, fever afirmada ('me duele' negado no activa dolor)", () => {
+    const result = extractAffirmedAndNegatedClinicalSignals("No me duele la muela y tengo fiebre");
+    expect(result.negated).toContain("pain");
+    expect(result.affirmed).toContain("fever");
+    expect(result.affirmed).not.toContain("pain");
+  });
+
+  it("6. 'Sin dolor pero con hinchazón' -> pain negado, swelling afirmada", () => {
+    const result = extractAffirmedAndNegatedClinicalSignals("Sin dolor pero con hinchazón");
+    expect(result.negated).toContain("pain");
+    expect(result.affirmed).toContain("swelling");
+  });
+
+  it("7. 'No tengo fiebre ni hinchazón' -> ambas negadas (regresion)", () => {
+    const result = extractAffirmedAndNegatedClinicalSignals("No tengo fiebre ni hinchazón");
+    expect(result.negated).toEqual(expect.arrayContaining(["fever", "swelling"]));
+  });
+
+  it("8. 'Tengo fiebre pero no tengo hinchazón' -> fever afirmada, swelling negada (regresion)", () => {
+    const result = extractAffirmedAndNegatedClinicalSignals("Tengo fiebre pero no tengo hinchazón");
+    expect(result.affirmed).toContain("fever");
+    expect(result.negated).toContain("swelling");
+  });
+
+  it("9. 'No he recibido ningún golpe pero sangro mucho' -> trauma negado, sangrado afirmado", () => {
+    const result = extractAffirmedAndNegatedClinicalSignals("No he recibido ningún golpe pero sangro mucho");
+    expect(result.negated).toContain("trauma");
+    expect(result.affirmed).toContain("bleedingUncontrolled");
+  });
+
+  it("10. 'No puedo respirar' -> breathingDifficulty afirmada, no negada", () => {
+    const result = extractAffirmedAndNegatedClinicalSignals("No puedo respirar");
+    expect(result.affirmed).toContain("breathingDifficulty");
+    expect(result.negated).not.toContain("breathingDifficulty");
+  });
+
+  it("11. 'No tengo dificultad para respirar' -> breathingDifficulty negada", () => {
+    const result = extractAffirmedAndNegatedClinicalSignals("No tengo dificultad para respirar");
+    expect(result.negated).toContain("breathingDifficulty");
+  });
+
+  it("end-to-end: 'Sin fiebre y con hinchazón en el ojo' -> EMERGENCY, respuesta de urgencias, sin consentimiento ni reserva", () => {
+    const turn = runDentalSeniorTurn(initialDentalAgentState, "Sin fiebre y con hinchazón en el ojo");
+    expect(turn.state.redFlags).toContain("hinchazon en cuello, boca u ojo");
+    expect(turn.state.triageLevel).toBe("EMERGENCY");
+    expect(turn.state.escalated).toBe(true);
+    expect(turn.reply).toContain("urgencias");
+    expect(turn.reply.toLowerCase()).not.toContain("aceptas");
+    expect(turn.state.consent).toBe(false);
+    expect(turn.state.bookingStatus).toBe("IDLE");
+    expect(turn.state.ready).toBe(false);
+  });
+
+  it("end-to-end: 'Me duele una muela y no tengo fiebre' -> comienza el triaje de dolor, no diagnostica, no pide consentimiento", () => {
+    const turn = runDentalSeniorTurn(initialDentalAgentState, "Me duele una muela y no tengo fiebre");
+    expect(turn.state.intent).toBe("urgent_pain");
+    expect(turn.reply.toLowerCase()).not.toContain("que necesitas");
+    expect(turn.reply.toLowerCase()).not.toContain("podria ser");
+    expect(turn.reply.toLowerCase()).not.toContain("pulpitis");
+    expect(turn.reply.toLowerCase()).not.toContain("absceso");
+    expect(turn.reply.toLowerCase()).not.toContain("aceptas");
+    expect(turn.reply).toContain("fiebre");
+    expect(extractAffirmedAndNegatedClinicalSignals("Me duele una muela y no tengo fiebre").negated).toContain("fever");
+  });
+});

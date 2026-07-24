@@ -377,19 +377,26 @@ export type ClinicalSignalKey =
   | "breathingDifficulty"
   | "openingDifficulty"
   | "bleedingUncontrolled"
-  | "trauma";
+  | "trauma"
+  | "pain";
 
 // Solo las señales de "negacion simple" (no tengo/hay X => X ausente) usan el
 // algoritmo generico por clausula. tragar/respirar/abrir quedan fuera: su
 // forma AFIRMATIVA real ("no puedo respirar") contiene literalmente "no",
 // asi que un escaneo generico de negacion las cancelaria a si mismas (bug
 // real ya detectado antes en isNegatedLabel - ver DIFFICULTY_SIGNAL_RULES).
-const SIMPLE_NEGATION_SIGNAL_PATTERNS: Record<"fever" | "swelling" | "pus" | "bleedingUncontrolled" | "trauma", RegExp> = {
+const SIMPLE_NEGATION_SIGNAL_PATTERNS: Record<"fever" | "swelling" | "pus" | "bleedingUncontrolled" | "trauma" | "pain", RegExp> = {
   fever: /fiebre|decimas|escalofrios/,
   swelling: /hinchaz/,
   pus: /\bpus\b|flemon|absceso/,
   bleedingUncontrolled: /sangr/,
-  trauma: /golpe|traumatismo|me golpee|\baccidente\b|\bcaida\b/
+  trauma: /golpe|traumatismo|me golpee|\baccidente\b|\bcaida\b/,
+  // PR #13 (Codex P2 - "Don't drop pain intents after unrelated denials"):
+  // "dolor"/"duele" necesitan la misma resolucion de polaridad por señal que
+  // fiebre/hinchazon/etc, para que inferIntent (mas abajo,
+  // mentionsUrgentAlarmWithoutNegation) deje de usar un negacion de clausula
+  // completa independiente que se contaminaba con un "no" de otra señal.
+  pain: /duele|dolor/
 };
 
 // tragar/respirar/abrir: "no puedo X" ES la afirmacion (hay dificultad real),
@@ -420,10 +427,6 @@ const DIFFICULTY_SIGNAL_RULES: Record<
 // afirmacion real en otra clausula del mismo mensaje ("pero si tengo
 // hinchazon" ya queda en su propia clausula).
 const CLAUSE_SPLIT_PATTERN = /[.,;!¡¿?]+|\bpero\b/;
-// Usado por mentionsUrgentAlarmWithoutNegation (mas abajo) para descartar
-// menciones de dolor/hinchazon/pus claramente negadas antes de reclasificar
-// el intent a urgent_pain.
-const NEGATION_CUE_PATTERN = /\b(no|ningun[oa]?|nada|sin|tampoco|nunca|ni)\b/;
 
 // Bug real (PR #13, comentario P1 de Codex - "Do not negate red flags from
 // unrelated no"): tratar TODA la clausula como negada o afirmada de un tiron
@@ -438,13 +441,23 @@ const NEGATION_CUE_PATTERN = /\b(no|ningun[oa]?|nada|sin|tampoco|nunca|ni)\b/;
 // global encontraria "no" y "tengo" como dos marcadores SEPARADOS (uno
 // negado, otro afirmado) en vez de una sola unidad negada, y "tengo"
 // (mas cercano a la señal) ganaria por error deshaciendo el "no".
+// PR #13 (Codex P1/P2, revision sobre 6511e78): "con X" (afirmacion: "con
+// hinchazon") y "me duele X"/"no me duele X" (dolor dental) se suman a la
+// alternancia con el mismo cuidado de orden que "no tengo" vs "tengo": los
+// compuestos con "no " (no noto/no me duele/no me cuesta) van ANTES que su
+// version afirmativa suelta, para que el escaneo global los consuma como una
+// sola unidad negada en vez de partirlos en un "no" negado + un afirmativo
+// sin relacion que gane por estar mas cerca de la señal.
 const SIGNAL_SEGMENT_MARKER_PATTERN =
-  /\b(no tengo|no hay|no puedo|sin|ningun[oa]?|nada de|tampoco|nunca|ni|no|si tengo|tambien tengo|ademas tengo|tengo|hay|presento|noto)\b/g;
+  /\b(no tengo|no hay|no puedo|no noto|no me duele|no me cuesta|sin|ningun[oa]?|nada de|tampoco|nunca|ni|no|si tengo|tambien tengo|ademas tengo|me duele|me cuesta|tengo|hay|presento|noto|con)\b/g;
 
 const NEGATION_MARKER_WORDS = new Set([
   "no tengo",
   "no hay",
   "no puedo",
+  "no noto",
+  "no me duele",
+  "no me cuesta",
   "sin",
   "ningun",
   "nada de",
@@ -488,6 +501,42 @@ function resolveSignalPolarityAt(markers: SignalMarker[], signalIndex: number): 
   return false;
 }
 
+// PR #13 (Codex, revision sobre 6511e78 - "no mantengas un parser correcto
+// para red flags y otro regex independiente por clausula para inferIntent"):
+// unica fuente de verdad para resolver si UN termino clinico concreto
+// (cualquier RegExp, no solo las claves fijas de SIMPLE_NEGATION_SIGNAL_
+// PATTERNS) esta afirmado, negado o no mencionado en el mensaje - reutilizada
+// por extractAffirmedAndNegatedClinicalSignals (mas abajo) y por
+// mentionsUrgentAlarmWithoutNegation (inferIntent) para que ambas nunca
+// puedan divergir sobre la misma frase.
+type ClinicalTermPolarity = "affirmed" | "negated" | "unknown";
+
+function resolveClinicalTermPolarity(normalized: string, termPattern: RegExp): ClinicalTermPolarity {
+  const clauses = normalized
+    .split(CLAUSE_SPLIT_PATTERN)
+    .map(clause => clause.trim())
+    .filter(Boolean);
+  let sawNegated = false;
+  for (const clause of clauses) {
+    const match = termPattern.exec(clause);
+    if (!match) continue;
+    const markers = findSignalSegmentMarkers(clause);
+    if (resolveSignalPolarityAt(markers, match.index)) {
+      sawNegated = true;
+    } else {
+      // Afirmada en cualquier clausula del mensaje gana de inmediato: una
+      // negacion en otra clausula ("no tengo fiebre, pero si tengo dolor")
+      // nunca puede anular una afirmacion real de la misma señal.
+      return "affirmed";
+    }
+  }
+  return sawNegated ? "negated" : "unknown";
+}
+
+function isClinicalTermAffirmed(normalized: string, termPattern: RegExp): boolean {
+  return resolveClinicalTermPolarity(normalized, termPattern) === "affirmed";
+}
+
 export type ClinicalSignalExtraction = {
   affirmed: ClinicalSignalKey[];
   negated: ClinicalSignalKey[];
@@ -499,30 +548,15 @@ export type ClinicalSignalExtraction = {
 // cualquier negacion no prevista en una lista cerrada de frases).
 export function extractAffirmedAndNegatedClinicalSignals(message: string): ClinicalSignalExtraction {
   const normalized = normalize(message);
-  const clauses = normalized
-    .split(CLAUSE_SPLIT_PATTERN)
-    .map(clause => clause.trim())
-    .filter(Boolean);
   const affirmed = new Set<ClinicalSignalKey>();
   const negated = new Set<ClinicalSignalKey>();
   const simpleKeys = Object.keys(SIMPLE_NEGATION_SIGNAL_PATTERNS) as Array<keyof typeof SIMPLE_NEGATION_SIGNAL_PATTERNS>;
 
-  for (const clause of clauses) {
-    const markers = findSignalSegmentMarkers(clause);
-    for (const key of simpleKeys) {
-      const match = SIMPLE_NEGATION_SIGNAL_PATTERNS[key].exec(clause);
-      if (!match) continue;
-      if (resolveSignalPolarityAt(markers, match.index)) {
-        negated.add(key);
-      } else {
-        affirmed.add(key);
-      }
-    }
+  for (const key of simpleKeys) {
+    const polarity = resolveClinicalTermPolarity(normalized, SIMPLE_NEGATION_SIGNAL_PATTERNS[key]);
+    if (polarity === "affirmed") affirmed.add(key);
+    else if (polarity === "negated") negated.add(key);
   }
-  // Si la misma señal aparece afirmada en otra clausula del mismo mensaje
-  // ("no tengo fiebre, pero si tengo hinchazon" - dos clausulas, cada una con
-  // su propia señal), la afirmacion real gana sobre cualquier negacion.
-  for (const key of affirmed) negated.delete(key);
 
   // tragar/respirar/abrir: reglas dedicadas sobre el mensaje completo (su via
   // libre real, "puedo respirar", ya contiene la palabra sin negacion previa
@@ -848,13 +882,27 @@ export function runDentalSeniorTurn(current: DentalAgentState, rawText: string, 
   // sin golpe" cerraba de un tiron todo el cribado sin haber preguntado
   // nunca fiebre/hinchazon/pus/dificultad.
   const isAnsweringBleedingQuestion = current.lastQuestionKey === "bleeding_severity_or_impact";
+  // PR #13 (Codex P2, revision sobre 6511e78): el antiguo fallback de
+  // detectSafetyScreen consideraba el cribado GENERAL completo con que
+  // apareciera CUALQUIER UNA de muchas frases sueltas ("no tengo fiebre",
+  // "leve", "puedo respirar"...), aunque solo cubriera una fraccion minima
+  // del cribado real. "Me duele una muela y no tengo fiebre" (solo niega
+  // fiebre, nada de hinchazon/pus/dificultad) marcaba safetyScreened=true de
+  // un tiron y diagnosticaba en el mismo turno. Sustituido por el mismo
+  // motor de polaridad por señal que el resto del archivo: fiebre e
+  // hinchazon (los dos primeros puntos de la pregunta real) deben estar
+  // ambos genuinamente resueltos (afirmados o negados) en el mensaje, no
+  // solo mencionados de pasada - "no tengo fiebre ni hinchazon" (ambos)
+  // sigue completando el cribado sin haber preguntado antes; "no tengo
+  // fiebre" (solo uno) ya no.
+  const hasFeverEvidence = clinicalAnswer.affirmed.includes("fever") || clinicalAnswer.negated.includes("fever");
+  const hasSwellingEvidence = clinicalAnswer.affirmed.includes("swelling") || clinicalAnswer.negated.includes("swelling");
   const safetyScreened =
     current.safetyScreened ||
     clinicalAnswer.resolvesSafetyScreen ||
+    redFlags.length > 0 ||
     (!isAnsweringBleedingQuestion &&
-      (intent === "trauma"
-        ? detectTraumaSafetyScreen(normalized, redFlags)
-        : detectSafetyScreen(normalized, redFlags))) ||
+      (intent === "trauma" ? detectTraumaSafetyScreen(normalized, redFlags) : hasFeverEvidence && hasSwellingEvidence)) ||
     patientDeescalates;
   // Hotfix dental-negation-context (Problema 2): sangrado leve/abundante +
   // golpe si/no resuelto es un requisito PREVIO al cribado general, nunca lo
@@ -1959,20 +2007,21 @@ function completeDentalState(state: DentalAgentState): DentalAgentState {
 // clausula, no una lista cerrada de frases) - sustituye a la vieja
 // isTraumaNegated, que no reconocia frases como "no he recibido ningun
 // golpe".
-// Bug real (Problema 2 / CASO F): negar fiebre/hinchazon/pus al responder la
-// pregunta general de seguridad ("no tengo fiebre, hinchazon ni pus...")
-// coincidia con las palabras sueltas de la rama generica de urgent_pain (mas
-// abajo) y reclasificaba el intent aunque el paciente estuviera DESCARTANDO
-// alarmas, no reportandolas. Reutiliza el mismo escaneo por clausula que
-// extractAffirmedAndNegatedClinicalSignals para saber si la mencion esta
-// realmente negada en su propia clausula.
+// PR #13 (Codex P2, revision sobre 6511e78 - "Don't drop pain intents after
+// unrelated denials"): la version anterior de esta funcion trataba TODA la
+// clausula como negada si contenia CUALQUIER "no/sin/ningun", igual que el
+// bug P1 ya corregido para red flags - "no tengo fiebre y me duele una
+// muela" quedaba con el dolor anulado solo por compartir clausula con la
+// negacion de fiebre, que no lo gobierna. Ahora reutiliza el mismo motor de
+// polaridad LOCAL por termino (resolveClinicalTermPolarity) que
+// extractAffirmedAndNegatedClinicalSignals, en vez de un regex de negacion
+// de clausula completa independiente.
+const URGENT_ALARM_TERM_PATTERN = /hinchad|inflamad|pus|flemon|urgencia/;
+
 function mentionsUrgentAlarmWithoutNegation(normalized: string): boolean {
-  const clauses = normalized
-    .split(CLAUSE_SPLIT_PATTERN)
-    .map(clause => clause.trim())
-    .filter(Boolean);
-  return clauses.some(
-    clause => /(dolor|duele|hinchad|inflamad|pus|flemon|urgencia)/.test(clause) && !NEGATION_CUE_PATTERN.test(clause)
+  return (
+    isClinicalTermAffirmed(normalized, SIMPLE_NEGATION_SIGNAL_PATTERNS.pain) ||
+    isClinicalTermAffirmed(normalized, URGENT_ALARM_TERM_PATTERN)
   );
 }
 
@@ -2143,11 +2192,6 @@ function detectLabels(normalized: string, rules: Array<{ label: string; pattern:
   return rules
     .filter(rule => rule.pattern.test(normalized) && !isNegatedLabel(rule.label, normalized))
     .map(rule => rule.label);
-}
-
-function detectSafetyScreen(normalized: string, redFlags: string[]) {
-  if (redFlags.length > 0) return true;
-  return /(no tengo fiebre|sin fiebre|no hay fiebre|no esta hinchad|sin hinchazon|no tengo hinchazon|noto inflamacion|tengo inflamacion|hay inflamacion|puedo tragar|puedo respirar|no sangra|sangrado leve|sangra poco|leve|no hay pus|sin golpe|no ha sido golpe|dolor [0-7])/.test(normalized);
 }
 
 function detectTraumaSafetyScreen(normalized: string, redFlags: string[]) {
