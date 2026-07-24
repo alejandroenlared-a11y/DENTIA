@@ -1335,7 +1335,7 @@ describe("Codex P2 (Allow declined patients to reopen booking): resolveAppointme
   it.each([
     ["He cambiado de opinión, quiero cita", "ACCEPTED"],
     ["Ahora sí quiero cita", "ACCEPTED"],
-    ["Sí, ayúdame a pedirla", "ACCEPTED"],
+    ["Sí, ayúdame a pedir una cita", "ACCEPTED"],
     ["Al final sí necesito una cita", "ACCEPTED"],
     ["Quiero que me ayudes con la cita", "ACCEPTED"],
     ["Vale, finalmente quiero reservar", "ACCEPTED"],
@@ -1422,6 +1422,208 @@ describe("Codex P2 (Allow declined patients to reopen booking): resolveAppointme
     expect(reopened.state.appointmentHelpDeclined).toBe(false);
     expect(reopened.reply).toContain("Aceptas");
     expect(reopened.reply.toLowerCase()).not.toContain("quieres que te ayude a solicitar una cita");
+  });
+});
+
+// Codex P1 (Bloqueante 1 - "No confundir reapertura de cita con
+// consentimiento"): reabrir la ayuda con la cita (appointmentHelpAccepted)
+// y aceptar el uso de datos (consent) son dos decisiones distintas, aunque
+// el mismo mensaje contenga "vale"/"si"/"de acuerdo"/"perfecto"/"acepto".
+// Mientras appointmentHelpDeclined siga true, Clara nunca mostro la
+// pregunta de privacidad (nextStep devuelve "" en ese estado) - un "vale"
+// en el turno que reabre la oferta no puede contestarla.
+describe("Codex P1 (Bloqueante 1): reapertura de cita no dispara consent por error", () => {
+  function buildDeclinedState(): DentalAgentState {
+    const first = runDentalSeniorTurn(initialDentalAgentState, "Me duele al morder.");
+    const second = runDentalSeniorTurn(first.state, "No, nada de eso.");
+    const declined = runDentalSeniorTurn(second.state, "No, gracias");
+    expect(declined.state.appointmentHelpDeclined).toBe(true);
+    expect(declined.state.consent).toBe(false);
+    return declined.state;
+  }
+
+  it("Caso A: 'Vale, finalmente quiero reservar' - reabre sin marcar consent, solo pregunta consentimiento, no pide nombre", () => {
+    const declinedState = buildDeclinedState();
+    const reopened = runDentalSeniorTurn(declinedState, "Vale, finalmente quiero reservar");
+
+    expect(reopened.state.appointmentHelpAccepted).toBe(true);
+    expect(reopened.state.appointmentHelpDeclined).toBe(false);
+    expect(reopened.state.consent).toBe(false);
+    expect(reopened.reply).toContain("Aceptas");
+    expect(reopened.reply.toLowerCase()).not.toContain("nombre");
+  });
+
+  it("Caso B: 'Sí, ahora quiero cita' - mismo resultado que el caso A", () => {
+    const declinedState = buildDeclinedState();
+    const reopened = runDentalSeniorTurn(declinedState, "Sí, ahora quiero cita");
+
+    expect(reopened.state.appointmentHelpAccepted).toBe(true);
+    expect(reopened.state.appointmentHelpDeclined).toBe(false);
+    expect(reopened.state.consent).toBe(false);
+    expect(reopened.reply).toContain("Aceptas");
+  });
+
+  it("Caso C: 'De acuerdo, ayúdame a reservar una cita' - mismo resultado que el caso A", () => {
+    const declinedState = buildDeclinedState();
+    const reopened = runDentalSeniorTurn(declinedState, "De acuerdo, ayúdame a reservar una cita");
+
+    expect(reopened.state.appointmentHelpAccepted).toBe(true);
+    expect(reopened.state.appointmentHelpDeclined).toBe(false);
+    expect(reopened.state.consent).toBe(false);
+    expect(reopened.reply).toContain("Aceptas");
+  });
+
+  it("Caso D: tras mostrar realmente la pregunta de privacidad, 'Acepto' SI marca consent y continua con el nombre", () => {
+    const declinedState = buildDeclinedState();
+    const reopened = runDentalSeniorTurn(declinedState, "Vale, finalmente quiero reservar");
+    expect(reopened.state.consent).toBe(false);
+    expect(reopened.reply).toContain("Aceptas");
+
+    const consented = runDentalSeniorTurn(reopened.state, "Acepto");
+    expect(consented.state.consent).toBe(true);
+    expect(consented.reply.toLowerCase()).toContain("nombre");
+  });
+});
+
+// Codex P2 (Bloqueante 2 - "'Ayudame' solo reabre con contexto de cita"):
+// "ayud*" sin mencion de cita/reserva/agenda no puede reabrir una oferta
+// declinada - "Ayudame con el precio" no esta hablando de una cita.
+describe("Codex P2 (Bloqueante 2): 'ayudame' exige contexto de cita para reabrir", () => {
+  function buildDeclinedState(): DentalAgentState {
+    const first = runDentalSeniorTurn(initialDentalAgentState, "Me duele al morder.");
+    const second = runDentalSeniorTurn(first.state, "No, nada de eso.");
+    const declined = runDentalSeniorTurn(second.state, "No, gracias");
+    return declined.state;
+  }
+
+  it.each([
+    ["Ayúdame a pedir una cita", "ACCEPTED"],
+    ["Quiero que me ayudes con la reserva", "ACCEPTED"],
+    ["¿Puedes ayudarme a reservar?", "ACCEPTED"],
+    ["Necesito ayuda para pedir hora", "ACCEPTED"],
+    ["Al final quiero que gestionéis la cita", "ACCEPTED"],
+    ["Ayúdame con el precio", "UNKNOWN"],
+    ["Ayúdame a entender el dolor", "UNKNOWN"],
+    ["Ayúdame con la dirección", "UNKNOWN"],
+    ["¿Me ayudas con el horario?", "UNKNOWN"],
+    ["Necesito ayuda", "UNKNOWN"],
+    ["Sí, ayúdame", "UNKNOWN"]
+  ])("%s -> %s", (message, expected) => {
+    const declinedState = buildDeclinedState();
+    expect(resolveAppointmentHelpReconsideration({ message, currentState: declinedState })).toBe(expected);
+  });
+
+  it("'Sí, ayúdame' sin contexto no reabre end-to-end: declined sigue true, no pide consentimiento", () => {
+    const declinedState = buildDeclinedState();
+    const reply = runDentalSeniorTurn(declinedState, "Sí, ayúdame");
+
+    expect(reply.state.appointmentHelpDeclined).toBe(true);
+    expect(reply.state.appointmentHelpAccepted).toBe(false);
+    expect(reply.reply.toLowerCase()).not.toContain("aceptas");
+  });
+});
+
+// Codex P2 (Bloqueante 3 - "La ultima decision explicita del mensaje debe
+// ganar"): la clausula ganadora (aceptacion o rechazo explicito de
+// cita/reserva) es la ULTIMA inequivoca del mensaje en orden textual, no la
+// primera frase de rechazo que aparezca.
+describe("Codex P2 (Bloqueante 3): la ultima decision explicita del mensaje gana", () => {
+  function buildDeclinedState(): DentalAgentState {
+    const first = runDentalSeniorTurn(initialDentalAgentState, "Me duele al morder.");
+    const second = runDentalSeniorTurn(first.state, "No, nada de eso.");
+    const declined = runDentalSeniorTurn(second.state, "No, gracias");
+    return declined.state;
+  }
+
+  it.each([
+    ["No quiero cita, pero ahora sí quiero cita", "ACCEPTED"],
+    ["Antes no quería, pero al final quiero reservar", "ACCEPTED"],
+    ["Quería cita, pero mejor no", "DECLINED"],
+    ["Sí quiero cita, aunque ahora prefiero que no", "DECLINED"],
+    ["No quiero cita y tampoco quiero que me ayudéis", "DECLINED"],
+    ["No quería cita antes; ahora quiero información sobre precios", "UNKNOWN"]
+  ])("%s -> %s", (message, expected) => {
+    const declinedState = buildDeclinedState();
+    expect(resolveAppointmentHelpReconsideration({ message, currentState: declinedState })).toBe(expected);
+  });
+});
+
+// Codex P1 (Bloqueante 4 - "Respuestas 'No' a preguntas de capacidad"):
+// trauma_opening_only/trauma_swallowing_only preguntan en POSITIVO ("Puedes
+// abrir/tragar bien?"). Un "No" corto contesta que NO puede - afirma la
+// dificultad - al reves que safety_screen_general, donde el "no" niega.
+describe("Codex P1 (Bloqueante 4): 'No' a preguntas de capacidad (abrir/tragar) afirma la dificultad", () => {
+  it.each([
+    ["No", "openingDifficulty", "affirmed"],
+    ["No puedo", "openingDifficulty", "affirmed"],
+    ["Me cuesta", "openingDifficulty", "affirmed"],
+    ["Sí", "openingDifficulty", "negated"],
+    ["Sí, puedo abrir bien", "openingDifficulty", "negated"]
+  ])("trauma_opening_only: '%s' -> %s %s", (message, signal, polarity) => {
+    const result = resolveAnswerToLastClinicalQuestion({ patientMessage: message, lastQuestionKey: "trauma_opening_only" });
+    if (polarity === "affirmed") {
+      expect(result.affirmed).toContain(signal);
+      expect(result.negated).not.toContain(signal);
+    } else {
+      expect(result.negated).toContain(signal);
+      expect(result.affirmed).not.toContain(signal);
+    }
+  });
+
+  it.each([
+    ["No", "swallowingDifficulty", "affirmed"],
+    ["No puedo", "swallowingDifficulty", "affirmed"],
+    ["Me cuesta", "swallowingDifficulty", "affirmed"],
+    ["Sí", "swallowingDifficulty", "negated"],
+    ["Sí, puedo tragar bien", "swallowingDifficulty", "negated"]
+  ])("trauma_swallowing_only: '%s' -> %s %s", (message, signal, polarity) => {
+    const result = resolveAnswerToLastClinicalQuestion({ patientMessage: message, lastQuestionKey: "trauma_swallowing_only" });
+    if (polarity === "affirmed") {
+      expect(result.affirmed).toContain(signal);
+      expect(result.negated).not.toContain(signal);
+    } else {
+      expect(result.negated).toContain(signal);
+      expect(result.affirmed).not.toContain(signal);
+    }
+  });
+
+  it("Integracion (abrir): trauma confirmado, 'No' a '¿Puedes abrir la boca bien?' afirma openingDifficulty y no la niega falsamente", () => {
+    const first = runDentalSeniorTurn(initialDentalAgentState, "Me he dado un golpe en una muela y se mueve");
+    expect(first.state.intent).toBe("trauma");
+    expect(first.state.triageLevel).toBe("URGENT_24H");
+
+    const second = runDentalSeniorTurn(first.state, "Puedo tragar bien");
+    expect(second.state.lastQuestionKey).toBe("trauma_opening_only");
+
+    const answer = resolveAnswerToLastClinicalQuestion({ patientMessage: "No", lastQuestionKey: "trauma_opening_only" });
+    expect(answer.affirmed).toContain("openingDifficulty");
+    expect(answer.negated).not.toContain("openingDifficulty");
+
+    const third = runDentalSeniorTurn(second.state, "No");
+    expect(third.state.triageLevel).toBe("URGENT_24H");
+  });
+
+  it("Integracion (tragar): trauma confirmado, 'No' a '¿Puedes tragar bien?' afirma swallowingDifficulty y no la niega falsamente", () => {
+    const first = runDentalSeniorTurn(initialDentalAgentState, "Me he dado un golpe en una muela y se mueve");
+    const second = runDentalSeniorTurn(first.state, "Puedo abrir bien");
+    expect(second.state.lastQuestionKey).toBe("trauma_swallowing_only");
+
+    const answer = resolveAnswerToLastClinicalQuestion({ patientMessage: "No", lastQuestionKey: "trauma_swallowing_only" });
+    expect(answer.affirmed).toContain("swallowingDifficulty");
+    expect(answer.negated).not.toContain("swallowingDifficulty");
+
+    const third = runDentalSeniorTurn(second.state, "No");
+    expect(third.state.triageLevel).toBe("URGENT_24H");
+  });
+
+  it("no afecta safety_screen_general: 'No, nada de eso' sigue negando las 5 señales (incluye opening/swallowing)", () => {
+    const result = resolveAnswerToLastClinicalQuestion({
+      patientMessage: "No, nada de eso",
+      lastQuestionKey: "safety_screen_general"
+    });
+    expect(result.negated).toEqual(
+      expect.arrayContaining(["fever", "swelling", "pus", "swallowingDifficulty", "openingDifficulty"])
+    );
   });
 });
 

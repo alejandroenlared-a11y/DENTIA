@@ -828,8 +828,36 @@ export function resolveAnswerToLastClinicalQuestion(input: {
   const negated = new Set(extraction.negated);
   const affirmed = new Set(extraction.affirmed);
 
-  if (expectedSignals.length > 0 && isBareDenial(normalized)) {
+  // Codex P1 (Bloqueante 4 - "'No' a preguntas de capacidad"):
+  // trauma_opening_only/trauma_swallowing_only estan formuladas en POSITIVO
+  // ("Puedes abrir/tragar bien?"), al reves que safety_screen_general (que
+  // pregunta "...o te cuesta abrir/tragar?"). El bare-denial generico de
+  // abajo (isBareDenial) NIEGA la señal - correcto para
+  // safety_screen_general, pero estas dos claves quedan excluidas: aqui un
+  // "no" desnudo contesta que NO puede, es decir CONFIRMA la dificultad.
+  const isTraumaCapacityQuestion =
+    input.lastQuestionKey === "trauma_opening_only" || input.lastQuestionKey === "trauma_swallowing_only";
+
+  if (expectedSignals.length > 0 && isBareDenial(normalized) && !isTraumaCapacityQuestion) {
     for (const key of expectedSignals) negated.add(key);
+  }
+
+  if (isTraumaCapacityQuestion) {
+    const capacitySignal: ClinicalSignalKey =
+      input.lastQuestionKey === "trauma_opening_only" ? "openingDifficulty" : "swallowingDifficulty";
+    // Solo si el motor generico (extractAffirmedAndNegatedClinicalSignals,
+    // via DIFFICULTY_SIGNAL_RULES) no resolvio ya la señal con el verbo
+    // explicito ("Si, puedo abrir bien" ya afirma via allClear) - una
+    // respuesta corta sin verbo propio ("No", "No puedo", "Me cuesta",
+    // "Si") solo tiene sentido en el contexto de esta pregunta concreta.
+    if (!affirmed.has(capacitySignal) && !negated.has(capacitySignal)) {
+      const trimmed = normalized.trim();
+      if (/^(no|no puedo|me cuesta)\b/.test(trimmed)) {
+        affirmed.add(capacitySignal);
+      } else if (/^(si|vale|puedo)\b/.test(trimmed)) {
+        negated.add(capacitySignal);
+      }
+    }
   }
 
   if (input.lastQuestionKey === "bleeding_severity_or_impact") {
@@ -2707,6 +2735,18 @@ function wasAskedForConsent(state: DentalAgentState): boolean {
   ) {
     return false;
   }
+  // Codex P1 (Bloqueante 1 - "No confundir reapertura de cita con
+  // consentimiento"): mientras appointmentHelpDeclined siga true, nextStep
+  // no pregunta NADA (ver mas arriba: "return ''" cuando declined y sin
+  // consentimiento) - asi que un "vale"/"si"/"de acuerdo" en ese turno (que
+  // puede estar reabriendo la ayuda con la cita via
+  // resolveAppointmentHelpReconsideration) nunca esta contestando una
+  // pregunta de privacidad que Clara jamas mostro. Sin esto,
+  // acceptsConsent() marcaria consent=true en el MISMO turno que reabre la
+  // oferta, saltandose la pregunta de privacidad real.
+  if (!state.escalated && state.appointmentHelpDeclined) {
+    return false;
+  }
   return true;
 }
 
@@ -2894,15 +2934,41 @@ const APPOINTMENT_RECONSIDERATION_CLAUSE_SPLIT_PATTERN = /[.,;:!¡¿?]+|\bpero\b
 // palabra en la misma clausula.
 const APPOINTMENT_RECONSIDERATION_DECLINE_PHRASES = /\bmejor no\b/;
 
-// Intencion explicita de pedir/reservar cita o de que Clara ayude con ella.
+// Codex P2 (Bloqueante 2 - "'Ayudame' solo reabre con contexto de cita"):
+// "ayud*" SIN contexto de cita/reserva no puede reabrir - "Ayudame con el
+// precio"/"Ayudame a entender el dolor"/"Necesito ayuda" no hablan de una
+// cita. Solo cuenta como intencion explicita si el verbo de ayuda aparece
+// pegado (hasta 25 caracteres) a una palabra de cita/reserva/agenda, o si el
+// mensaje ya usa una frase fija de pedir/reservar/solicitar/gestionar cita.
 // Deliberadamente NO incluye "quiero"/"si" sueltos (ver casos "quiero saber
 // el precio", "si, en Murcia") para no reabrir por una respuesta puramente
 // administrativa.
 const APPOINTMENT_REOPEN_KEYWORD_PATTERN =
-  /(quiero (una |la )?cita|pedir (una |la )?cita|solicitar (una |la )?cita|reservar (una |la )?cita|necesito (una |la )?cita|quiero reservar|necesito (que me )?ayud\w*|\bayud\w*)/;
+  /(quiero (una |la )?cita\b|pedir (una |la )?cita\b|solicitar (una |la )?cita\b|reservar (una |la )?cita\b|necesito (una |la )?cita\b|quiero reservar\b|gestion\w*.{0,15}\bcita\b|ayud\w*.{0,25}\b(cita|reserva\w*|agendar|hora)\b|\b(cita|reserva\w*|agendar|hora)\b.{0,25}ayud\w*)/;
 
 export type AppointmentHelpReconsideration = "ACCEPTED" | "DECLINED" | "UNKNOWN";
 
+type ClauseVerdict = "ACCEPTED" | "DECLINED" | null;
+
+function classifyAppointmentReconsiderationClause(clause: string): ClauseVerdict {
+  if (/^no$/.test(clause)) return "DECLINED";
+  if (EXPLICIT_APPOINTMENT_DECLINE_PHRASES.test(clause) || APPOINTMENT_RECONSIDERATION_DECLINE_PHRASES.test(clause)) {
+    return "DECLINED";
+  }
+  if (/\bno\b/.test(clause) && APPOINTMENT_REOPEN_KEYWORD_PATTERN.test(clause)) return "DECLINED";
+  if (APPOINTMENT_REOPEN_KEYWORD_PATTERN.test(clause)) return "ACCEPTED";
+  return null;
+}
+
+// Codex P2 (Bloqueante 3 - "La ultima decision explicita del mensaje debe
+// ganar"): la version anterior devolvia DECLINED en cuanto encontraba
+// CUALQUIER frase de rechazo en el mensaje completo, antes de mirar el resto
+// de clausulas ("No quiero cita, pero ahora si quiero cita" quedaba
+// DECLINED por la primera parte). Ahora se recorren las clausulas en orden
+// textual y cada clausula inequivoca (aceptacion o rechazo) SUSTITUYE al
+// veredicto anterior - la ultima clausula inequivoca del mensaje gana
+// siempre. Una clausula que no dice nada claro (ni acepta ni rechaza
+// explicitamente) no toca el veredicto ya visto.
 export function resolveAppointmentHelpReconsideration(params: {
   message: string;
   currentState: Pick<DentalAgentState, "appointmentHelpDeclined">;
@@ -2911,25 +2977,17 @@ export function resolveAppointmentHelpReconsideration(params: {
   const normalized = normalize(params.message).trim();
   if (!normalized) return "UNKNOWN";
 
-  if (
-    EXPLICIT_APPOINTMENT_DECLINE_PHRASES.test(normalized) ||
-    APPOINTMENT_RECONSIDERATION_DECLINE_PHRASES.test(normalized)
-  ) {
-    return "DECLINED";
-  }
-
   const clauses = normalized
     .split(APPOINTMENT_RECONSIDERATION_CLAUSE_SPLIT_PATTERN)
     .map(clause => clause.trim())
     .filter(Boolean);
 
-  let sawAccept = false;
+  let lastVerdict: ClauseVerdict = null;
   for (const clause of clauses) {
-    if (/^no$/.test(clause)) return "DECLINED";
-    if (/\bno\b/.test(clause) && APPOINTMENT_REOPEN_KEYWORD_PATTERN.test(clause)) return "DECLINED";
-    if (APPOINTMENT_REOPEN_KEYWORD_PATTERN.test(clause) && !/\bno\b/.test(clause)) sawAccept = true;
+    const verdict = classifyAppointmentReconsiderationClause(clause);
+    if (verdict) lastVerdict = verdict;
   }
-  return sawAccept ? "ACCEPTED" : "UNKNOWN";
+  return lastVerdict ?? "UNKNOWN";
 }
 
 // Hotfix dental-negation-context (Problema 3): replica la secuencia completa

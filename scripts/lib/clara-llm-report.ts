@@ -25,6 +25,15 @@ export type LlmRunSummary = {
   geminiFreeformTurns: number;
   localFallbackTurns: number;
   fallbackPercentage: number;
+  // Codex P1 (Bloqueante 5 - "La evaluacion LLM no puede aprobar texto
+  // libre degradado"): un turno Gemini que respondio en texto libre (no
+  // estructurado) NUNCA es un exito estructurado, aunque runtime="gemini".
+  // Politica documentada: cuenta para el MISMO presupuesto de degradacion
+  // que el fallback local (localFallbackTurns + geminiFreeformTurns) /
+  // totalTurns, no un umbral aparte - con MAX_FALLBACK_PERCENTAGE=0
+  // cualquier turno freeform hace fallar la puerta estricta igual que un
+  // fallback local.
+  degradedPercentage: number;
   schemaErrors: number;
   timeouts: number;
   fallbackReasonGroups: Array<{ reason: string; count: number }>;
@@ -82,6 +91,8 @@ export function summarizeLlmObservations(
 
   const totalTurns = observations.length;
   const fallbackPercentage = totalTurns > 0 ? Math.round((localFallbackTurns / totalTurns) * 1000) / 10 : 0;
+  const degradedPercentage =
+    totalTurns > 0 ? Math.round(((localFallbackTurns + geminiFreeformTurns) / totalTurns) * 1000) / 10 : 0;
 
   return {
     commitSha: getCommitSha(),
@@ -95,6 +106,7 @@ export function summarizeLlmObservations(
     geminiFreeformTurns,
     localFallbackTurns,
     fallbackPercentage,
+    degradedPercentage,
     schemaErrors,
     timeouts,
     fallbackReasonGroups: [...fallbackReasonCounts.entries()]
@@ -126,6 +138,7 @@ export function buildLlmSummaryMarkdown(summary: LlmRunSummary): string[] {
     `- Turnos Gemini con texto libre (degradado, no estructurado): ${summary.geminiFreeformTurns}`,
     `- Turnos con fallback local: ${summary.localFallbackTurns}`,
     `- Porcentaje de fallback local: ${summary.fallbackPercentage}%`,
+    `- Porcentaje degradado (fallback local + Gemini texto libre): ${summary.degradedPercentage}%`,
     `- Errores de schema (JSON invalido): ${summary.schemaErrors}`,
     `- Timeouts: ${summary.timeouts}`,
     "",
@@ -165,8 +178,16 @@ export function evaluateRealLlmGate(
   if (summary.requestedProvider === "openai" && summary.geminiTurns > 0) {
     reasons.push(`Proveedor solicitado era OpenAI pero ${summary.geminiTurns} turno(s) usaron Gemini.`);
   }
-  if (summary.fallbackPercentage > options.maxFallbackPercentage) {
-    reasons.push(`Fallback local (${summary.fallbackPercentage}%) supera el umbral permitido (${options.maxFallbackPercentage}%).`);
+  // Bloqueante 5: geminiFreeformTurns cuenta para el MISMO presupuesto de
+  // degradacion que el fallback local (ver degradedPercentage) - un turno
+  // freeform nunca es un exito estructurado aprobado, aunque runtime sea
+  // "gemini". degradedPercentage >= fallbackPercentage siempre (incluye el
+  // fallback local), asi que esta unica comprobacion sustituye al chequeo
+  // que antes solo miraba fallbackPercentage.
+  if (summary.degradedPercentage > options.maxFallbackPercentage) {
+    reasons.push(
+      `Turnos degradados (fallback local + Gemini texto libre: ${summary.degradedPercentage}%, de los cuales ${summary.geminiFreeformTurns} turno(s) fueron texto libre) superan el umbral permitido (${options.maxFallbackPercentage}%).`
+    );
   }
   if (evaluation.criticalFailures > 0) {
     reasons.push(`${evaluation.criticalFailures} fallo(s) critico(s) en la evaluacion.`);
