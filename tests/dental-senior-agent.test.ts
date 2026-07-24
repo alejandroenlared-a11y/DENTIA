@@ -7,6 +7,7 @@ import {
   initialDentalAgentState,
   resolveAnswerToLastClinicalQuestion,
   resolveAppointmentHelpDecision,
+  resolveAppointmentHelpReconsideration,
   runDentalSeniorTurn,
   type DentalAgentState
 } from "@/lib/agent/dental-senior-agent";
@@ -1312,6 +1313,115 @@ describe("PR #13 P2 (revision sobre f334ecb): resolveAppointmentHelpDecision", (
     const third = runDentalSeniorTurn(second.state, "No, si ya llamaré yo");
     expect(third.state.appointmentHelpDeclined).toBe(true);
     expect(third.state.appointmentHelpAccepted).toBe(false);
+  });
+});
+
+// Codex P2 ("Allow declined patients to reopen booking"): un rechazo
+// (appointmentHelpDeclined=true) no puede ser sticky para siempre.
+// resolveAppointmentHelpDecision solo actua el turno INMEDIATAMENTE
+// siguiente a la oferta (lastAssistantAction === "OFFER_APPOINTMENT_HELP");
+// varios turnos despues esa bandera ya no aplica, por eso hace falta
+// resolveAppointmentHelpReconsideration, independiente de lastAssistantAction.
+describe("Codex P2 (Allow declined patients to reopen booking): resolveAppointmentHelpReconsideration", () => {
+  function buildDeclinedState(): DentalAgentState {
+    const first = runDentalSeniorTurn(initialDentalAgentState, "Me duele al morder.");
+    const second = runDentalSeniorTurn(first.state, "No, nada de eso.");
+    const declined = runDentalSeniorTurn(second.state, "No, gracias");
+    expect(declined.state.appointmentHelpDeclined).toBe(true);
+    expect(declined.state.appointmentHelpAccepted).toBe(false);
+    return declined.state;
+  }
+
+  it.each([
+    ["He cambiado de opinión, quiero cita", "ACCEPTED"],
+    ["Ahora sí quiero cita", "ACCEPTED"],
+    ["Sí, ayúdame a pedirla", "ACCEPTED"],
+    ["Al final sí necesito una cita", "ACCEPTED"],
+    ["Quiero que me ayudes con la cita", "ACCEPTED"],
+    ["Vale, finalmente quiero reservar", "ACCEPTED"],
+    ["Sí, en Murcia", "UNKNOWN"],
+    ["Sí, ese es mi teléfono", "UNKNOWN"],
+    ["Sí, entiendo", "UNKNOWN"],
+    ["Quizá más adelante", "UNKNOWN"],
+    ["Quiero saber el precio", "UNKNOWN"],
+    ["¿Dónde estáis?", "UNKNOWN"],
+    ["No, sigo sin querer cita", "DECLINED"],
+    ["He cambiado de opinión: mejor no", "DECLINED"],
+    ["No necesito que me ayudéis", "DECLINED"]
+  ])("%s -> %s", (message, expected) => {
+    const declinedState = buildDeclinedState();
+    expect(resolveAppointmentHelpReconsideration({ message, currentState: declinedState })).toBe(expected);
+  });
+
+  it("no reabre si appointmentHelpDeclined es false (nunca se rechazo)", () => {
+    expect(
+      resolveAppointmentHelpReconsideration({
+        message: "Quiero cita",
+        currentState: { appointmentHelpDeclined: false }
+      })
+    ).toBe("UNKNOWN");
+  });
+
+  it("Caso A: rechaza y luego 'He cambiado de opinión, quiero cita' - reabre, solo pide consentimiento, no repite la oferta ni pide datos", () => {
+    const declinedState = buildDeclinedState();
+    const reopened = runDentalSeniorTurn(declinedState, "He cambiado de opinión, quiero cita");
+
+    expect(reopened.state.appointmentHelpAccepted).toBe(true);
+    expect(reopened.state.appointmentHelpDeclined).toBe(false);
+    expect(reopened.reply).toContain("Aceptas");
+    expect(reopened.reply.toLowerCase()).not.toContain("quieres que te ayude a solicitar una cita");
+    expect(reopened.reply.toLowerCase()).not.toContain("nombre");
+    expect(reopened.reply.toLowerCase()).not.toContain("email");
+    expect(reopened.reply.toLowerCase()).not.toContain("teléfono");
+  });
+
+  it("Caso B: rechaza y luego 'Ahora sí quiero que me ayudes con la cita' - mismo resultado que el caso A", () => {
+    const declinedState = buildDeclinedState();
+    const reopened = runDentalSeniorTurn(declinedState, "Ahora sí quiero que me ayudes con la cita");
+
+    expect(reopened.state.appointmentHelpAccepted).toBe(true);
+    expect(reopened.state.appointmentHelpDeclined).toBe(false);
+    expect(reopened.reply).toContain("Aceptas");
+    expect(reopened.reply.toLowerCase()).not.toContain("quieres que te ayude a solicitar una cita");
+  });
+
+  it("Caso C: rechaza y luego 'Sí, en Murcia' - un si administrativo no reabre ni salta al consentimiento", () => {
+    const declinedState = buildDeclinedState();
+    const reply = runDentalSeniorTurn(declinedState, "Sí, en Murcia");
+
+    expect(reply.state.appointmentHelpDeclined).toBe(true);
+    expect(reply.state.appointmentHelpAccepted).toBe(false);
+    expect(reply.reply.toLowerCase()).not.toContain("aceptas");
+  });
+
+  it("Caso D: rechaza y luego 'Quiero saber cuánto cuesta un implante' - responde el precio, declined sigue true, no pide consentimiento", () => {
+    const declinedState = buildDeclinedState();
+    const reply = runDentalSeniorTurn(declinedState, "Quiero saber cuánto cuesta un implante");
+
+    expect(reply.state.appointmentHelpDeclined).toBe(true);
+    expect(reply.reply.toLowerCase()).not.toContain("aceptas");
+  });
+
+  it("Caso E: rechaza y luego 'No, sigo sin querer cita' - declined sigue true, no pide consentimiento", () => {
+    const declinedState = buildDeclinedState();
+    const reply = runDentalSeniorTurn(declinedState, "No, sigo sin querer cita");
+
+    expect(reply.state.appointmentHelpDeclined).toBe(true);
+    expect(reply.state.appointmentHelpAccepted).toBe(false);
+    expect(reply.reply.toLowerCase()).not.toContain("aceptas");
+  });
+
+  it("Caso F: rechaza, consulta administrativa intermedia ('¿Dónde estáis?') y luego 'Al final sí quiero reservar una cita' - reabre, solo consentimiento", () => {
+    const declinedState = buildDeclinedState();
+    const intermediate = runDentalSeniorTurn(declinedState, "¿Dónde estáis?");
+    expect(intermediate.state.appointmentHelpDeclined).toBe(true);
+    expect(intermediate.state.appointmentHelpAccepted).toBe(false);
+
+    const reopened = runDentalSeniorTurn(intermediate.state, "Al final sí quiero reservar una cita");
+    expect(reopened.state.appointmentHelpAccepted).toBe(true);
+    expect(reopened.state.appointmentHelpDeclined).toBe(false);
+    expect(reopened.reply).toContain("Aceptas");
+    expect(reopened.reply.toLowerCase()).not.toContain("quieres que te ayude a solicitar una cita");
   });
 });
 

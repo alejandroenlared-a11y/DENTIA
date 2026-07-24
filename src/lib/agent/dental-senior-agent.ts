@@ -1191,7 +1191,18 @@ export function runDentalSeniorTurn(current: DentalAgentState, rawText: string, 
   // no por texto suelto sin contexto - sticky una vez aceptado o declinado.
   const offeredAppointmentHelpLastTurn = current.lastAssistantAction === "OFFER_APPOINTMENT_HELP";
   const appointmentHelpDecision = offeredAppointmentHelpLastTurn ? resolveAppointmentHelpDecision(text) : "UNKNOWN";
-  const appointmentHelpAccepted = current.appointmentHelpAccepted || appointmentHelpDecision === "ACCEPTED";
+  // Codex P2: si el rechazo ya quedo fijado en un turno anterior (no en
+  // este), lastAssistantAction ya no es OFFER_APPOINTMENT_HELP - solo
+  // resolveAppointmentHelpReconsideration (independiente de esa bandera)
+  // puede revertirlo con una peticion explicita posterior.
+  const appointmentHelpReconsideration =
+    !offeredAppointmentHelpLastTurn && current.appointmentHelpDeclined
+      ? resolveAppointmentHelpReconsideration({ message: text, currentState: current })
+      : "UNKNOWN";
+  const appointmentHelpAccepted =
+    current.appointmentHelpAccepted ||
+    appointmentHelpDecision === "ACCEPTED" ||
+    appointmentHelpReconsideration === "ACCEPTED";
   const appointmentHelpDeclined =
     !appointmentHelpAccepted && (current.appointmentHelpDeclined || appointmentHelpDecision === "DECLINED");
   const lastAssistantAction = identifyLastAssistantAction({
@@ -2863,6 +2874,60 @@ export function resolveAppointmentHelpDecision(message: string): AppointmentHelp
     if (/\bno\b/.test(clause) && APPOINTMENT_OFFER_KEYWORD_PATTERN.test(clause)) return "DECLINED";
     if (APPOINTMENT_ACCEPT_ACK_PATTERN.test(clause)) sawAccept = true;
     if (APPOINTMENT_OFFER_KEYWORD_PATTERN.test(clause) && !/\bno\b/.test(clause)) sawAccept = true;
+  }
+  return sawAccept ? "ACCEPTED" : "UNKNOWN";
+}
+
+// Codex P2 ("Allow declined patients to reopen booking"): un rechazo previo
+// de la ayuda con la cita (appointmentHelpDeclined) no puede ser irreversible.
+// resolveAppointmentHelpDecision() solo se ejecuta el turno INMEDIATAMENTE
+// siguiente a la oferta (lastAssistantAction === "OFFER_APPOINTMENT_HELP"),
+// asi que un cambio de opinion varios turnos despues quedaba UNKNOWN y el
+// rechazo se volvia sticky para siempre. Esta funcion es independiente de
+// lastAssistantAction: solo reabre con intencion EXPLICITA de pedir/reservar
+// cita o de que Clara ayude con ella - un "si" administrativo suelto
+// (ubicacion, telefono, "entiendo", precio) no reabre nada.
+const APPOINTMENT_RECONSIDERATION_CLAUSE_SPLIT_PATTERN = /[.,;:!¡¿?]+|\bpero\b|\baunque\b/;
+
+// "mejor no" es un idioma de rechazo fijo ("he cambiado de opinion: mejor
+// no") que no encaja en la clausula-"no"-desnuda porque va precedido de otra
+// palabra en la misma clausula.
+const APPOINTMENT_RECONSIDERATION_DECLINE_PHRASES = /\bmejor no\b/;
+
+// Intencion explicita de pedir/reservar cita o de que Clara ayude con ella.
+// Deliberadamente NO incluye "quiero"/"si" sueltos (ver casos "quiero saber
+// el precio", "si, en Murcia") para no reabrir por una respuesta puramente
+// administrativa.
+const APPOINTMENT_REOPEN_KEYWORD_PATTERN =
+  /(quiero (una |la )?cita|pedir (una |la )?cita|solicitar (una |la )?cita|reservar (una |la )?cita|necesito (una |la )?cita|quiero reservar|necesito (que me )?ayud\w*|\bayud\w*)/;
+
+export type AppointmentHelpReconsideration = "ACCEPTED" | "DECLINED" | "UNKNOWN";
+
+export function resolveAppointmentHelpReconsideration(params: {
+  message: string;
+  currentState: Pick<DentalAgentState, "appointmentHelpDeclined">;
+}): AppointmentHelpReconsideration {
+  if (!params.currentState.appointmentHelpDeclined) return "UNKNOWN";
+  const normalized = normalize(params.message).trim();
+  if (!normalized) return "UNKNOWN";
+
+  if (
+    EXPLICIT_APPOINTMENT_DECLINE_PHRASES.test(normalized) ||
+    APPOINTMENT_RECONSIDERATION_DECLINE_PHRASES.test(normalized)
+  ) {
+    return "DECLINED";
+  }
+
+  const clauses = normalized
+    .split(APPOINTMENT_RECONSIDERATION_CLAUSE_SPLIT_PATTERN)
+    .map(clause => clause.trim())
+    .filter(Boolean);
+
+  let sawAccept = false;
+  for (const clause of clauses) {
+    if (/^no$/.test(clause)) return "DECLINED";
+    if (/\bno\b/.test(clause) && APPOINTMENT_REOPEN_KEYWORD_PATTERN.test(clause)) return "DECLINED";
+    if (APPOINTMENT_REOPEN_KEYWORD_PATTERN.test(clause) && !/\bno\b/.test(clause)) sawAccept = true;
   }
   return sawAccept ? "ACCEPTED" : "UNKNOWN";
 }
