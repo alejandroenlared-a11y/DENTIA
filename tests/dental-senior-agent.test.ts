@@ -1444,6 +1444,22 @@ describe("PR #13 blocker 2: safetyScreened exige las 5 senales de la pregunta ge
     expect(turn.state.triageLevel).toBe("EMERGENCY");
     expect(turn.state.safetyScreened).toBe(true);
   });
+
+  it("FINAL-DENTIA-CLOSEOUT Fase 7 Caso 2 (wording exacto): 'No tengo fiebre, hinchazón ni pus y puedo abrir y tragar bien' -> las 5 senales resueltas en un solo mensaje, safetyScreened=true", () => {
+    const turn = runDentalSeniorTurn(initialDentalAgentState, "No tengo fiebre, hinchazón ni pus y puedo abrir y tragar bien");
+
+    expect(turn.state.safetyScreened).toBe(true);
+    expect(turn.state.redFlags).toEqual([]);
+  });
+
+  it("FINAL-DENTIA-CLOSEOUT Fase 7 Caso 3 (wording exacto): 'Tengo hinchazón en el ojo' -> EMERGENCY, corta el flujo administrativo sin completar preguntas rutinarias", () => {
+    const turn = runDentalSeniorTurn(initialDentalAgentState, "Tengo hinchazón en el ojo");
+
+    expect(turn.state.triageLevel).toBe("EMERGENCY");
+    expect(turn.state.consent).toBe(false);
+    expect(turn.reply.toLowerCase()).not.toContain("aceptas que guardemos");
+    expect(turn.reply).toContain("urgencias");
+  });
 });
 
 describe("PR #13 blocker 3: resolveClinicalTermPolarity procesa todas las apariciones de una señal", () => {
@@ -1478,5 +1494,110 @@ describe("PR #13 blocker 3: resolveClinicalTermPolarity procesa todas las aparic
     const unit = extractAffirmedAndNegatedClinicalSignals("Antes me dolía, pero ahora no me duele");
     expect(unit.negated).toContain("pain");
     expect(unit.affirmed).not.toContain("pain");
+  });
+
+  it("FINAL-DENTIA-CLOSEOUT Fase 8 caso 4: 'Antes me costaba respirar, ahora respiro bien' -> breathingDifficulty negada actualmente", () => {
+    const unit = extractAffirmedAndNegatedClinicalSignals("Antes me costaba respirar, ahora respiro bien");
+    expect(unit.negated).toContain("breathingDifficulty");
+    expect(unit.affirmed).not.toContain("breathingDifficulty");
+  });
+
+  it("FINAL-DENTIA-CLOSEOUT Fase 8 caso 7: 'No me dolía, pero ahora me duele mucho' -> pain afirmado, se valora la intensidad actual", () => {
+    const unit = extractAffirmedAndNegatedClinicalSignals("No me dolía, pero ahora me duele mucho");
+    expect(unit.affirmed).toContain("pain");
+    expect(unit.negated).not.toContain("pain");
+
+    const turn = runDentalSeniorTurn(initialDentalAgentState, "No me dolía, pero ahora me duele mucho");
+    expect(turn.state.intent).toBe("urgent_pain");
+  });
+
+  // FINAL-DENTIA-CLOSEOUT Fase 8 caso 2 - resuelto: "Tenia hinchazon, pero
+  // ahora ya no tengo" niega swelling aunque la clausula posterior omita el
+  // sustantivo (elipsis) - ver resolveEllipticalTemporalSignals
+  // (dental-senior-agent.ts). A diferencia de "respiro bien" (caso 4) o "me
+  // duele" (caso 7), que repiten el verbo en la clausula negadora y por eso
+  // ya funcionaban con el motor de polaridad por termino, "hinchazon" (un
+  // sustantivo) se elide del todo en "ahora ya no tengo" - la elipsis
+  // temporal identifica que la clausula anterior menciona EXACTAMENTE una
+  // señal candidata (swelling) y que la posterior es una negacion temporal
+  // desnuda, y hereda la negacion.
+  it("FINAL-DENTIA-CLOSEOUT Fase 8 caso 2 (elipsis clinica temporal, caso A del closeout): 'Tenía hinchazón, pero ahora ya no tengo' -> swelling negada, sin red flag ocular por la mencion historica", () => {
+    const unit = extractAffirmedAndNegatedClinicalSignals("Tenía hinchazón, pero ahora ya no tengo");
+    expect(unit.negated).toContain("swelling");
+    expect(unit.affirmed).not.toContain("swelling");
+
+    const turn = runDentalSeniorTurn(initialDentalAgentState, "Tenía hinchazón, pero ahora ya no tengo");
+    expect(turn.state.redFlags).toEqual([]);
+    expect(turn.state.triageLevel).not.toBe("EMERGENCY");
+  });
+});
+
+describe("FINAL-DENTIA-CLOSEOUT: elipsis clinica temporal (resolveEllipticalTemporalSignals) - casos B-I del closeout", () => {
+  it("Caso B: 'Tenía fiebre, pero ahora ya no tengo' -> fever negada actualmente", () => {
+    const unit = extractAffirmedAndNegatedClinicalSignals("Tenía fiebre, pero ahora ya no tengo");
+    expect(unit.negated).toContain("fever");
+    expect(unit.affirmed).not.toContain("fever");
+  });
+
+  it("Caso C: 'Antes me dolía, pero ahora ya no' -> pain negado actualmente", () => {
+    const unit = extractAffirmedAndNegatedClinicalSignals("Antes me dolía, pero ahora ya no");
+    expect(unit.negated).toContain("pain");
+    expect(unit.affirmed).not.toContain("pain");
+  });
+
+  it("Caso D: 'No tenía hinchazón, pero ahora sí' -> swelling afirmada actualmente (elipsis de afirmacion, no solo de negacion)", () => {
+    const unit = extractAffirmedAndNegatedClinicalSignals("No tenía hinchazón, pero ahora sí");
+    expect(unit.affirmed).toContain("swelling");
+    expect(unit.negated).not.toContain("swelling");
+  });
+
+  it("Caso E (caso ambiguo - no debe sobre-negar): 'Tenía fiebre e hinchazón, pero ahora ya no tengo' -> ninguna de las dos se resuelve por inferencia, resultado ambiguo y seguro, no completa el cribado", () => {
+    const unit = extractAffirmedAndNegatedClinicalSignals("Tenía fiebre e hinchazón, pero ahora ya no tengo");
+    expect(unit.negated).not.toContain("fever");
+    expect(unit.negated).not.toContain("swelling");
+    expect(unit.affirmed).not.toContain("fever");
+    expect(unit.affirmed).not.toContain("swelling");
+    expect(unit.ambiguous).toContain("fever");
+    expect(unit.ambiguous).toContain("swelling");
+
+    const turn = runDentalSeniorTurn(initialDentalAgentState, "Tenía fiebre e hinchazón, pero ahora ya no tengo");
+    expect(turn.state.safetyScreened).toBe(false);
+    expect(turn.state.redFlags).toEqual([]);
+    expect(turn.state.triageLevel).not.toBe("EMERGENCY");
+  });
+
+  it("Caso F: 'Ahora ya no tengo' sin señal clinica explicita previa -> no infiere nada, no completa el cribado", () => {
+    const unit = extractAffirmedAndNegatedClinicalSignals("Ahora ya no tengo");
+    expect(unit.affirmed).toEqual([]);
+    expect(unit.negated).toEqual([]);
+    expect(unit.ambiguous).toEqual([]);
+
+    const turn = runDentalSeniorTurn(initialDentalAgentState, "Ahora ya no tengo");
+    expect(turn.state.safetyScreened).toBe(false);
+  });
+
+  it("Caso G: 'Tenía hinchazón, pero ahora ya no tengo y me cuesta respirar' -> swelling negada, breathingDifficulty afirmada, EMERGENCY", () => {
+    const unit = extractAffirmedAndNegatedClinicalSignals("Tenía hinchazón, pero ahora ya no tengo y me cuesta respirar");
+    expect(unit.negated).toContain("swelling");
+    expect(unit.affirmed).toContain("breathingDifficulty");
+
+    const turn = runDentalSeniorTurn(initialDentalAgentState, "Tenía hinchazón, pero ahora ya no tengo y me cuesta respirar");
+    expect(turn.state.triageLevel).toBe("EMERGENCY");
+    expect(turn.state.escalated).toBe(true);
+  });
+
+  it("Caso H: 'Tenía hinchazón, pero ahora tengo hinchazón en el ojo' -> swelling afirmada, red flag ocular, EMERGENCY (mencion explicita, no elipsis)", () => {
+    const unit = extractAffirmedAndNegatedClinicalSignals("Tenía hinchazón, pero ahora tengo hinchazón en el ojo");
+    expect(unit.affirmed).toContain("swelling");
+
+    const turn = runDentalSeniorTurn(initialDentalAgentState, "Tenía hinchazón, pero ahora tengo hinchazón en el ojo");
+    expect(turn.state.redFlags).toContain("hinchazon en cuello, boca u ojo");
+    expect(turn.state.triageLevel).toBe("EMERGENCY");
+  });
+
+  it("Caso I: 'Tenía hinchazón, pero ahora ya no tengo fiebre' -> la negacion explicita es de fever, la elipsis NO se aplica automaticamente a swelling", () => {
+    const unit = extractAffirmedAndNegatedClinicalSignals("Tenía hinchazón, pero ahora ya no tengo fiebre");
+    expect(unit.negated).toContain("fever");
+    expect(unit.negated).not.toContain("swelling");
   });
 });

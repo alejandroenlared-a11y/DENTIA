@@ -264,8 +264,9 @@ export async function runOpenAiDentalAgentTurn(input: {
   state: DentalAgentState;
   clinicContext?: string;
 }): Promise<DentalAgentApiTurn> {
+  const startedAt = Date.now();
   const turn = await runOpenAiDentalAgentTurnInternal(input);
-  return attachConversationFields(turn, input.latestPatientMessage, input.state, lastAssistantMessageOf(input.history));
+  return attachConversationFields(turn, input.latestPatientMessage, input.state, lastAssistantMessageOf(input.history), startedAt);
 }
 
 async function runOpenAiDentalAgentTurnInternal(input: {
@@ -339,8 +340,9 @@ async function runGeminiDentalAgentTurn(input: {
   state: DentalAgentState;
   clinicContext?: string;
 }): Promise<DentalAgentApiTurn> {
+  const startedAt = Date.now();
   const turn = await runGeminiDentalAgentTurnInternal(input);
-  return attachConversationFields(turn, input.latestPatientMessage, input.state, lastAssistantMessageOf(input.history));
+  return attachConversationFields(turn, input.latestPatientMessage, input.state, lastAssistantMessageOf(input.history), startedAt);
 }
 
 async function runGeminiDentalAgentTurnInternal(input: {
@@ -993,11 +995,41 @@ function logConversationClassificationShadow(
 // esos 2 campos aunque V2 se los pida - eso solo se registra en sombra para
 // comparar. Esto cumple que ninguna transicion critica (reserva, confirmacion,
 // cancelacion, urgencia, cierre) quede en manos del modelo.
+// FINAL-DENTIA-CLOSEOUT Fase 10: metricas tecnicas sin PII - nunca el texto
+// del paciente, nunca nombre/telefono/email, nunca la conversacion completa,
+// nunca una API key. Solo senales operativas para observabilidad (runtime
+// real usado, duracion, si hubo timeout/schema invalido, escalado, estado de
+// reserva). "guardrail que sustituyo la respuesta" NO se incluye todavia:
+// requeriria que preparePatientReply (guardrails.ts) devuelva metadata ademas
+// del string final, y ese cambio de contrato se deja fuera de esta ronda para
+// no tocar una funcion de seguridad ya cubierta por 13+ tests sin su propia
+// pasada de tests dedicada.
+function logDentalAgentTelemetry(turn: DentalAgentApiTurn, durationMs: number): void {
+  // console.debug (no console.info): logConversationClassificationShadow ya
+  // usa console.info y varios tests existentes (dental-agent-schema-v2.test.ts)
+  // hacen spy exacto sobre console.info esperando SOLO esa llamada - un
+  // segundo console.info aqui rompia ese conteo sin aportar nada, dos
+  // preocupaciones distintas no deberian compartir el mismo canal de log.
+  console.debug("[dental-agent] telemetry", {
+    runtime: turn.runtime,
+    model: turn.model,
+    durationMs,
+    timeout: Boolean(turn.fallbackReason?.startsWith("Sin respuesta del proveedor externo")),
+    schemaParseFailure: Boolean(turn.fallbackReason?.startsWith("Salida IA invalida")),
+    fallbackReason: turn.fallbackReason ?? null,
+    escalated: turn.state.escalated,
+    triageLevel: turn.state.triageLevel,
+    bookingStatus: turn.bookingStatus,
+    conversationStatus: turn.conversationStatus
+  });
+}
+
 function attachConversationFields(
   turn: DentalAgentApiTurn & { aiSelfReportedFields?: AiSelfReportedConversationFields },
   latestPatientMessage: string,
   previousState: DentalAgentState,
-  lastAssistantMessage: string | undefined
+  lastAssistantMessage: string | undefined,
+  startedAt: number
 ): DentalAgentApiTurn {
   // Bug real (PR #11): antes solo se pasaba turn.state (ya procesado) al
   // enrutador, asi que seleccionar un hueco ("1") no se detectaba como
@@ -1021,7 +1053,7 @@ function attachConversationFields(
     bookingStatus: routed.bookingStatus,
     conversationStatus: routed.conversationStatus
   };
-  return {
+  const result: DentalAgentApiTurn = {
     reply: turn.reply,
     state,
     runtime: turn.runtime,
@@ -1032,6 +1064,8 @@ function attachConversationFields(
     bookingStatus: routed.bookingStatus,
     conversationStatus: routed.conversationStatus
   };
+  logDentalAgentTelemetry(result, Date.now() - startedAt);
+  return result;
 }
 
 // Hotfix (fallo confirmado en produccion, "me duele al morder" -> diagnostico

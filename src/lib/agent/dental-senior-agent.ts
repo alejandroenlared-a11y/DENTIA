@@ -554,7 +554,107 @@ export type ClinicalSignalExtraction = {
   affirmed: ClinicalSignalKey[];
   negated: ClinicalSignalKey[];
   unknown: ClinicalSignalKey[];
+  // Subconjunto de `unknown`: la señal SI se menciono, pero junto a una OTRA
+  // señal en la misma clausula historica y una elipsis temporal ambigua
+  // despues ("Tenia fiebre e hinchazon, pero ahora ya no tengo" - regla 6,
+  // FINAL-DENTIA-CLOSEOUT) - nunca se resuelve por inferencia, y ademas
+  // suprime la confirmacion de red flag por el fallback de frase cerrada
+  // (isNegatedLabel) que de otro modo la confirmaria solo por mencionar la
+  // palabra en el mensaje. Vacio en el caso normal (unknown = "no mencionada
+  // en absoluto").
+  ambiguous: ClinicalSignalKey[];
 };
+
+// FINAL-DENTIA-CLOSEOUT: elipsis clinica temporal MUY limitada, dentro del
+// MISMO mensaje. "Tenia hinchazon, pero ahora ya no tengo" niega swelling
+// aunque la clausula posterior omita el sustantivo - resolveClinicalTermPolarity
+// no puede resolverlo por diseño porque el termino simplemente NO aparece en
+// la clausula que trae el marcador temporal (no es una cuestion de polaridad,
+// es que no hay nada que buscar ahi). Esta funcion rellena UNICAMENTE ese
+// hueco puntual, nunca sustituye ni contradice al motor compartido:
+// - Solo mira pares de clausulas ADYACENTES (i, i+1) del mismo mensaje -
+//   nunca cruza turnos (eso ya lo impide el hecho de operar sobre un unico
+//   `normalized` de un solo mensaje).
+// - Solo actua cuando la clausula anterior menciona EXACTAMENTE una señal
+//   candidata (si menciona 0 o >=2, no hace nada - caso ambiguo, se deja sin
+//   resolver a proposito en vez de adivinar).
+// - Solo actua cuando la clausula posterior es una elipsis "desnuda": trae un
+//   marcador temporal+negacion/afirmacion elidida (lista cerrada, no una
+//   regla generica de "cualquier no niega la ultima señal") Y no menciona
+//   ningun termino clinico explicito propio - si lo hace (misma señal u otra
+//   distinta, ej. "...pero ahora ya no tengo fiebre" tras hablar de
+//   hinchazon), esa mencion explicita gobierna su propia clausula y esta
+//   funcion no toca nada (la resuelve, como siempre, resolveClinicalTermPolarity).
+const ELLIPTICAL_TEMPORAL_NEGATION_PATTERN =
+  /\b(ahora ya no tengo|ahora no tengo|ya no tengo|actualmente no tengo|ahora ya no|ya no|actualmente no|ya se me ha pasado)\b/;
+const ELLIPTICAL_TEMPORAL_AFFIRMATION_PATTERN = /\b(ahora ya si|ahora si|actualmente si|ya si)\b/;
+
+// Deteccion de "la clausula anterior menciona la señal X" para efectos de
+// elipsis unicamente - reutiliza el mismo patron que SIMPLE_NEGATION_SIGNAL_
+// PATTERNS para 5 de las 6 señales. `pain` se amplia SOLO aqui (añade
+// "dolia", forma de imperfecto de "doler" que el patron principal no cubre)
+// porque tocar el patron compartido de pain rompia el caso ya existente
+// "Antes me dolia, pero ahora no me duele" (dolia pasaria a disparar el
+// "afirmado inmediato" de resolveClinicalTermPolarity en la propia clausula
+// historica, antes de llegar nunca a la negacion real de la clausula
+// siguiente). Ampliar solo la deteccion de MENCION (no la de polaridad) evita
+// esa regresion sin crear un tercer motor de polaridad.
+const ELLIPTICAL_CANDIDATE_MENTION_PATTERNS: Record<keyof typeof SIMPLE_NEGATION_SIGNAL_PATTERNS, RegExp> = {
+  ...SIMPLE_NEGATION_SIGNAL_PATTERNS,
+  pain: /duele|dolor|dolia/
+};
+
+type EllipticalTemporalResolution = {
+  resolutions: Map<ClinicalSignalKey, "affirmed" | "negated">;
+  // Regla 6: la clausula anterior menciona MAS de una señal candidata y la
+  // posterior es igualmente una elipsis temporal desnuda - no hay forma
+  // segura de saber CUAL de ellas cambio, asi que ninguna se resuelve por
+  // inferencia Y ademas se marcan como "ambiguas" (no solo "no tocadas") para
+  // que la confirmacion de red flag por frase cerrada (isNegatedLabel) tampoco
+  // las de por buenas solo por aparecer mencionadas en el texto.
+  ambiguous: Set<ClinicalSignalKey>;
+};
+
+function resolveEllipticalTemporalSignals(normalized: string): EllipticalTemporalResolution {
+  const resolutions = new Map<ClinicalSignalKey, "affirmed" | "negated">();
+  const ambiguous = new Set<ClinicalSignalKey>();
+  const clauses = normalized
+    .split(CLAUSE_SPLIT_PATTERN)
+    .map(clause => clause.trim())
+    .filter(Boolean);
+  const candidateKeys = Object.keys(ELLIPTICAL_CANDIDATE_MENTION_PATTERNS) as Array<
+    keyof typeof ELLIPTICAL_CANDIDATE_MENTION_PATTERNS
+  >;
+
+  for (let i = 0; i < clauses.length - 1; i += 1) {
+    const priorClause = clauses[i];
+    const laterClause = clauses[i + 1];
+
+    const mentionedInPrior = candidateKeys.filter(key => ELLIPTICAL_CANDIDATE_MENTION_PATTERNS[key].test(priorClause));
+    if (mentionedInPrior.length === 0) continue;
+
+    const laterMentionsOwnSignal = candidateKeys.some(key => ELLIPTICAL_CANDIDATE_MENTION_PATTERNS[key].test(laterClause));
+    if (laterMentionsOwnSignal) continue;
+
+    const laterIsBareTemporalEllipsis =
+      ELLIPTICAL_TEMPORAL_NEGATION_PATTERN.test(laterClause) || ELLIPTICAL_TEMPORAL_AFFIRMATION_PATTERN.test(laterClause);
+    if (!laterIsBareTemporalEllipsis) continue;
+
+    if (mentionedInPrior.length > 1) {
+      for (const key of mentionedInPrior) ambiguous.add(key);
+      continue;
+    }
+
+    const candidate = mentionedInPrior[0];
+    if (ELLIPTICAL_TEMPORAL_NEGATION_PATTERN.test(laterClause)) {
+      resolutions.set(candidate, "negated");
+    } else {
+      resolutions.set(candidate, "affirmed");
+    }
+  }
+
+  return { resolutions, ambiguous };
+}
 
 // Deteccion de señales clinicas afirmadas/negadas por clausula - reemplaza el
 // enfoque anterior de "la palabra aparece => la señal es real" (que ignoraba
@@ -609,9 +709,29 @@ export function extractAffirmedAndNegatedClinicalSignals(message: string): Clini
     else if (sawAllClearClause) negated.add(key);
   }
 
+  // Elipsis clinica temporal (ver resolveEllipticalTemporalSignals arriba) -
+  // corrige el estado de una señal SOLO cuando la clausula inmediatamente
+  // posterior es una elipsis desnuda inequivoca; puede sobreescribir un
+  // "afirmado por defecto" (clausula sin marcador propio, ej. "tenia
+  // hinchazon" solo) o un "negado por defecto" segun corresponda - nunca una
+  // mencion explicita en OTRA clausula, porque esa mencion explicita ya
+  // habria hecho que la clausula posterior "mencione su propia señal" y el
+  // gate de arriba la descarta antes de llegar aqui.
+  const { resolutions: ellipticalResolutions, ambiguous: ellipticalAmbiguous } = resolveEllipticalTemporalSignals(normalized);
+  for (const [key, polarity] of ellipticalResolutions) {
+    affirmed.delete(key);
+    negated.delete(key);
+    if (polarity === "affirmed") affirmed.add(key);
+    else negated.add(key);
+  }
+  for (const key of ellipticalAmbiguous) {
+    affirmed.delete(key);
+    negated.delete(key);
+  }
+
   const signalKeys = [...simpleKeys, ...difficultyKeys];
   const unknown = signalKeys.filter(key => !affirmed.has(key) && !negated.has(key));
-  return { affirmed: [...affirmed], negated: [...negated], unknown };
+  return { affirmed: [...affirmed], negated: [...negated], unknown, ambiguous: [...ellipticalAmbiguous] };
 }
 
 // "no, nada de eso" no menciona ninguna señal por su nombre: solo tiene
@@ -677,6 +797,10 @@ const QUESTION_SIGNAL_MAP: Record<Exclude<LastQuestionKey, "">, ClinicalSignalKe
 export type ResolvedClinicalAnswer = {
   affirmed: ClinicalSignalKey[];
   negated: ClinicalSignalKey[];
+  // Ver ClinicalSignalExtraction.ambiguous - propagado tal cual para que
+  // runDentalSeniorTurn pueda suprimir la confirmacion de red flag por frase
+  // cerrada cuando la señal quedo deliberadamente sin resolver.
+  ambiguous: ClinicalSignalKey[];
   resolvesSafetyScreen: boolean;
   resolvesBleedingDifferential: boolean;
 };
@@ -740,7 +864,13 @@ export function resolveAnswerToLastClinicalQuestion(input: {
   const resolvesBleedingDifferential =
     isBleedingQuestion && expectedSignals.every(key => negated.has(key) || affirmed.has(key));
 
-  return { affirmed: [...affirmed], negated: [...negated], resolvesSafetyScreen, resolvesBleedingDifferential };
+  return {
+    affirmed: [...affirmed],
+    negated: [...negated],
+    ambiguous: extraction.ambiguous,
+    resolvesSafetyScreen,
+    resolvesBleedingDifferential
+  };
 }
 
 // Determina que pregunta clinica/de seguridad fija hara nextStep ESTE turno
@@ -900,13 +1030,20 @@ export function runDentalSeniorTurn(current: DentalAgentState, rawText: string, 
     lastQuestionKey: (current.lastQuestionKey || "") as LastQuestionKey
   });
   const affirmedClinicalSignals = new Set(clinicalAnswer.affirmed);
+  // FINAL-DENTIA-CLOSEOUT (elipsis clinica temporal, regla 6): una señal
+  // marcada "ambigua" (mencionada junto a otra en una clausula historica
+  // seguida de una elipsis temporal desnuda - "Tenia fiebre e hinchazon,
+  // pero ahora ya no tengo") nunca debe confirmarse como red flag solo por
+  // el fallback de frase cerrada de detectLabels (isNegatedLabel), que de
+  // otro modo la daria por buena con solo ver la palabra en el mensaje.
+  const ambiguousClinicalSignals = new Set(clinicalAnswer.ambiguous);
   const messageRedFlags = filterOutNegatedLabels(
-    detectLabels(normalized, redFlagPatterns, affirmedClinicalSignals, REDFLAG_LABEL_TO_SIGNAL_KEY),
+    detectLabels(normalized, redFlagPatterns, affirmedClinicalSignals, ambiguousClinicalSignals, REDFLAG_LABEL_TO_SIGNAL_KEY),
     clinicalAnswer.negated,
     REDFLAG_LABEL_TO_SIGNAL_KEY
   );
   const messageSignals = filterOutNegatedLabels(
-    detectLabels(normalized, signalPatterns, affirmedClinicalSignals, SIGNAL_LABEL_TO_SIGNAL_KEY),
+    detectLabels(normalized, signalPatterns, affirmedClinicalSignals, ambiguousClinicalSignals, SIGNAL_LABEL_TO_SIGNAL_KEY),
     clinicalAnswer.negated,
     SIGNAL_LABEL_TO_SIGNAL_KEY
   );
@@ -2338,10 +2475,17 @@ export function triageLabel(level: TriageLevel) {
 // motor correcto (extractAffirmedAndNegatedClinicalSignals, via
 // clinicalAnswer.affirmed) ya determino que la señal esta afirmada, esa
 // conclusion gana siempre sobre el regex de frase cerrada.
+// FINAL-DENTIA-CLOSEOUT (elipsis clinica temporal, regla 6): ambiguousSignals
+// son señales que el motor de elipsis marco explicitamente como "no se puede
+// saber cual de varias cambio" (ver resolveEllipticalTemporalSignals) -  esa
+// duda gana sobre el fallback de frase cerrada igual que affirmedSignals gana
+// para confirmar: ninguna de las dos deja que isNegatedLabel decida por su
+// cuenta cuando ya hay una conclusion mejor informada.
 function detectLabels(
   normalized: string,
   rules: Array<{ label: string; pattern: RegExp }>,
   affirmedSignals: Set<ClinicalSignalKey>,
+  ambiguousSignals: Set<ClinicalSignalKey>,
   labelToSignalKey: Record<string, ClinicalSignalKey>
 ) {
   return rules
@@ -2349,6 +2493,7 @@ function detectLabels(
       if (!rule.pattern.test(normalized)) return false;
       const signalKey = labelToSignalKey[rule.label];
       if (signalKey && affirmedSignals.has(signalKey)) return true;
+      if (signalKey && ambiguousSignals.has(signalKey)) return false;
       return !isNegatedLabel(rule.label, normalized);
     })
     .map(rule => rule.label);
