@@ -2405,3 +2405,75 @@ describe("Codex (revision sobre c7c9e1a): declaraciones coordinadas de capacidad
     expect(third.state.triageLevel).toBe("EMERGENCY");
   });
 });
+
+// Codex (P1, revision sobre 87ce2be): "ningun"/"alguna" entre el verbo de
+// negacion y "dificultad" rompia DIFFICULTY_SIGNAL_RULES.allClear (exige el
+// determinante pegado a "tengo"/"hay"), mientras que affirmed ("dificultad.*
+// abrir", sin ancla) igual coincidia - afirmando dificultad en un mensaje
+// que la niega explicitamente.
+describe("Codex (revision sobre 87ce2be): determinante 'ningun'/'alguna' entre la negacion y 'dificultad'/'problema' sigue siendo capacidad normal", () => {
+  it.each([
+    "No tengo ningún problema para abrir ni para tragar.",
+    "Sin ningún problema para abrir ni para tragar.",
+    "No tengo ninguna dificultad para abrir ni para tragar."
+  ])("niega ambas, no EMERGENCY: '%s'", message => {
+    const result = resolveAnswerToLastClinicalQuestion({
+      patientMessage: message,
+      lastQuestionKey: "trauma_capacity_clarification"
+    });
+    expect(result.negated).toContain("openingDifficulty");
+    expect(result.negated).toContain("swallowingDifficulty");
+    expect(result.affirmed).not.toContain("openingDifficulty");
+    expect(result.affirmed).not.toContain("swallowingDifficulty");
+  });
+
+  it.each(["Tengo problemas para abrir y tragar.", "No puedo abrir ni tragar."])(
+    "afirma ambas, EMERGENCY: '%s'",
+    message => {
+      const result = resolveAnswerToLastClinicalQuestion({
+        patientMessage: message,
+        lastQuestionKey: "trauma_capacity_clarification"
+      });
+      expect(result.affirmed).toContain("openingDifficulty");
+      expect(result.affirmed).toContain("swallowingDifficulty");
+    }
+  );
+
+  it("end-to-end: 'No tengo ninguna dificultad para abrir ni para tragar' NO escala a EMERGENCY", () => {
+    const first = runDentalSeniorTurn(initialDentalAgentState, "Me di un golpe en el diente");
+    const second = runDentalSeniorTurn(first.state, "No");
+    const third = runDentalSeniorTurn(second.state, "No tengo ninguna dificultad para abrir ni para tragar");
+    expect(third.state.safetyScreened).toBe(true);
+    expect(third.state.triageLevel).not.toBe("EMERGENCY");
+  });
+
+  it("end-to-end: 'Tengo problemas para abrir y tragar' escala a EMERGENCY", () => {
+    const first = runDentalSeniorTurn(initialDentalAgentState, "Me di un golpe en el diente");
+    const second = runDentalSeniorTurn(first.state, "No");
+    const third = runDentalSeniorTurn(second.state, "Tengo problemas para abrir y tragar");
+    expect(third.state.safetyScreened).toBe(true);
+    expect(third.state.redFlags).toContain("dificultad para tragar o hablar");
+    expect(third.state.triageLevel).toBe("EMERGENCY");
+  });
+
+  it("no rompe los casos ya cubiertos", () => {
+    const denies = ["Puedo abrir y tragar.", "No me cuesta abrir ni tragar."];
+    for (const message of denies) {
+      const result = resolveAnswerToLastClinicalQuestion({
+        patientMessage: message,
+        lastQuestionKey: "trauma_capacity_clarification"
+      });
+      expect(result.negated).toContain("openingDifficulty");
+      expect(result.negated).toContain("swallowingDifficulty");
+    }
+    const affirms = ["Ambas cosas.", "Me cuesta abrir y tragar."];
+    for (const message of affirms) {
+      const result = resolveAnswerToLastClinicalQuestion({
+        patientMessage: message,
+        lastQuestionKey: "trauma_capacity_clarification"
+      });
+      expect(result.affirmed).toContain("openingDifficulty");
+      expect(result.affirmed).toContain("swallowingDifficulty");
+    }
+  });
+});

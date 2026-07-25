@@ -402,22 +402,36 @@ const SIMPLE_NEGATION_SIGNAL_PATTERNS: Record<"fever" | "swelling" | "pus" | "bl
 // tragar/respirar/abrir: "no puedo X" ES la afirmacion (hay dificultad real),
 // no una negacion - necesitan reglas dedicadas de afirmacion/via libre en vez
 // del escaneo generico de negacion de arriba.
+// Codex (P1, revision sobre 87ce2be - "capacidad normal con 'ningun' no es
+// dificultad"): "no tengo NINGUNA dificultad para abrir" no coincidia con
+// "no (tengo|hay) dificultad.*abrir" (exige "tengo"/"hay" pegado a
+// "dificultad", sin determinante entre medias), mientras que affirmed
+// ("dificultad.*abrir", sin ancla de negacion) SI coincidia igual -
+// afirmando dificultad en un mensaje que la niega explicitamente. Grupo
+// opcional reutilizable para tolerar el determinante ("ningun"/"alguna"/etc)
+// entre el verbo de negacion y "dificultad", sin dejar de exigir que la
+// negacion este presente.
+const CAPACITY_DETERMINER_GROUP = "(?:(?:ningun|algun)\\w*\\s+)?";
 const DIFFICULTY_SIGNAL_RULES: Record<
   "breathingDifficulty" | "swallowingDifficulty" | "openingDifficulty",
   { affirmed: RegExp; allClear: RegExp }
 > = {
   breathingDifficulty: {
-    allClear: /(?<!no )puedo respirar|sin dificultad para respirar|respiro bien|no (tengo|hay) dificultad.*respirar/,
+    allClear: new RegExp(
+      `(?<!no )puedo respirar|sin ${CAPACITY_DETERMINER_GROUP}dificultad para respirar|respiro bien|no (tengo|hay) ${CAPACITY_DETERMINER_GROUP}dificultad.*respirar`
+    ),
     affirmed: /no puedo respirar|dificultad.*respirar|me cuesta respirar|\bahogo\b|asfixia/
   },
   swallowingDifficulty: {
-    allClear:
-      /(?<!no )puedo tragar|trago bien|tragar bien|sin dificultad.*tragar|tragar.*sin dificultad|no me cuesta tragar|no (tengo|hay) dificultad.*tragar/,
+    allClear: new RegExp(
+      `(?<!no )puedo tragar|trago bien|tragar bien|sin ${CAPACITY_DETERMINER_GROUP}dificultad.*tragar|tragar.*sin ${CAPACITY_DETERMINER_GROUP}dificultad|no me cuesta tragar|no (tengo|hay) ${CAPACITY_DETERMINER_GROUP}dificultad.*tragar`
+    ),
     affirmed: /no puedo tragar|dificultad.*tragar|me cuesta tragar/
   },
   openingDifficulty: {
-    allClear:
-      /(?<!no )puedo abrir|abro bien|sin dificultad.*abrir|abrir.*sin dificultad|no me cuesta abrir|no (tengo|hay) dificultad.*abrir/,
+    allClear: new RegExp(
+      `(?<!no )puedo abrir|abro bien|sin ${CAPACITY_DETERMINER_GROUP}dificultad.*abrir|abrir.*sin ${CAPACITY_DETERMINER_GROUP}dificultad|no me cuesta abrir|no (tengo|hay) ${CAPACITY_DETERMINER_GROUP}dificultad.*abrir`
+    ),
     affirmed: /no puedo abrir|dificultad.*abrir|me cuesta abrir|mandibula bloqueada|trismus|cuesta abrir/
   }
 };
@@ -866,7 +880,7 @@ const CAPACITY_EXPLICIT_CAPACITY_PATTERN = /\b(puedo bien|sin problema|con norma
 // (mismo orden de prioridad clinica: incapacidad explicita > negacion
 // compuesta de dificultad > dificultad explicita > capacidad explicita).
 const CAPACITY_NEGATED_NORMAL_PATTERN =
-  /\bno me cuesta\w*\b|\b(no tengo|no hay|sin|tampoco tengo|ningun\w*)\s+(dificultad\w*|problemas?)\b/;
+  /\bno me cuesta\w*\b|\b(no tengo|no hay|sin|tampoco tengo|ningun\w*|algun\w*)\s+(dificultad\w*|problemas?)\b/;
 const CAPACITY_BARE_DIFFICULTY_PATTERN = /\bcuesta\w*\b|\bdificultad\w*\b|\bproblemas?\b/;
 const CAPACITY_BARE_NORMAL_PATTERN = /\bnormalidad\b|\bbien\b/;
 

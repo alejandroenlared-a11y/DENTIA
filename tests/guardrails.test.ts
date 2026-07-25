@@ -294,6 +294,67 @@ describe("preparePatientReply - EMERGENCY short-circuit", () => {
     expect(mentionsUrgentCareGuidance("Esto es serio, ve a urgencias sin esperar.")).toBe(true);
   });
 
+  it("no rompe el caso ya cubierto: 'No esperes; descansa y observa.' sigue sin considerarse guia valida (nunca menciona urgencias/112/emergencias)", () => {
+    expect(mentionsUrgentCareGuidance("No esperes; descansa y observa.")).toBe(false);
+  });
+
+  // Codex (P1, revision sobre 87ce2be, "'tampoco' debe conservar la
+  // negacion de urgencias"): matriz completa.
+  it.each([
+    ["No llames al 112 y tampoco acudas a urgencias.", false],
+    ["Tampoco acudas a urgencias.", false],
+    ["No vayas a urgencias.", false],
+    ["Nunca llames a emergencias.", false],
+    ["Ni llames al 112 ni acudas a urgencias.", false],
+    ["No es necesario acudir a urgencias.", false],
+    ["Evita ir a urgencias.", false],
+    ["Puedes esperar antes de ir a urgencias.", false],
+    ["Acude a urgencias solo si mañana empeoras.", false],
+    ["Acude a urgencias ahora mismo.", true],
+    ["Ve directamente a urgencias.", true],
+    ["Llama al 112.", true],
+    ["Contacta con emergencias inmediatamente.", true],
+    ["No esperes y acude a urgencias.", true],
+    ["Busca atención urgente ahora.", true]
+  ])("mentionsUrgentCareGuidance('%s') -> %s", (reply, expected) => {
+    expect(mentionsUrgentCareGuidance(reply)).toBe(expected);
+  });
+
+  it("no rompe el caso ya cubierto: 'No acudas a urgencias.' sigue descartandose", () => {
+    expect(mentionsUrgentCareGuidance("No acudas a urgencias.")).toBe(false);
+  });
+
+  // Casos de integracion del Bloque 2 (preparePatientReply completo).
+  it.each([
+    ["No llames al 112 y tampoco acudas a urgencias.", false],
+    ["Tampoco acudas a urgencias.", false],
+    ["Ni llames al 112 ni acudas a urgencias.", false]
+  ])("preparePatientReply descarta aiReply EMERGENCY negado con 'tampoco'/'ni': '%s'", aiReply => {
+    const { state, reply: localReply } = emergencyTurn();
+    const result = preparePatientReply(aiReply, state, localReply, "Tengo la cara muy hinchada y me cuesta respirar");
+    expect(result).toBe(localReply);
+  });
+
+  it.each([["Acude a urgencias ahora mismo.", true], ["No esperes y acude a urgencias.", true]])(
+    "preparePatientReply conserva aiReply EMERGENCY afirmativo: '%s'",
+    aiReply => {
+      const { state, reply: localReply } = emergencyTurn();
+      const result = preparePatientReply(aiReply, state, localReply, "Tengo la cara muy hinchada y me cuesta respirar");
+      expect(result).toContain("urgencias");
+    }
+  );
+
+  it("preparePatientReply descarta aiReply EMERGENCY condicional: 'Acude a urgencias solo si mañana empeoras.'", () => {
+    const { state, reply: localReply } = emergencyTurn();
+    const result = preparePatientReply(
+      "Acude a urgencias solo si mañana empeoras.",
+      state,
+      localReply,
+      "Tengo la cara muy hinchada y me cuesta respirar"
+    );
+    expect(result).toBe(localReply);
+  });
+
   // Casos de integracion del P1 (preparePatientReply completo, no solo la
   // funcion unitaria).
   it.each([

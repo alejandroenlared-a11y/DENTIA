@@ -231,11 +231,29 @@ const URGENT_CARE_CLAUSE_SPLIT_PATTERN = /[.,;:!¡¿?]+|\by\b|\bpero\b|\baunque\
 const URGENT_CARE_CONDITIONAL_OR_PERMISSIVE_PATTERN =
   /(solo si|\bsi\b[^,]{0,25}(empeor\w*|persist\w*|se agrava|sigue|acaso)|puedes esperar|mejor esperar|espera (a ver|un poco)|no hace falta|no es necesario|no necesitas|no tienes que|\bevita\b|mejor no)/;
 
+// Codex (P1, revision sobre 87ce2be - "'tampoco' debe conservar la negacion
+// de urgencias"): solo "no" disparaba la negacion del verbo de instruccion.
+// "No llames al 112 y tampoco acudas a urgencias." se separa (por el propio
+// split en "y") en una clausula "tampoco acudas a urgencias" sin ningun
+// "no" literal - "tampoco" no tiene ninguna "n"+"o" que haga match con
+// \bno\b, asi que esa clausula pasaba el filtro de negacion y llegaba
+// intacta al patron afirmativo. Mismo vocabulario de negacion que
+// NEGATION_MARKER_WORDS en dental-senior-agent.ts (tampoco/nunca/ni junto a
+// "no").
 const URGENT_CARE_NEGATED_INSTRUCTION_PATTERN =
-  /\bno\b[^,]*\b(acud\w*|vayas|vay\w*|llam\w*|contact\w*|busqu\w*|busca\w*|dirij\w*)\b/;
+  /\b(no|tampoco|nunca|ni)\b[^,]*\b(acud\w*|vayas|vay\w*|llam\w*|contact\w*|busqu\w*|busca\w*|dirij\w*)\b/;
 
+// Codex (P1, revision sobre 87ce2be): "ve a"/"llama\w*" no cubrian formas
+// reales - "Ve directamente a urgencias." no contiene el bigrama exacto
+// "ve a" (hay "directamente" en medio), y "llama\w*" no matchea "llames"/
+// "llame" (la raiz literal es "llama", no un prefijo de esas conjugaciones).
+// "ve" ahora es un verbo suelto (like acud\w*/llam\w*) en vez de un bigrama
+// fijo, y "llam\w*" cubre todas las conjugaciones. "no esperes" deja de ser
+// una alternativa independiente sin objetivo (que la hacia contar como guia
+// valida aunque el mensaje entero nunca mencionara urgencias/112/
+// emergencias) y pasa a exigir el mismo objetivo que el resto de verbos.
 const URGENT_CARE_AFFIRMATIVE_INSTRUCTION_PATTERN =
-  /\b(acud\w*|ve a|vete a|dirigete a|llama\w*|contacta\w*|busca\w*)\b.*(urgencias|emergencias|112|atencion urgente|atencion inmediata)|no esperes\b/;
+  /\b(acud\w*|ve|vete\w*|dirigete\w*|llam\w*|contacta\w*|busca\w*|no esperes)\b.*(urgencias|emergencias|112|atencion urgente|atencion inmediata)/;
 
 function isUrgentCareInstructionClause(clause: string): boolean {
   if (URGENT_CARE_CONDITIONAL_OR_PERMISSIVE_PATTERN.test(clause)) return false;
