@@ -2237,3 +2237,58 @@ describe("Codex (revision sobre 77a41cc): 'y' separa clausulas independientes en
     expect(resolveOrderedAppointmentDecision("No, si ya llamaré yo", { mode: "initial_offer" })).toBe("DECLINED");
   });
 });
+
+// Codex (revision sobre c7c9e1a): 3 findings nuevos sobre el commit anterior.
+describe("Codex (revision sobre c7c9e1a): la negacion de una clausula posterior no gobierna una señal markerless anterior", () => {
+  it("'Dolor de muela y no tengo fiebre' -> intent urgent_pain, pregunta de seguridad de dolor (no menu generico)", () => {
+    const turn = runDentalSeniorTurn(initialDentalAgentState, "Dolor de muela y no tengo fiebre");
+    expect(turn.state.intent).toBe("urgent_pain");
+    expect(turn.reply.toLowerCase()).toContain("fiebre");
+    expect(turn.reply.toLowerCase()).not.toContain("que necesitas o que te preocupa");
+  });
+
+  it("no rompe el caso ya cubierto: 'No tengo fiebre y tengo hinchazon en el ojo' sigue afirmando hinchazon (marcador propio mas cercano)", () => {
+    const turn = runDentalSeniorTurn(initialDentalAgentState, "No tengo fiebre y tengo hinchazon en el ojo");
+    expect(turn.state.redFlags).toContain("hinchazon en cuello, boca u ojo");
+  });
+
+  it("no rompe el caso ya cubierto: 'No tengo fiebre, hinchazón ni pus y puedo abrir y tragar bien' sigue resolviendo las 5 señales", () => {
+    const turn = runDentalSeniorTurn(initialDentalAgentState, "No tengo fiebre, hinchazón ni pus y puedo abrir y tragar bien");
+    expect(turn.state.safetyScreened).toBe(true);
+    expect(turn.state.redFlags).toEqual([]);
+  });
+});
+
+describe("Codex (revision sobre c7c9e1a): declaraciones coordinadas de capacidad normal no afirman dificultad", () => {
+  it.each([["Puedo abrir y tragar"], ["No me cuesta abrir ni tragar"]])(
+    "trauma_capacity_clarification: '%s' niega ambas (no afirma por defecto)",
+    message => {
+      const result = resolveAnswerToLastClinicalQuestion({
+        patientMessage: message,
+        lastQuestionKey: "trauma_capacity_clarification"
+      });
+      expect(result.negated).toContain("openingDifficulty");
+      expect(result.negated).toContain("swallowingDifficulty");
+      expect(result.affirmed).not.toContain("openingDifficulty");
+      expect(result.affirmed).not.toContain("swallowingDifficulty");
+    }
+  );
+
+  it("end-to-end: 'Puedo abrir y tragar' tras la aclaracion NO escala a EMERGENCY", () => {
+    const first = runDentalSeniorTurn(initialDentalAgentState, "Me di un golpe en el diente");
+    const second = runDentalSeniorTurn(first.state, "No");
+    expect(second.state.lastQuestionKey).toBe("trauma_capacity_clarification");
+    const third = runDentalSeniorTurn(second.state, "Puedo abrir y tragar");
+    expect(third.state.safetyScreened).toBe(true);
+    expect(third.state.triageLevel).not.toBe("EMERGENCY");
+  });
+
+  it("no rompe el caso ya cubierto: 'Ambas cosas' desnudo sigue afirmando ambas dificultades", () => {
+    const result = resolveAnswerToLastClinicalQuestion({
+      patientMessage: "Ambas cosas",
+      lastQuestionKey: "trauma_capacity_clarification"
+    });
+    expect(result.affirmed).toContain("openingDifficulty");
+    expect(result.affirmed).toContain("swallowingDifficulty");
+  });
+});

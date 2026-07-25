@@ -486,7 +486,7 @@ function findSignalSegmentMarkers(clause: string): SignalMarker[] {
 // propio: "hinchazon ni pus"), hereda la polaridad del marcador que la SIGUE
 // (aqui, "ni" -> negada). Una clausula sin ningun marcador ("el sangrado es
 // abundante") no tiene nada que negarla: se asume afirmada.
-function resolveSignalPolarityAt(markers: SignalMarker[], signalIndex: number): boolean {
+function resolveSignalPolarityAt(markers: SignalMarker[], signalIndex: number, clause: string): boolean {
   let preceding: SignalMarker | null = null;
   let following: SignalMarker | null = null;
   for (const marker of markers) {
@@ -497,7 +497,20 @@ function resolveSignalPolarityAt(markers: SignalMarker[], signalIndex: number): 
     }
   }
   if (preceding) return preceding.negated;
-  if (following) return following.negated;
+  if (following) {
+    // Codex (P1, revision sobre c7c9e1a - "Do not apply later-clause
+    // negation to an earlier symptom"): CLAUSE_SPLIT_PATTERN no separa por
+    // "y" a proposito (para no romper listas sin verbo como "hinchazon ni
+    // pus", que SI dependen de heredar el marcador que las sigue). Pero eso
+    // dejaba que una señal sin marcador propio ("Dolor de muela y no tengo
+    // fiebre") heredara la negacion de una clausula independiente al otro
+    // lado del "y" ("no tengo fiebre"), como si "no" tambien gobernara
+    // "dolor". Una "y" real entre la señal y el marcador que la sigue corta
+    // la herencia hacia delante; las listas sin verbo usan "ni"/"," como
+    // union, nunca "y", asi que no se ven afectadas por este corte.
+    const crossesYBoundary = /\by\b/.test(clause.slice(signalIndex, following.index));
+    if (!crossesYBoundary) return following.negated;
+  }
   return false;
 }
 
@@ -540,7 +553,7 @@ function resolveClinicalTermPolarity(normalized: string, termPattern: RegExp): C
     globalTermPattern.lastIndex = 0;
     let match: RegExpExecArray | null;
     while ((match = globalTermPattern.exec(clause))) {
-      lastPolarity = resolveSignalPolarityAt(markers, match.index) ? "negated" : "affirmed";
+      lastPolarity = resolveSignalPolarityAt(markers, match.index, clause) ? "negated" : "affirmed";
       if (match[0].length === 0) globalTermPattern.lastIndex += 1;
     }
   }
@@ -952,8 +965,18 @@ export function resolveAnswerToLastClinicalQuestion(input: {
       const mentionsSwallowingTopic = /\btragar\b/.test(normalized);
       const mentionsBothWord = /\b(ambas cosas|las dos|los dos)\b/.test(normalized);
       const mentionsExclusive = /\b(solo|solamente|unicamente)\b/.test(normalized);
+      // Codex (P1, revision sobre c7c9e1a - "Preserve coordinated statements
+      // of normal capacity"): las alternativas anteriores solo reconocian la
+      // negacion conjunta cuando el paciente usaba la palabra colectiva
+      // "ambas cosas"/"las dos"/"los dos" ("puedo hacer ambas cosas bien").
+      // Una respuesta coordinada SIN esa palabra colectiva pero igual de
+      // explicita ("Puedo abrir y tragar", "No me cuesta abrir ni tragar")
+      // no la reconocia como negacion, caia en mentionsOpeningTopic &&
+      // mentionsSwallowingTopic, y el branch por defecto (mas abajo)
+      // afirmaba ambas dificultades igualmente - escalando a EMERGENCY a un
+      // paciente que dijo explicitamente que no tiene molestias.
       const deniesBothProblem =
-        /(no tengo ningun problema|sin ningun problema|ningun problema|puedo hacer (ambas cosas|las dos|los dos)|puedo con (ambas cosas|las dos|los dos)|(ambas cosas|las dos|los dos) (estan|esta) bien|(ambas cosas|las dos|los dos) van bien|todo bien)/.test(
+        /(no tengo ningun problema|sin ningun problema|ningun problema|puedo hacer (ambas cosas|las dos|los dos)|puedo con (ambas cosas|las dos|los dos)|(ambas cosas|las dos|los dos) (estan|esta) bien|(ambas cosas|las dos|los dos) van bien|todo bien|puedo (abrir( la boca)?|tragar)\s*(y|e)\s*(abrir( la boca)?|tragar)|no me cuesta (abrir( la boca)?|tragar)\s*(y|ni|e)\s*(abrir( la boca)?|tragar)|sin dificultad (para )?(abrir|tragar)\s*(y|ni|e)\s*(abrir|tragar))/.test(
           normalized
         );
 

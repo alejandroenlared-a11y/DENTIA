@@ -8,6 +8,7 @@ import {
   jumpsToBookingOptions,
   mentionsHealthCard,
   mentionsUnauthorizedTraumaHypothesis,
+  mentionsUrgentCareGuidance,
   preparePatientReply,
   promisesSpecificProvider
 } from "@/lib/agent/guardrails";
@@ -246,6 +247,34 @@ describe("preparePatientReply - EMERGENCY short-circuit", () => {
     );
     expect(result).toBe(localReply);
     expect(result.toLowerCase()).toContain("urgencias");
+  });
+
+  // Codex (P1, revision sobre c7c9e1a - "Reject negated emergency
+  // guidance"): la palabra suelta "urgencias" no bastaba - un aiReply que
+  // dice explicitamente NO acudir tambien pasaba el guardrail.
+  it("descarta un aiReply EMERGENCY que niega explicitamente la indicacion de acudir a urgencias", () => {
+    const { state, reply: localReply } = emergencyTurn();
+
+    const result = preparePatientReply(
+      "No acudas a urgencias; descansa y observa.",
+      state,
+      localReply,
+      "Tengo la cara muy hinchada y me cuesta respirar"
+    );
+    expect(result).toBe(localReply);
+  });
+
+  it("mentionsUrgentCareGuidance: 'No acudas a urgencias; descansa y observa' se detecta como negado", () => {
+    expect(mentionsUrgentCareGuidance("No acudas a urgencias; descansa y observa.")).toBe(false);
+  });
+
+  it("no rompe el caso ya cubierto: el texto canonico de EMERGENCY (con 'no esperes' lejos de 'urgencias') sigue reconociendose como indicacion valida", () => {
+    const { reply: localReply } = emergencyTurn();
+    expect(mentionsUrgentCareGuidance(localReply)).toBe(true);
+  });
+
+  it("no rompe el caso ya cubierto: 've a urgencias sin esperar' sigue reconociendose como indicacion valida", () => {
+    expect(mentionsUrgentCareGuidance("Esto es serio, ve a urgencias sin esperar.")).toBe(true);
   });
 
   it("un caso ROUTINE tras completar el triaje sigue ofreciendo ayuda para la cita - el guardrail de emergencia no lo bloquea", () => {

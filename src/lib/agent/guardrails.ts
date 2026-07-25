@@ -214,8 +214,22 @@ export function asksForPersonalData(reply: string): boolean {
 const URGENT_CARE_GUIDANCE_PATTERN =
   /(urgencias|servicio de urgencias|emergencias|acude (ahora|de inmediato|inmediatamente|ya)|ve (ahora|de inmediato|directamente)|no esperes|llama al 112|acudir de inmediato)/;
 
+// Codex (P1, revision sobre c7c9e1a - "Reject negated emergency guidance"):
+// el patron anterior aceptaba la palabra suelta "urgencias" sin mirar su
+// polaridad, asi que "No acudas a urgencias; descansa y observa" tambien
+// contaba como indicacion valida. Una "no" a poca distancia de un verbo de
+// instruccion (acude/vayas/llames) o de la propia mencion de urgencias/112/
+// emergencias invierte el sentido - se excluye explicitamente. Las ventanas
+// son cortas a proposito para no atrapar el "no esperes" legitimo del texto
+// canonico ("...no esperes y ve directamente a un servicio de urgencias."),
+// donde la distancia real hasta "urgencias" es mucho mayor.
+const URGENT_CARE_NEGATED_INSTRUCTION_PATTERN =
+  /\bno\b[^.,;:!¿?]{0,25}\b(acud|vayas|vaya|llames|llame)\w*\b[^.,;:!¿?]{0,10}(urgencias|112|emergencias)|\bno\b[^.,;:!¿?]{0,15}(urgencias|112|emergencias|servicio de urgencias)/;
+
 export function mentionsUrgentCareGuidance(reply: string): boolean {
-  return URGENT_CARE_GUIDANCE_PATTERN.test(normalize(reply));
+  const normalized = normalize(reply);
+  if (URGENT_CARE_NEGATED_INSTRUCTION_PATTERN.test(normalized)) return false;
+  return URGENT_CARE_GUIDANCE_PATTERN.test(normalized);
 }
 
 export function mentionsHealthCard(reply: string): boolean {
