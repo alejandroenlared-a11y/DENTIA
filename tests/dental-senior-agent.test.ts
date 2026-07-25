@@ -2477,3 +2477,87 @@ describe("Codex (revision sobre 87ce2be): determinante 'ningun'/'alguna' entre l
     }
   });
 });
+
+// Codex (P1, revision sobre 3814c73): "algun\w*" se habia añadido como
+// disparador de negacion INDEPENDIENTE junto a "ningun\w*" - "ningun
+// problema" es una negacion por si misma, pero "algun problema"/"alguna
+// dificultad" es justo lo contrario (afirma la dificultad). "algun/alguna"
+// solo debe tolerarse como determinante DENTRO de una estructura ya
+// negativa ("no tengo alguna dificultad", "sin alguna dificultad"), nunca
+// como disparador propio.
+describe("Codex (revision sobre 3814c73): 'alguna dificultad' sin negacion exterior afirma, no niega", () => {
+  // "Tengo alguna dificultad para tragar" ya se resuelve correctamente via
+  // DIFFICULTY_SIGNAL_RULES (el motor generico de extraccion, resuelto ANTES
+  // de que resolveCapacityClausePolarity/CAPACITY_NEGATED_NORMAL_PATTERN
+  // entren en juego) independientemente de este bug - "problema" en cambio
+  // NO esta en el vocabulario de DIFFICULTY_SIGNAL_RULES, asi que estos
+  // casos SI dependen exclusivamente de CAPACITY_NEGATED_NORMAL_PATTERN y
+  // son los que realmente prueban el fix (y fallan bajo la mutacion).
+  it.each(["Tengo algún problema para tragar.", "Hay algún problema para tragar."])(
+    "afirma swallowingDifficulty via 'problema' (no negated): '%s'",
+    message => {
+      const result = resolveAnswerToLastClinicalQuestion({
+        patientMessage: message,
+        lastQuestionKey: "trauma_capacity_clarification"
+      });
+      expect(result.affirmed).toContain("swallowingDifficulty");
+      expect(result.negated).not.toContain("swallowingDifficulty");
+    }
+  );
+
+  it("afirma openingDifficulty via 'problema' (no negated): 'Algún problema para abrir.'", () => {
+    const result = resolveAnswerToLastClinicalQuestion({
+      patientMessage: "Algún problema para abrir.",
+      lastQuestionKey: "trauma_capacity_clarification"
+    });
+    expect(result.affirmed).toContain("openingDifficulty");
+    expect(result.negated).not.toContain("openingDifficulty");
+  });
+
+  it.each(["Tengo alguna dificultad para tragar.", "Hay alguna dificultad para tragar."])(
+    "afirma swallowingDifficulty (no negated): '%s'",
+    message => {
+      const result = resolveAnswerToLastClinicalQuestion({
+        patientMessage: message,
+        lastQuestionKey: "trauma_capacity_clarification"
+      });
+      expect(result.affirmed).toContain("swallowingDifficulty");
+      expect(result.negated).not.toContain("swallowingDifficulty");
+    }
+  );
+
+  it.each(["Tengo alguna dificultad para abrir.", "Alguna dificultad para abrir."])(
+    "afirma openingDifficulty (no negated): '%s'",
+    message => {
+      const result = resolveAnswerToLastClinicalQuestion({
+        patientMessage: message,
+        lastQuestionKey: "trauma_capacity_clarification"
+      });
+      expect(result.affirmed).toContain("openingDifficulty");
+      expect(result.negated).not.toContain("openingDifficulty");
+    }
+  );
+
+  it("end-to-end: 'Tengo alguna dificultad para tragar' cierra el cribado con red flag y EMERGENCY", () => {
+    const first = runDentalSeniorTurn(initialDentalAgentState, "Me di un golpe en el diente");
+    const second = runDentalSeniorTurn(first.state, "No");
+    const third = runDentalSeniorTurn(second.state, "Tengo alguna dificultad para tragar");
+    expect(third.state.safetyScreened).toBe(true);
+    expect(third.state.redFlags).toContain("dificultad para tragar o hablar");
+    expect(third.state.triageLevel).toBe("EMERGENCY");
+  });
+
+  it("no rompe el caso ya cubierto: 'No tengo ninguna dificultad para abrir ni para tragar' sigue negando ambas, no EMERGENCY", () => {
+    const result = resolveAnswerToLastClinicalQuestion({
+      patientMessage: "No tengo ninguna dificultad para abrir ni para tragar",
+      lastQuestionKey: "trauma_capacity_clarification"
+    });
+    expect(result.negated).toContain("openingDifficulty");
+    expect(result.negated).toContain("swallowingDifficulty");
+
+    const first = runDentalSeniorTurn(initialDentalAgentState, "Me di un golpe en el diente");
+    const second = runDentalSeniorTurn(first.state, "No");
+    const third = runDentalSeniorTurn(second.state, "No tengo ninguna dificultad para abrir ni para tragar");
+    expect(third.state.triageLevel).not.toBe("EMERGENCY");
+  });
+});

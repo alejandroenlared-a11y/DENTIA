@@ -879,8 +879,16 @@ const CAPACITY_EXPLICIT_CAPACITY_PATTERN = /\b(puedo bien|sin problema|con norma
 // como palabras sueltas. Se comprueban DESPUES de los patrones compartidos
 // (mismo orden de prioridad clinica: incapacidad explicita > negacion
 // compuesta de dificultad > dificultad explicita > capacidad explicita).
+// Codex (P1, revision sobre 3814c73 - "'alguna dificultad' no es negacion"):
+// "algun\w*" se habia añadido como alternativa INDEPENDIENTE junto a
+// "ningun\w*" - correcto para "ningun problema" (esa palabra sola YA es una
+// negacion), pero "algun problema"/"alguna dificultad" NO es una negacion,
+// es justo lo contrario ("Tengo alguna dificultad para tragar" afirma la
+// dificultad). "algun/alguna" solo cuenta como determinante tolerado DENTRO
+// de una estructura que ya es negativa por si misma ("no tengo alguna
+// dificultad", "sin alguna dificultad") - nunca como disparador propio.
 const CAPACITY_NEGATED_NORMAL_PATTERN =
-  /\bno me cuesta\w*\b|\b(no tengo|no hay|sin|tampoco tengo|ningun\w*|algun\w*)\s+(dificultad\w*|problemas?)\b/;
+  /\bno me cuesta\w*\b|\b(no tengo|no hay|sin|tampoco tengo)\s+(?:(?:ningun|algun)\w*\s+)?(dificultad\w*|problemas?)\b|\bningun\w*\s+(dificultad\w*|problemas?)\b/;
 const CAPACITY_BARE_DIFFICULTY_PATTERN = /\bcuesta\w*\b|\bdificultad\w*\b|\bproblemas?\b/;
 const CAPACITY_BARE_NORMAL_PATTERN = /\bnormalidad\b|\bbien\b/;
 
