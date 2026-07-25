@@ -208,28 +208,48 @@ export function asksForPersonalData(reply: string): boolean {
   return /(nombre|email|e-mail|correo|telefono|contacto|apellidos|sede|murcia|elche|consentimiento|guardar|datos|informacion|registrar|cita)/.test(normalized);
 }
 
-// Codex (revision sobre 77a41cc): frases minimas que demuestran que el reply
-// realmente indica al paciente acudir a un servicio de urgencias YA, no solo
-// que reconoce la gravedad ("entiendo", "es serio") sin decir que hacer.
-const URGENT_CARE_GUIDANCE_PATTERN =
-  /(urgencias|servicio de urgencias|emergencias|acude (ahora|de inmediato|inmediatamente|ya)|ve (ahora|de inmediato|directamente)|no esperes|llama al 112|acudir de inmediato)/;
+// Codex (P1, revision sobre c7c9e1a - hardening solicitado tras un primer
+// intento incompleto): una lista de frases prohibidas contra una lista de
+// frases permitidas dejaba huecos reales sin ningun "no" pegado al verbo de
+// instruccion: "Puedes esperar antes de ir a urgencias.", "Evita las
+// urgencias." y "Consulta urgencias solo si empeora." (condicional, no
+// inmediata) seguian leyendose como guia valida. La funcion ahora resuelve
+// la POLARIDAD de la instruccion por clausula en vez de buscar una palabra
+// suelta: se separa el reply en clausulas independientes (misma idea que
+// APPOINTMENT_DECISION_CLAUSE_SPLIT_PATTERN en dental-senior-agent.ts - una
+// "y"/"pero"/"aunque" real separa dos instrucciones distintas, para que un
+// "no esperes" en una clausula no contamine la clausula siguiente), y cada
+// clausula debe superar dos filtros antes de contar como guia valida:
+//   1. no ser condicional/permisiva/de espera ("solo si empeora", "puedes
+//      esperar", "no hace falta", "evita"...), aunque mencione urgencias;
+//   2. no negar explicitamente el verbo de instruccion ("no acudas", "no
+//      llames"...).
+// Solo entonces se comprueba si la clausula contiene una instruccion
+// afirmativa real de acudir/ir/llamar/contactar/buscar atencion urgente.
+const URGENT_CARE_CLAUSE_SPLIT_PATTERN = /[.,;:!¡¿?]+|\by\b|\bpero\b|\baunque\b/;
 
-// Codex (P1, revision sobre c7c9e1a - "Reject negated emergency guidance"):
-// el patron anterior aceptaba la palabra suelta "urgencias" sin mirar su
-// polaridad, asi que "No acudas a urgencias; descansa y observa" tambien
-// contaba como indicacion valida. Una "no" a poca distancia de un verbo de
-// instruccion (acude/vayas/llames) o de la propia mencion de urgencias/112/
-// emergencias invierte el sentido - se excluye explicitamente. Las ventanas
-// son cortas a proposito para no atrapar el "no esperes" legitimo del texto
-// canonico ("...no esperes y ve directamente a un servicio de urgencias."),
-// donde la distancia real hasta "urgencias" es mucho mayor.
+const URGENT_CARE_CONDITIONAL_OR_PERMISSIVE_PATTERN =
+  /(solo si|\bsi\b[^,]{0,25}(empeor\w*|persist\w*|se agrava|sigue|acaso)|puedes esperar|mejor esperar|espera (a ver|un poco)|no hace falta|no es necesario|no necesitas|no tienes que|\bevita\b|mejor no)/;
+
 const URGENT_CARE_NEGATED_INSTRUCTION_PATTERN =
-  /\bno\b[^.,;:!¿?]{0,25}\b(acud|vayas|vaya|llames|llame)\w*\b[^.,;:!¿?]{0,10}(urgencias|112|emergencias)|\bno\b[^.,;:!¿?]{0,15}(urgencias|112|emergencias|servicio de urgencias)/;
+  /\bno\b[^,]*\b(acud\w*|vayas|vay\w*|llam\w*|contact\w*|busqu\w*|busca\w*|dirij\w*)\b/;
+
+const URGENT_CARE_AFFIRMATIVE_INSTRUCTION_PATTERN =
+  /\b(acud\w*|ve a|vete a|dirigete a|llama\w*|contacta\w*|busca\w*)\b.*(urgencias|emergencias|112|atencion urgente|atencion inmediata)|no esperes\b/;
+
+function isUrgentCareInstructionClause(clause: string): boolean {
+  if (URGENT_CARE_CONDITIONAL_OR_PERMISSIVE_PATTERN.test(clause)) return false;
+  if (URGENT_CARE_NEGATED_INSTRUCTION_PATTERN.test(clause)) return false;
+  return URGENT_CARE_AFFIRMATIVE_INSTRUCTION_PATTERN.test(clause);
+}
 
 export function mentionsUrgentCareGuidance(reply: string): boolean {
   const normalized = normalize(reply);
-  if (URGENT_CARE_NEGATED_INSTRUCTION_PATTERN.test(normalized)) return false;
-  return URGENT_CARE_GUIDANCE_PATTERN.test(normalized);
+  const clauses = normalized
+    .split(URGENT_CARE_CLAUSE_SPLIT_PATTERN)
+    .map(clause => clause.trim())
+    .filter(Boolean);
+  return clauses.some(isUrgentCareInstructionClause);
 }
 
 export function mentionsHealthCard(reply: string): boolean {

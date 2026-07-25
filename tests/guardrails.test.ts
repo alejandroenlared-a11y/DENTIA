@@ -264,8 +264,25 @@ describe("preparePatientReply - EMERGENCY short-circuit", () => {
     expect(result).toBe(localReply);
   });
 
-  it("mentionsUrgentCareGuidance: 'No acudas a urgencias; descansa y observa' se detecta como negado", () => {
-    expect(mentionsUrgentCareGuidance("No acudas a urgencias; descansa y observa.")).toBe(false);
+  // Codex (P1, revision sobre c7c9e1a, hardening solicitado): matriz
+  // completa - la funcion debe resolver POLARIDAD (instruccion afirmativa
+  // e inmediata), no solo detectar la palabra suelta "urgencias".
+  it.each([
+    ["Acude a urgencias ahora mismo.", true],
+    ["Ve a un servicio de urgencias.", true],
+    ["Busca atención urgente inmediatamente.", true],
+    ["Llama al 112.", true],
+    ["Contacta con emergencias.", true],
+    ["No esperes y ve a urgencias.", true],
+    ["No acudas a urgencias.", false],
+    ["No hace falta ir a urgencias.", false],
+    ["No es necesario acudir a urgencias.", false],
+    ["Evita las urgencias.", false],
+    ["Puedes esperar antes de ir a urgencias.", false],
+    ["Descansa y observa cómo evolucionas.", false],
+    ["Consulta urgencias solo si empeora.", false]
+  ])("mentionsUrgentCareGuidance('%s') -> %s", (reply, expected) => {
+    expect(mentionsUrgentCareGuidance(reply)).toBe(expected);
   });
 
   it("no rompe el caso ya cubierto: el texto canonico de EMERGENCY (con 'no esperes' lejos de 'urgencias') sigue reconociendose como indicacion valida", () => {
@@ -275,6 +292,29 @@ describe("preparePatientReply - EMERGENCY short-circuit", () => {
 
   it("no rompe el caso ya cubierto: 've a urgencias sin esperar' sigue reconociendose como indicacion valida", () => {
     expect(mentionsUrgentCareGuidance("Esto es serio, ve a urgencias sin esperar.")).toBe(true);
+  });
+
+  // Casos de integracion del P1 (preparePatientReply completo, no solo la
+  // funcion unitaria).
+  it.each([
+    ["No acudas a urgencias; descansa.", false],
+    ["No es necesario acudir a urgencias.", false],
+    ["Consulta urgencias si mañana empeoras.", false]
+  ])("preparePatientReply descarta aiReply EMERGENCY no afirmativo: '%s'", aiReply => {
+    const { state, reply: localReply } = emergencyTurn();
+    const result = preparePatientReply(aiReply, state, localReply, "Tengo la cara muy hinchada y me cuesta respirar");
+    expect(result).toBe(localReply);
+  });
+
+  it("preparePatientReply conserva un aiReply EMERGENCY afirmativo si cumple el resto de guardrails", () => {
+    const { state, reply: localReply } = emergencyTurn();
+    const result = preparePatientReply(
+      "Acude a urgencias ahora mismo.",
+      state,
+      localReply,
+      "Tengo la cara muy hinchada y me cuesta respirar"
+    );
+    expect(result).toContain("urgencias");
   });
 
   it("un caso ROUTINE tras completar el triaje sigue ofreciendo ayuda para la cita - el guardrail de emergencia no lo bloquea", () => {

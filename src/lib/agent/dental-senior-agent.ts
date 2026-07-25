@@ -856,6 +856,28 @@ const CAPACITY_INCAPACITY_PATTERN = /\b(no puedo|no consigo|me resulta imposible
 const CAPACITY_DIFFICULTY_PATTERN = /\b(me cuesta|con dificultad|apenas puedo|puedo muy poco)\b/;
 const CAPACITY_EXPLICIT_CAPACITY_PATTERN = /\b(puedo bien|sin problema|con normalidad|puedo)\b/;
 
+// Codex (P1, revision sobre c7c9e1a): vocabulario adicional para
+// trauma_capacity_clarification (pregunta COMPUESTA), que necesita cubrir
+// formas que CAPACITY_DIFFICULTY_PATTERN/CAPACITY_EXPLICIT_CAPACITY_PATTERN
+// no cubren por si solas: negacion compuesta de "problema"/"dificultad"
+// ("no tengo dificultad", "sin problema", "ningun problema"), conjugaciones
+// de "cuesta" ("cuestan"), y "dificultad"/"problema"/"bien"/"normalidad"
+// como palabras sueltas. Se comprueban DESPUES de los patrones compartidos
+// (mismo orden de prioridad clinica: incapacidad explicita > negacion
+// compuesta de dificultad > dificultad explicita > capacidad explicita).
+const CAPACITY_NEGATED_NORMAL_PATTERN =
+  /\bno me cuesta\w*\b|\b(no tengo|no hay|sin|tampoco tengo|ningun\w*)\s+(dificultad\w*|problemas?)\b/;
+const CAPACITY_BARE_DIFFICULTY_PATTERN = /\bcuesta\w*\b|\bdificultad\w*\b|\bproblemas?\b/;
+const CAPACITY_BARE_NORMAL_PATTERN = /\bnormalidad\b|\bbien\b/;
+
+function resolveCapacityClausePolarity(clause: string): "difficulty" | "normal" {
+  if (CAPACITY_INCAPACITY_PATTERN.test(clause)) return "difficulty";
+  if (CAPACITY_NEGATED_NORMAL_PATTERN.test(clause)) return "normal";
+  if (CAPACITY_DIFFICULTY_PATTERN.test(clause) || CAPACITY_BARE_DIFFICULTY_PATTERN.test(clause)) return "difficulty";
+  if (CAPACITY_EXPLICIT_CAPACITY_PATTERN.test(clause) || CAPACITY_BARE_NORMAL_PATTERN.test(clause)) return "normal";
+  return "difficulty";
+}
+
 // Fuente unica de verdad para interpretar una respuesta a la ULTIMA pregunta
 // clinica/de seguridad hecha (lastQuestionKey persistido en el estado). No
 // reconstruye señales por texto libre solamente: si la respuesta es una
@@ -961,58 +983,74 @@ export function resolveAnswerToLastClinicalQuestion(input: {
     }
 
     if (isTraumaCapacityClarification && unresolvedCapacityKeys.length > 0) {
-      const mentionsOpeningTopic = /\b(abrir|boca)\b/.test(normalized);
-      const mentionsSwallowingTopic = /\btragar\b/.test(normalized);
-      const mentionsBothWord = /\b(ambas cosas|las dos|los dos)\b/.test(normalized);
       const mentionsExclusive = /\b(solo|solamente|unicamente)\b/.test(normalized);
-      // Codex (P1, revision sobre c7c9e1a - "Preserve coordinated statements
-      // of normal capacity"): las alternativas anteriores solo reconocian la
-      // negacion conjunta cuando el paciente usaba la palabra colectiva
-      // "ambas cosas"/"las dos"/"los dos" ("puedo hacer ambas cosas bien").
-      // Una respuesta coordinada SIN esa palabra colectiva pero igual de
-      // explicita ("Puedo abrir y tragar", "No me cuesta abrir ni tragar")
-      // no la reconocia como negacion, caia en mentionsOpeningTopic &&
-      // mentionsSwallowingTopic, y el branch por defecto (mas abajo)
-      // afirmaba ambas dificultades igualmente - escalando a EMERGENCY a un
-      // paciente que dijo explicitamente que no tiene molestias.
-      const deniesBothProblem =
-        /(no tengo ningun problema|sin ningun problema|ningun problema|puedo hacer (ambas cosas|las dos|los dos)|puedo con (ambas cosas|las dos|los dos)|(ambas cosas|las dos|los dos) (estan|esta) bien|(ambas cosas|las dos|los dos) van bien|todo bien|puedo (abrir( la boca)?|tragar)\s*(y|e)\s*(abrir( la boca)?|tragar)|no me cuesta (abrir( la boca)?|tragar)\s*(y|ni|e)\s*(abrir( la boca)?|tragar)|sin dificultad (para )?(abrir|tragar)\s*(y|ni|e)\s*(abrir|tragar))/.test(
-          normalized
-        );
+      // Codex (P1, revision sobre c7c9e1a, hardening solicitado tras un
+      // primer intento incompleto): la version anterior clasificaba la
+      // respuesta ENTERA como "ambas afirman" o "ambas niegan" en cuanto se
+      // mencionaban los dos topics, comparando el mensaje completo contra
+      // una lista fija de frases de negacion. Eso no distinguia capacidad de
+      // dificultad POR TOPIC real: "Tragar bien, pero abrir me cuesta" es
+      // una respuesta MIXTA (tragar normal, abrir con dificultad) que la
+      // version anterior habria tratado como "ambas afirman" solo por
+      // mencionar los dos topics en el mismo mensaje. Ahora cada CLAUSULA
+      // (separada por coma/punto/"pero" - reutilizando CLAUSE_SPLIT_PATTERN,
+      // nunca por "y", que aqui casi siempre coordina objetos de un mismo
+      // verbo: "puedo abrir y tragar") resuelve su propia polaridad de
+      // capacidad via resolveCapacityClausePolarity (mismo vocabulario
+      // compartido que la pregunta simple trauma_opening_only/
+      // trauma_swallowing_only: CAPACITY_INCAPACITY_PATTERN/
+      // CAPACITY_DIFFICULTY_PATTERN/CAPACITY_EXPLICIT_CAPACITY_PATTERN), y
+      // esa polaridad se aplica a cualquier topic que la clausula mencione.
+      // Una clausula colectiva ("ambas"/"las dos"/"los dos") sin marcador de
+      // capacidad/dificultad explicito hereda el default ya establecido en
+      // Bloqueante 1: nombrar el topic sin decir "estoy bien" es la
+      // respuesta afirmativa por defecto de esta pregunta.
+      const clauses = normalized
+        .split(CLAUSE_SPLIT_PATTERN)
+        .map(clause => clause.trim())
+        .filter(Boolean);
 
-      // Codex (revision sobre 77a41cc - "Treat 'ambas cosas' as affirming
-      // both difficulties"): la version anterior solo actuaba cuando
-      // deniesBothProblem coincidia ("puedo hacer ambas cosas bien"/"ningun
-      // problema...") - una respuesta AFIRMATIVA desnuda ("Ambas cosas",
-      // "Las dos", "Abrir y tragar") a la pregunta "¿te cuesta abrir la
-      // boca, tragar o ambas cosas?" no tocaba ninguna señal, dejando el
-      // cribado sin resolver y perdiendo una posible dificultad real para
-      // tragar. Mencionar ambos topics SIN una frase de "estoy bien" es la
-      // respuesta afirmativa por defecto de esta pregunta concreta.
-      if (mentionsBothWord || (mentionsOpeningTopic && mentionsSwallowingTopic)) {
-        if (deniesBothProblem) {
-          for (const key of unresolvedCapacityKeys) negated.add(key);
-        } else {
-          for (const key of unresolvedCapacityKeys) {
-            affirmed.add(key);
-            contextuallyAffirmed.add(key);
+      let openingVerdict: "difficulty" | "normal" | null = null;
+      let swallowingVerdict: "difficulty" | "normal" | null = null;
+
+      for (const clause of clauses) {
+        const mentionsOpeningTopic = /\babr\w*\b|\bboca\b/.test(clause);
+        const mentionsSwallowingTopic = /\btrag\w*\b/.test(clause);
+        const mentionsCollective = /\b(ambas|las dos|los dos)\b/.test(clause);
+        if (!mentionsOpeningTopic && !mentionsSwallowingTopic && !mentionsCollective) continue;
+
+        const polarity = resolveCapacityClausePolarity(clause);
+        if (mentionsOpeningTopic || mentionsCollective) openingVerdict = polarity;
+        if (mentionsSwallowingTopic || mentionsCollective) swallowingVerdict = polarity;
+
+        // "Solo"/"solamente"/"unicamente" + UN unico topic en la clausula
+        // (nunca colectivo) fuerza la negacion del topic no mencionado -
+        // precedente ya establecido (Bloqueante 1/2): "Solo abrir la boca"
+        // afirma opening y niega swallowing, nunca lo deja sin resolver.
+        if (mentionsExclusive && !mentionsCollective) {
+          if (mentionsOpeningTopic && !mentionsSwallowingTopic && swallowingVerdict === null) {
+            swallowingVerdict = "normal";
+          }
+          if (mentionsSwallowingTopic && !mentionsOpeningTopic && openingVerdict === null) {
+            openingVerdict = "normal";
           }
         }
-      } else if (mentionsOpeningTopic && !mentionsSwallowingTopic) {
-        if (unresolvedCapacityKeys.includes("openingDifficulty")) {
+      }
+
+      if (openingVerdict && unresolvedCapacityKeys.includes("openingDifficulty")) {
+        if (openingVerdict === "normal") {
+          negated.add("openingDifficulty");
+        } else {
           affirmed.add("openingDifficulty");
           contextuallyAffirmed.add("openingDifficulty");
         }
-        if (mentionsExclusive && unresolvedCapacityKeys.includes("swallowingDifficulty")) {
+      }
+      if (swallowingVerdict && unresolvedCapacityKeys.includes("swallowingDifficulty")) {
+        if (swallowingVerdict === "normal") {
           negated.add("swallowingDifficulty");
-        }
-      } else if (mentionsSwallowingTopic && !mentionsOpeningTopic) {
-        if (unresolvedCapacityKeys.includes("swallowingDifficulty")) {
+        } else {
           affirmed.add("swallowingDifficulty");
           contextuallyAffirmed.add("swallowingDifficulty");
-        }
-        if (mentionsExclusive && unresolvedCapacityKeys.includes("openingDifficulty")) {
-          negated.add("openingDifficulty");
         }
       }
     }

@@ -2257,6 +2257,41 @@ describe("Codex (revision sobre c7c9e1a): la negacion de una clausula posterior 
     expect(turn.state.safetyScreened).toBe(true);
     expect(turn.state.redFlags).toEqual([]);
   });
+
+  // Codex (P1, revision sobre c7c9e1a, hardening solicitado): matriz de
+  // casos B-F del spec (A ya cubierto arriba, G/H ya cubiertos en el
+  // describe "la ultima mencion explicita gana, sin return prematuro").
+  it("caso B: 'Tengo dolor y no tengo hinchazón' -> pain afirmado, swelling negado", () => {
+    const result = extractAffirmedAndNegatedClinicalSignals("Tengo dolor y no tengo hinchazón");
+    expect(result.affirmed).toContain("pain");
+    expect(result.negated).toContain("swelling");
+  });
+
+  it("caso C: 'Hinchazón en el ojo y no tengo fiebre' -> swelling afirmado (red flag conservado), fever negado", () => {
+    const turn = runDentalSeniorTurn(initialDentalAgentState, "Hinchazón en el ojo y no tengo fiebre");
+    expect(turn.state.redFlags).toContain("hinchazon en cuello, boca u ojo");
+    expect(turn.state.triageLevel).toBe("EMERGENCY");
+    const signals = extractAffirmedAndNegatedClinicalSignals("Hinchazón en el ojo y no tengo fiebre");
+    expect(signals.negated).toContain("fever");
+  });
+
+  it("caso D: 'Me sangra una muela y no he recibido ningún golpe' -> bleeding afirmado, trauma negado (sin hipotesis de fractura)", () => {
+    const result = extractAffirmedAndNegatedClinicalSignals("Me sangra una muela y no he recibido ningún golpe");
+    expect(result.affirmed).toContain("bleedingUncontrolled");
+    expect(result.negated).toContain("trauma");
+  });
+
+  it("caso E: 'No tengo fiebre ni hinchazón' -> ambas negadas", () => {
+    const result = extractAffirmedAndNegatedClinicalSignals("No tengo fiebre ni hinchazón");
+    expect(result.negated).toContain("fever");
+    expect(result.negated).toContain("swelling");
+  });
+
+  it("caso F: 'No tengo hinchazón ni pus' -> ambas negadas", () => {
+    const result = extractAffirmedAndNegatedClinicalSignals("No tengo hinchazón ni pus");
+    expect(result.negated).toContain("swelling");
+    expect(result.negated).toContain("pus");
+  });
 });
 
 describe("Codex (revision sobre c7c9e1a): declaraciones coordinadas de capacidad normal no afirman dificultad", () => {
@@ -2290,5 +2325,83 @@ describe("Codex (revision sobre c7c9e1a): declaraciones coordinadas de capacidad
     });
     expect(result.affirmed).toContain("openingDifficulty");
     expect(result.affirmed).toContain("swallowingDifficulty");
+  });
+
+  // Codex (P1, revision sobre c7c9e1a, hardening solicitado): matriz
+  // completa. Niega ambas (capacidad normal coordinada, con o sin la
+  // palabra colectiva "ambas/las dos").
+  it.each([
+    "Puedo abrir y tragar",
+    "Puedo abrir la boca y tragar bien",
+    "No me cuesta abrir ni tragar",
+    "No tengo dificultad para abrir ni para tragar",
+    "Puedo hacer ambas cosas bien",
+    "Las dos cosas están bien",
+    "Ambas sin problema",
+    "Abro y trago con normalidad"
+  ])("niega ambas: '%s'", message => {
+    const result = resolveAnswerToLastClinicalQuestion({
+      patientMessage: message,
+      lastQuestionKey: "trauma_capacity_clarification"
+    });
+    expect(result.negated).toContain("openingDifficulty");
+    expect(result.negated).toContain("swallowingDifficulty");
+    expect(result.affirmed).not.toContain("openingDifficulty");
+    expect(result.affirmed).not.toContain("swallowingDifficulty");
+  });
+
+  // Afirma ambas (dificultad real, incluyendo doble negativo e incapacidad
+  // explicita).
+  it.each(["Me cuesta abrir y tragar", "No puedo hacer ninguna de las dos", "Tengo dificultad para ambas", "Me cuestan las dos cosas"])(
+    "afirma ambas: '%s'",
+    message => {
+      const result = resolveAnswerToLastClinicalQuestion({
+        patientMessage: message,
+        lastQuestionKey: "trauma_capacity_clarification"
+      });
+      expect(result.affirmed).toContain("openingDifficulty");
+      expect(result.affirmed).toContain("swallowingDifficulty");
+      expect(result.negated).not.toContain("openingDifficulty");
+      expect(result.negated).not.toContain("swallowingDifficulty");
+    }
+  );
+
+  // Resuelve solo una - incluye el caso MIXTO (una clausula normal, otra
+  // con dificultad) que la version anterior no podia distinguir porque
+  // trataba "menciona ambos topics" como un unico veredicto binario.
+  it("resuelve solo una: 'Solo me cuesta abrir' afirma opening, niega swallowing", () => {
+    const result = resolveAnswerToLastClinicalQuestion({
+      patientMessage: "Solo me cuesta abrir",
+      lastQuestionKey: "trauma_capacity_clarification"
+    });
+    expect(result.affirmed).toContain("openingDifficulty");
+    expect(result.negated).toContain("swallowingDifficulty");
+  });
+
+  it("resuelve solo una (caso MIXTO por clausula): 'Tragar bien, pero abrir me cuesta' niega swallowing y afirma opening", () => {
+    const result = resolveAnswerToLastClinicalQuestion({
+      patientMessage: "Tragar bien, pero abrir me cuesta",
+      lastQuestionKey: "trauma_capacity_clarification"
+    });
+    expect(result.negated).toContain("swallowingDifficulty");
+    expect(result.affirmed).toContain("openingDifficulty");
+  });
+
+  it("resuelve solo una: 'Solo tengo problemas para tragar' afirma swallowing, niega opening", () => {
+    const result = resolveAnswerToLastClinicalQuestion({
+      patientMessage: "Solo tengo problemas para tragar",
+      lastQuestionKey: "trauma_capacity_clarification"
+    });
+    expect(result.affirmed).toContain("swallowingDifficulty");
+    expect(result.negated).toContain("openingDifficulty");
+  });
+
+  it("end-to-end: 'Tengo dificultad para ambas' tras la aclaracion cierra el cribado con EMERGENCY", () => {
+    const first = runDentalSeniorTurn(initialDentalAgentState, "Me di un golpe en el diente");
+    const second = runDentalSeniorTurn(first.state, "No");
+    const third = runDentalSeniorTurn(second.state, "Tengo dificultad para ambas");
+    expect(third.state.safetyScreened).toBe(true);
+    expect(third.state.redFlags).toContain("dificultad para tragar o hablar");
+    expect(third.state.triageLevel).toBe("EMERGENCY");
   });
 });
