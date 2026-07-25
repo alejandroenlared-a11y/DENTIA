@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { initialDentalAgentState } from "@/lib/agent/dental-senior-agent";
+import { initialDentalAgentState, runDentalSeniorTurn } from "@/lib/agent/dental-senior-agent";
 import { runDentalAgentTurn, runOpenAiDentalAgentTurn } from "@/lib/agent/openai-dental-agent";
 
 // Forma real de la respuesta de la Generative Language API (generateContent).
@@ -177,7 +177,9 @@ describe("runDentalAgentTurn", () => {
     expect(result.runtime).toBe("local");
     expect(result.fallbackReason).toContain("OPENAI_API_KEY");
     expect(result.state.intent).toBe("caries_restoration");
-    expect(result.reply).toContain("empaste");
+    expect(result.state.safetyScreened).toBe(false);
+    expect(result.reply).not.toContain("empaste");
+    expect(result.reply).toContain("pus");
   });
 
   it("uses a valid structured OpenAI response and keeps CRM-ready state", async () => {
@@ -387,9 +389,18 @@ describe("runDentalAgentTurn", () => {
     });
 
     expect(result.runtime).toBe("gemini");
-    expect(result.reply).toContain("Aceptas que guardemos tus datos");
+    // Codex (revision PR #13 sobre a720519): "no tengo fiebre ni hinchazon"
+    // solo resuelve 2 de las 5 senales del cribado (falta pus/abrir/tragar).
+    // El aiOutput.safetyScreened=true de Gemini se descarta (mergeAiState
+    // bloquea el campo a localState) - Clara sigue preguntando por el resto
+    // del cribado y NUNCA ofrece ayuda con la cita ni pide datos/consentimiento
+    // en este turno.
+    expect(result.state.safetyScreened).toBe(false);
+    expect(result.reply).not.toContain("Quieres que te ayude a solicitar una cita");
+    expect(result.reply).not.toContain("Aceptas que guardemos tus datos");
     expect(result.reply.toLowerCase()).not.toContain("me podrias indicar tu nombre");
     expect(result.reply.toLowerCase()).not.toContain("murcia o elche");
+    expect(result.reply).toContain("pus");
   });
 
   it("does not let Gemini ask consent before safety triage for a moving tooth", async () => {
@@ -1738,5 +1749,360 @@ describe("runDentalAgentTurn", () => {
     expect(reply).not.toContain("filtración de empaste");
     expect(reply).not.toContain("aceptas que guardemos");
     expect(reply).toContain("?");
+  });
+
+  it("CASO 7 (hotfix dental-negation-context): OpenAI usa la misma interpretacion de negacion - bloquea fractura/luxacion aunque aiOutput reclame trauma", async () => {
+    delete process.env.LLM_PROVIDER;
+    const openAiKeyEnvName = ["OPENAI", "API", "KEY"].join("_");
+    process.env[openAiKeyEnvName] = "test-key";
+    process.env.OPENAI_MODEL = "gpt-test";
+
+    const output = {
+      reply: "Podria ser una fractura dental o luxacion; cuentame cuando te diste el golpe.",
+      intent: "trauma",
+      intentCode: "TRAUMA_DENTAL",
+      treatmentNeed: "Traumatismo dental",
+      budget: "desde 70 EUR",
+      estimatedValue: 70,
+      escalated: false,
+      consent: false,
+      name: "",
+      phone: "",
+      location: "",
+      availability: "",
+      triageLevel: "URGENT_24H",
+      triageLabel: "Urgencia 24h",
+      clinicalReading: "Posible fractura o luxacion dental.",
+      likelyCauses: ["fractura dental", "luxacion"],
+      detectedSignals: [],
+      redFlags: [],
+      missingClinicalData: [],
+      confidence: "Media",
+      safetyScreened: false
+    };
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => ({ output_text: JSON.stringify(output) })
+    } as Response);
+
+    const result = await runOpenAiDentalAgentTurn({
+      latestPatientMessage: "Es poco y no he recibido ningun golpe.",
+      history: [],
+      state: {
+        ...initialDentalAgentState,
+        intent: "periodontics",
+        lastQuestionKey: "bleeding_severity_or_impact"
+      }
+    });
+
+    const reply = result.reply.toLowerCase();
+    expect(reply).not.toContain("fractura");
+    expect(reply).not.toContain("luxacion");
+    expect(reply).not.toContain("luxación");
+    expect(reply).not.toContain("cuando te diste el golpe");
+  });
+
+  it("CASO 7 (hotfix dental-negation-context): Gemini usa la misma interpretacion de negacion - bloquea fractura/luxacion aunque aiOutput reclame trauma", async () => {
+    process.env.LLM_PROVIDER = "gemini";
+    process.env.GEMINI_API_KEY = "gemini-test-key";
+    process.env.GEMINI_MODEL = "gemini-test-model";
+
+    const output = {
+      reply: "Podria ser una fractura dental o luxacion; cuentame cuando te diste el golpe.",
+      intent: "trauma",
+      intentCode: "TRAUMA_DENTAL",
+      treatmentNeed: "Traumatismo dental",
+      budget: "desde 70 EUR",
+      estimatedValue: 70,
+      escalated: false,
+      consent: false,
+      name: "",
+      phone: "",
+      location: "",
+      availability: "",
+      triageLevel: "URGENT_24H",
+      triageLabel: "Urgencia 24h",
+      clinicalReading: "Posible fractura o luxacion dental.",
+      likelyCauses: ["fractura dental", "luxacion"],
+      detectedSignals: [],
+      redFlags: [],
+      missingClinicalData: [],
+      confidence: "Media",
+      safetyScreened: false
+    };
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => geminiResponse(JSON.stringify(output))
+    } as Response);
+
+    const result = await runDentalAgentTurn({
+      latestPatientMessage: "Es poco y no he recibido ningun golpe.",
+      history: [],
+      state: {
+        ...initialDentalAgentState,
+        intent: "periodontics",
+        lastQuestionKey: "bleeding_severity_or_impact"
+      }
+    });
+
+    const reply = result.reply.toLowerCase();
+    expect(reply).not.toContain("fractura");
+    expect(reply).not.toContain("luxacion");
+    expect(reply).not.toContain("luxación");
+    expect(reply).not.toContain("cuando te diste el golpe");
+  });
+
+  // PR #13 (Codex): short-circuit obligatorio para EMERGENCY - por igual para
+  // OpenAI y Gemini (los dos pasan por preparePatientReply/guardrails.ts).
+  it("EMERGENCY (OpenAI): descarta un aiReply que pide consentimiento - gana la respuesta determinista de emergencia", async () => {
+    delete process.env.LLM_PROVIDER;
+    const openAiKeyEnvName = ["OPENAI", "API", "KEY"].join("_");
+    process.env[openAiKeyEnvName] = "test-key";
+    process.env.OPENAI_MODEL = "gpt-test";
+
+    const output = {
+      reply: "Acude a urgencias. ¿Aceptas que guardemos tus datos para priorizarte?",
+      intent: "urgent_pain",
+      intentCode: "TRIAJE_DOLOR_INFECCION",
+      treatmentNeed: "Urgencia dental",
+      budget: "desde 70 EUR",
+      estimatedValue: 22000,
+      escalated: true,
+      consent: true,
+      name: "",
+      phone: "",
+      location: "",
+      availability: "",
+      triageLevel: "EMERGENCY",
+      triageLabel: "Emergencia inmediata",
+      clinicalReading: "Hinchazon ocular a valorar.",
+      likelyCauses: [],
+      detectedSignals: [],
+      redFlags: ["hinchazon en cuello, boca u ojo"],
+      missingClinicalData: [],
+      confidence: "Alta",
+      safetyScreened: true
+    };
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => ({ output_text: JSON.stringify(output) })
+    } as Response);
+
+    const result = await runOpenAiDentalAgentTurn({
+      latestPatientMessage: "No tengo fiebre y tengo hinchazón en el ojo",
+      history: [],
+      state: initialDentalAgentState
+    });
+
+    expect(result.state.triageLevel).toBe("EMERGENCY");
+    expect(result.reply.toLowerCase()).not.toContain("aceptas");
+    expect(result.reply).toContain("urgencias");
+    expect(result.state.consent).toBe(false);
+    expect(result.state.bookingStatus).toBe("IDLE");
+  });
+
+  it("EMERGENCY (OpenAI): bloquea un aiReply que ofrece cita/huecos", async () => {
+    delete process.env.LLM_PROVIDER;
+    const openAiKeyEnvName = ["OPENAI", "API", "KEY"].join("_");
+    process.env[openAiKeyEnvName] = "test-key";
+    process.env.OPENAI_MODEL = "gpt-test";
+
+    const output = {
+      reply: "Te propongo estos huecos:\n\n1. jueves, 10:00\n2. viernes, 11:00\n\nResponde con 1 o 2.",
+      intent: "urgent_pain",
+      intentCode: "TRIAJE_DOLOR_INFECCION",
+      treatmentNeed: "Urgencia dental",
+      budget: "desde 70 EUR",
+      estimatedValue: 22000,
+      escalated: true,
+      consent: true,
+      name: "",
+      phone: "",
+      location: "",
+      availability: "",
+      triageLevel: "EMERGENCY",
+      triageLabel: "Emergencia inmediata",
+      clinicalReading: "Hinchazon ocular a valorar.",
+      likelyCauses: [],
+      detectedSignals: [],
+      redFlags: ["hinchazon en cuello, boca u ojo"],
+      missingClinicalData: [],
+      confidence: "Alta",
+      safetyScreened: true
+    };
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => ({ output_text: JSON.stringify(output) })
+    } as Response);
+
+    const result = await runOpenAiDentalAgentTurn({
+      latestPatientMessage: "No tengo fiebre y tengo hinchazón en el ojo",
+      history: [],
+      state: initialDentalAgentState
+    });
+
+    expect(result.reply.toLowerCase()).not.toContain("huecos");
+    expect(result.reply).toContain("urgencias");
+  });
+
+  it("EMERGENCY (Gemini): descarta un aiReply que pide consentimiento/cita - gana la respuesta determinista de emergencia", async () => {
+    process.env.LLM_PROVIDER = "gemini";
+    process.env.GEMINI_API_KEY = "gemini-test-key";
+    process.env.GEMINI_MODEL = "gemini-test-model";
+
+    const output = {
+      reply: "Acude a urgencias ya. ¿Me confirmas tu nombre y telefono para preparar la cita?",
+      intent: "urgent_pain",
+      intentCode: "TRIAJE_DOLOR_INFECCION",
+      treatmentNeed: "Urgencia dental",
+      budget: "desde 70 EUR",
+      estimatedValue: 22000,
+      escalated: true,
+      consent: true,
+      name: "",
+      phone: "",
+      location: "",
+      availability: "",
+      triageLevel: "EMERGENCY",
+      triageLabel: "Emergencia inmediata",
+      clinicalReading: "Hinchazon ocular a valorar.",
+      likelyCauses: [],
+      detectedSignals: [],
+      redFlags: ["hinchazon en cuello, boca u ojo"],
+      missingClinicalData: [],
+      confidence: "Alta",
+      safetyScreened: true
+    };
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => geminiResponse(JSON.stringify(output))
+    } as Response);
+
+    const result = await runDentalAgentTurn({
+      latestPatientMessage: "No tengo fiebre y tengo hinchazón en el ojo",
+      history: [],
+      state: initialDentalAgentState
+    });
+
+    expect(result.state.triageLevel).toBe("EMERGENCY");
+    expect(result.reply.toLowerCase()).not.toContain("nombre");
+    expect(result.reply.toLowerCase()).not.toContain("telefono");
+    expect(result.reply).toContain("urgencias");
+    expect(result.state.consent).toBe(false);
+    expect(result.state.bookingStatus).toBe("IDLE");
+  });
+});
+
+describe("PR #13 blocker 1: mergeAiState bloquea campos clinicos deterministas (la IA nunca los sustituye)", () => {
+  const message = "Me duele una muela con frio y al morder, no tengo fiebre ni hinchazon.";
+  const baseOutput = {
+    reply: "Parece un problema de encias, conviene revisar periodoncia con prioridad.",
+    escalated: false,
+    consent: false,
+    name: "",
+    phone: "",
+    location: "",
+    availability: "",
+    triageLevel: "PRIORITY_72H",
+    triageLabel: "Prioridad 48-72h",
+    redFlags: [] as string[],
+    missingClinicalData: [] as string[],
+    safetyScreened: true
+  };
+
+  function mockOpenAiOutput(output: Record<string, unknown>) {
+    delete process.env.LLM_PROVIDER;
+    const openAiKeyEnvName = ["OPENAI", "API", "KEY"].join("_");
+    process.env[openAiKeyEnvName] = "test-key";
+    process.env.OPENAI_MODEL = "gpt-test";
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => ({ output_text: JSON.stringify(output) })
+    } as Response);
+  }
+
+  it("ignora un intent/intentCode/treatmentNeed distinto propuesto por el LLM - conserva el del motor local", async () => {
+    const localState = runDentalSeniorTurn(initialDentalAgentState, message).state;
+    mockOpenAiOutput({
+      ...baseOutput,
+      intent: "periodontics",
+      intentCode: "PERIODONCIA_ENCIAS",
+      treatmentNeed: "Periodoncia",
+      budget: "desde 90 EUR",
+      estimatedValue: 22000,
+      clinicalReading: "Inflamacion gingival compatible con periodontitis.",
+      likelyCauses: ["periodontitis", "sarro subgingival"],
+      detectedSignals: ["sangrado de encias"],
+      confidence: "Alta"
+    });
+
+    const result = await runOpenAiDentalAgentTurn({
+      latestPatientMessage: message,
+      history: [],
+      state: initialDentalAgentState
+    });
+
+    expect(result.state.intent).toBe(localState.intent);
+    expect(result.state.intent).not.toBe("periodontics");
+    expect(result.state.intentCode).toBe(localState.intentCode);
+    expect(result.state.treatmentNeed).toBe(localState.treatmentNeed);
+  });
+
+  it("descarta detectedSignals inventadas por el LLM - conserva solo las del motor local", async () => {
+    const localState = runDentalSeniorTurn(initialDentalAgentState, message).state;
+    mockOpenAiOutput({
+      ...baseOutput,
+      intent: "caries_restoration",
+      intentCode: "CARIES_RESTAURACION",
+      treatmentNeed: "Empaste / conservadora",
+      budget: "desde 65 EUR",
+      estimatedValue: 11000,
+      clinicalReading: localState.clinicalReading,
+      likelyCauses: localState.likelyCauses,
+      detectedSignals: ["sangrado activo", "fractura visible", "dolor pulsante nocturno"],
+      confidence: localState.confidence
+    });
+
+    const result = await runOpenAiDentalAgentTurn({
+      latestPatientMessage: message,
+      history: [],
+      state: initialDentalAgentState
+    });
+
+    expect(result.state.detectedSignals).toEqual(localState.detectedSignals);
+    expect(result.state.detectedSignals).not.toContain("fractura visible");
+    expect(result.state.detectedSignals).not.toContain("sangrado activo");
+  });
+
+  it("descarta clinicalReading/likelyCauses/confidence incompatibles propuestos por el LLM - conserva los del motor local", async () => {
+    const localState = runDentalSeniorTurn(initialDentalAgentState, message).state;
+    mockOpenAiOutput({
+      ...baseOutput,
+      intent: "caries_restoration",
+      intentCode: "CARIES_RESTAURACION",
+      treatmentNeed: "Empaste / conservadora",
+      budget: "desde 65 EUR",
+      estimatedValue: 11000,
+      clinicalReading: "Sospecha de tumor odontogenico, derivar a cirugia maxilofacial urgente.",
+      likelyCauses: ["neoplasia odontogenica"],
+      detectedSignals: localState.detectedSignals,
+      confidence: "Alta"
+    });
+
+    const result = await runOpenAiDentalAgentTurn({
+      latestPatientMessage: message,
+      history: [],
+      state: initialDentalAgentState
+    });
+
+    expect(result.state.clinicalReading).toBe(localState.clinicalReading);
+    expect(result.state.likelyCauses).toEqual(localState.likelyCauses);
+    expect(result.state.confidence).toBe(localState.confidence);
+    expect(result.state.clinicalReading).not.toContain("tumor");
   });
 });

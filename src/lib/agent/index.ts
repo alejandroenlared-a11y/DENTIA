@@ -19,7 +19,13 @@ import {
   type DentalAgentApiTurn,
   type DentalChatMessage
 } from "@/lib/agent/openai-dental-agent";
-import { initialDentalAgentState, normalize, type DentalAgentState, type DentalIntentId } from "@/lib/agent/dental-senior-agent";
+import {
+  computeBookingStatus,
+  initialDentalAgentState,
+  normalize,
+  type DentalAgentState,
+  type DentalIntentId
+} from "@/lib/agent/dental-senior-agent";
 import { prisma } from "@/lib/prisma";
 import {
   cancelAppointment,
@@ -946,16 +952,27 @@ async function resolvePendingBookingChoice(
 }
 
 export function buildConfirmedBookingState(previousState: DentalAgentState, startsAt: Date): DentalAgentState {
-  return {
+  const nextState = {
     ...previousState,
     availability: formatFriendlyDateTime(startsAt),
     offeredAvailabilityOptions: [],
     ready: true
   };
+  // Codex (cierre de pre-reserva): bookingStatus solo se recalcula dentro de
+  // runDentalSeniorTurn - este estado se construye directamente aqui, fuera
+  // de ese turno, y sin esto se quedaba con el valor STALE de antes de
+  // elegir hueco (SLOTS_OFFERED), nunca PREBOOKED. Unica fuente de verdad:
+  // computeBookingStatus, igual que en runDentalSeniorTurn.
+  return { ...nextState, bookingStatus: computeBookingStatus(nextState) };
 }
 
+// Codex (cierre de pre-reserva): tras elegir hueco el flujo ha terminado -
+// una unica respuesta final con fecha/hora, aviso de que la clinica debe
+// confirmarla, agradecimiento y despedida. Nunca "si no te encaja, dime
+// cambiar" (eso reabre un flujo que ya se cerro); un cambio real solo se
+// reabre si el paciente lo pide expresamente (detectSchedulingRequest).
 export function formatPendingBookingConfirmation(startsAt: Date) {
-  return `Perfecto, te dejo pre-reservada la cita ${formatFriendlyDateTime(startsAt)}.\n\nSi no te encaja, dime cambiar y te doy otras opciones.`;
+  return `Perfecto, te dejo pre-reservada la cita ${formatFriendlyDateTime(startsAt)}. La clínica revisará la solicitud y se pondrá en contacto contigo para confirmarla. Gracias por confiar en nosotros. Que tengas un buen día.`;
 }
 
 // Tras "Ya tenias una pre-reserva... si quieres cambiarla, dimelo", el

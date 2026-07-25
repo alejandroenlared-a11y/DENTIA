@@ -48,4 +48,28 @@ describe("buildConfirmedBookingState", () => {
     expect(jumpsToBookingOptions(geminiReOffer)).toBe(true);
     expect(isBookingClosingAcknowledgment("perfecto")).toBe(true);
   });
+
+  // Codex (cierre de pre-reserva, Caso A): bookingStatus solo se recalculaba
+  // dentro de runDentalSeniorTurn - este estado se construye directamente al
+  // elegir hueco (fuera de ese turno) y se quedaba con el bookingStatus
+  // STALE de antes de elegir (SLOTS_OFFERED), nunca PREBOOKED.
+  it("sets bookingStatus to PREBOOKED (the pre-reservation status) right after the slot is picked", () => {
+    const previousState = offeredState({ bookingStatus: "SLOTS_OFFERED" });
+    const startsAt = new Date("2026-07-27T10:00:00");
+
+    const confirmedState = buildConfirmedBookingState(previousState, startsAt);
+
+    expect(confirmedState.bookingStatus).toBe("PREBOOKED");
+  });
+
+  it("keeps the exact selected slot - never swaps it for another option", () => {
+    const previousState = offeredState();
+    const startsAt = new Date("2026-07-27T10:00:00");
+
+    const confirmedState = buildConfirmedBookingState(previousState, startsAt);
+
+    expect(confirmedState.availability).toContain("27");
+    expect(confirmedState.availability).toContain("10:00");
+    expect(confirmedState.offeredAvailabilityOptions).toEqual([]);
+  });
 });

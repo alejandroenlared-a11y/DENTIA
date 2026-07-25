@@ -5,11 +5,11 @@ import {
   hasConcreteAvailability,
   hasFullName,
   initialDentalAgentState,
+  LAST_QUESTION_KEY_VALUES,
   runDentalSeniorTurn,
   TRIAGE_URGENCY_ORDER,
   triageLabel,
   type DentalAgentState,
-  type DentalIntentId,
   type TriageLevel
 } from "@/lib/agent/dental-senior-agent";
 import { preparePatientReply } from "@/lib/agent/guardrails";
@@ -145,7 +145,28 @@ export const dentalAgentStateSchema = z.object({
   // seguros via z.default(), nunca inventan una reserva ni un cierre.
   bookingStatus: z.enum(bookingStatusValues).default("IDLE"),
   conversationStatus: z.enum(conversationStatusValues).default("ACTIVE"),
-  closureAcknowledged: z.boolean().default(false)
+  closureAcknowledged: z.boolean().default(false),
+  // Hotfix dental-negation-context: identifica que pregunta clinica/de
+  // seguridad fija se hizo el ultimo turno, para interpretar negaciones
+  // ("no, nada de eso") en contexto. Default seguro ("" = ninguna) para
+  // estados antiguos persistidos antes de este hotfix.
+  // PR #13 (comentario P2): un valor desconocido/corrupto (ej.
+  // "valor-invalido") se normaliza a "" en el limite de la API en vez de
+  // viajar crudo hasta el motor - z.enum().catch() nunca lanza ni deja pasar
+  // un valor fuera del enum (defensa adicional en resolveAnswerToLastClinicalQuestion,
+  // dental-senior-agent.ts, para cualquier estado que no pase por este schema).
+  lastQuestionKey: z.enum(LAST_QUESTION_KEY_VALUES).catch(""),
+  // Hotfix dental-negation-context (Problema 2): sangrado/golpe resuelto no
+  // implica cribado general completo. Default seguro (false) para estados
+  // antiguos persistidos antes de este hotfix.
+  bleedingDifferentialResolved: z.boolean().default(false),
+  // Hotfix dental-negation-context (Problema 1/3): identifica la ultima
+  // pregunta/oferta del flujo completo (no solo clinica) para interpretar
+  // "si"/"no, gracias" en contexto. Default seguro ("") para estados
+  // antiguos.
+  lastAssistantAction: z.string().default(""),
+  appointmentHelpAccepted: z.boolean().default(false),
+  appointmentHelpDeclined: z.boolean().default(false)
 });
 
 const dentalChatMessageSchema = z.object({
@@ -243,8 +264,9 @@ export async function runOpenAiDentalAgentTurn(input: {
   state: DentalAgentState;
   clinicContext?: string;
 }): Promise<DentalAgentApiTurn> {
+  const startedAt = Date.now();
   const turn = await runOpenAiDentalAgentTurnInternal(input);
-  return attachConversationFields(turn, input.latestPatientMessage, input.state, lastAssistantMessageOf(input.history));
+  return attachConversationFields(turn, input.latestPatientMessage, input.state, lastAssistantMessageOf(input.history), startedAt);
 }
 
 async function runOpenAiDentalAgentTurnInternal(input: {
@@ -318,8 +340,9 @@ async function runGeminiDentalAgentTurn(input: {
   state: DentalAgentState;
   clinicContext?: string;
 }): Promise<DentalAgentApiTurn> {
+  const startedAt = Date.now();
   const turn = await runGeminiDentalAgentTurnInternal(input);
-  return attachConversationFields(turn, input.latestPatientMessage, input.state, lastAssistantMessageOf(input.history));
+  return attachConversationFields(turn, input.latestPatientMessage, input.state, lastAssistantMessageOf(input.history), startedAt);
 }
 
 async function runGeminiDentalAgentTurnInternal(input: {
@@ -972,11 +995,41 @@ function logConversationClassificationShadow(
 // esos 2 campos aunque V2 se los pida - eso solo se registra en sombra para
 // comparar. Esto cumple que ninguna transicion critica (reserva, confirmacion,
 // cancelacion, urgencia, cierre) quede en manos del modelo.
+// FINAL-DENTIA-CLOSEOUT Fase 10: metricas tecnicas sin PII - nunca el texto
+// del paciente, nunca nombre/telefono/email, nunca la conversacion completa,
+// nunca una API key. Solo senales operativas para observabilidad (runtime
+// real usado, duracion, si hubo timeout/schema invalido, escalado, estado de
+// reserva). "guardrail que sustituyo la respuesta" NO se incluye todavia:
+// requeriria que preparePatientReply (guardrails.ts) devuelva metadata ademas
+// del string final, y ese cambio de contrato se deja fuera de esta ronda para
+// no tocar una funcion de seguridad ya cubierta por 13+ tests sin su propia
+// pasada de tests dedicada.
+function logDentalAgentTelemetry(turn: DentalAgentApiTurn, durationMs: number): void {
+  // console.debug (no console.info): logConversationClassificationShadow ya
+  // usa console.info y varios tests existentes (dental-agent-schema-v2.test.ts)
+  // hacen spy exacto sobre console.info esperando SOLO esa llamada - un
+  // segundo console.info aqui rompia ese conteo sin aportar nada, dos
+  // preocupaciones distintas no deberian compartir el mismo canal de log.
+  console.debug("[dental-agent] telemetry", {
+    runtime: turn.runtime,
+    model: turn.model,
+    durationMs,
+    timeout: Boolean(turn.fallbackReason?.startsWith("Sin respuesta del proveedor externo")),
+    schemaParseFailure: Boolean(turn.fallbackReason?.startsWith("Salida IA invalida")),
+    fallbackReason: turn.fallbackReason ?? null,
+    escalated: turn.state.escalated,
+    triageLevel: turn.state.triageLevel,
+    bookingStatus: turn.bookingStatus,
+    conversationStatus: turn.conversationStatus
+  });
+}
+
 function attachConversationFields(
   turn: DentalAgentApiTurn & { aiSelfReportedFields?: AiSelfReportedConversationFields },
   latestPatientMessage: string,
   previousState: DentalAgentState,
-  lastAssistantMessage: string | undefined
+  lastAssistantMessage: string | undefined,
+  startedAt: number
 ): DentalAgentApiTurn {
   // Bug real (PR #11): antes solo se pasaba turn.state (ya procesado) al
   // enrutador, asi que seleccionar un hueco ("1") no se detectaba como
@@ -1000,7 +1053,7 @@ function attachConversationFields(
     bookingStatus: routed.bookingStatus,
     conversationStatus: routed.conversationStatus
   };
-  return {
+  const result: DentalAgentApiTurn = {
     reply: turn.reply,
     state,
     runtime: turn.runtime,
@@ -1011,6 +1064,8 @@ function attachConversationFields(
     bookingStatus: routed.bookingStatus,
     conversationStatus: routed.conversationStatus
   };
+  logDentalAgentTelemetry(result, Date.now() - startedAt);
+  return result;
 }
 
 // Hotfix (fallo confirmado en produccion, "me duele al morder" -> diagnostico
@@ -1056,31 +1111,43 @@ function mergeClinicalEscalation(
 }
 
 function mergeAiState(localState: DentalAgentState, aiOutput: DentalAgentAiOutput): DentalAgentState {
-  const aiIntent = aiOutput.intent === "unknown" ? localState.intent : (aiOutput.intent as DentalIntentId);
-  const intent =
-    localState.intent === "trauma" && ["urgent_pain", "endodontics", "caries_restoration"].includes(aiIntent ?? "")
-      ? "trauma"
-      : aiIntent;
   const escalation = mergeClinicalEscalation(localState, aiOutput);
   const state: DentalAgentState = {
     ...localState,
-    intent,
-    intentCode: aiOutput.intentCode || localState.intentCode || PENDING_INTENT,
-    treatmentNeed: aiOutput.treatmentNeed || localState.treatmentNeed,
     budget: aiOutput.budget || localState.budget,
     estimatedValue: aiOutput.estimatedValue,
     name: localState.name || aiOutput.name,
     phone: localState.phone || aiOutput.phone,
     email: localState.email || aiOutput.email,
-    clinicalReading: aiOutput.clinicalReading,
-    likelyCauses: unique([...localState.likelyCauses, ...aiOutput.likelyCauses]),
-    detectedSignals: unique([...localState.detectedSignals, ...aiOutput.detectedSignals]),
-    confidence: aiOutput.confidence,
+    // Codex (revision PR #13 sobre a720519): mergeAiState dejaba que la IA
+    // sustituyera intent/intentCode/treatmentNeed/clinicalReading/
+    // likelyCauses/detectedSignals/confidence (union o reemplazo directo del
+    // aiOutput) - un intent inventado, señales alucinadas o una lectura
+    // clinica incompatible con lo que el motor local detecto de verdad
+    // podian colarse en el estado persistido. Estos campos son
+    // deterministicos igual que consent/safetyScreened/redFlags de abajo:
+    // la IA no tiene autoridad sobre ninguno, se conservan SIEMPRE desde
+    // localState. Lo que la IA proponga en aiOutput para estos campos se
+    // descarta por completo (no se registra ni como shadow metadata: no
+    // hay ningun consumidor que lo necesite hoy, y persistirlo sin uso real
+    // seria superficie sin proposito).
+    intent: localState.intent,
+    intentCode: localState.intentCode,
+    treatmentNeed: localState.treatmentNeed,
+    clinicalReading: localState.clinicalReading,
+    likelyCauses: localState.likelyCauses,
+    detectedSignals: localState.detectedSignals,
+    confidence: localState.confidence,
     // Autoridad exclusiva del motor deterministico - la IA nunca las toca:
     consent: localState.consent,
     safetyScreened: localState.safetyScreened,
     missingClinicalData: localState.missingClinicalData,
     redFlags: localState.redFlags,
+    lastQuestionKey: localState.lastQuestionKey,
+    bleedingDifferentialResolved: localState.bleedingDifferentialResolved,
+    lastAssistantAction: localState.lastAssistantAction,
+    appointmentHelpAccepted: localState.appointmentHelpAccepted,
+    appointmentHelpDeclined: localState.appointmentHelpDeclined,
     bookingStatus: localState.bookingStatus,
     conversationStatus: localState.conversationStatus,
     location: localState.location,
@@ -1111,6 +1178,3 @@ function computeReady(state: DentalAgentState) {
   );
 }
 
-function unique(values: string[]) {
-  return Array.from(new Set(values.map(value => value.trim()).filter(Boolean)));
-}

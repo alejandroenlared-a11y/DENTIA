@@ -56,7 +56,48 @@ export type DentalAgentState = {
   // reserva) al menos una vez, para no repetirlo en agradecimientos
   // posteriores (ver buildDentalReply, bloque state.ready).
   closureAcknowledged: boolean;
+  // Hotfix dental-negation-context: identifica de forma semantica (no por
+  // texto literal) cual fue la ULTIMA pregunta clinica/de seguridad que
+  // Clara hizo, para que resolveAnswerToLastClinicalQuestion (mas abajo)
+  // pueda interpretar una respuesta corta ("no, nada de eso", "es poco")
+  // en funcion de que se pregunto, no solo del texto suelto del paciente.
+  // "" cuando el ultimo turno no hizo ninguna de estas preguntas fijas.
+  lastQuestionKey: string;
+  // Hotfix dental-negation-context (Problema 2): resolver sangrado
+  // leve/abundante + presencia/ausencia de golpe (bleeding_severity_or_impact)
+  // ya NO basta por si solo para dar el cribado de seguridad por completo -
+  // todavia falta preguntar fiebre/hinchazon/pus/dificultad para abrir o
+  // tragar. Este flag distingue "la diferencial de sangrado esta resuelta" de
+  // "el cribado de seguridad completo esta resuelto" (safetyScreened).
+  bleedingDifferentialResolved: boolean;
+  // Hotfix dental-negation-context (Problema 1/3): identifica de forma
+  // semantica cual fue la ULTIMA pregunta/oferta que Clara hizo (mirroring de
+  // lastQuestionKey pero para el flujo completo de reserva, no solo las
+  // preguntas clinicas), para interpretar correctamente una respuesta corta
+  // ("si"/"no, gracias") segun el contexto real, no solo por texto suelto.
+  // Tipado como string (no LastAssistantAction) por el mismo motivo que
+  // lastQuestionKey: viaja serializado via Zod (dentalAgentStateSchema) y
+  // estados antiguos persistidos no garantizan un valor del enum.
+  lastAssistantAction: string;
+  // Una vez completado el triaje de seguridad, Clara ofrece ayuda para pedir
+  // cita ANTES de pedir consentimiento (nunca en el mismo turno). Estos dos
+  // flags son sticky: una vez el paciente acepta o declina esa oferta, la
+  // decision se recuerda en toda la conversacion.
+  appointmentHelpAccepted: boolean;
+  appointmentHelpDeclined: boolean;
 };
+
+export type LastAssistantAction =
+  | ""
+  | "EMERGENCY_GUIDANCE"
+  | "ASK_CLINICAL_SAFETY"
+  | "OFFER_APPOINTMENT_HELP"
+  | "ASK_PRIVACY_CONSENT"
+  | "ASK_NAME"
+  | "ASK_EMAIL"
+  | "ASK_PHONE"
+  | "ASK_LOCATION"
+  | "OFFER_SLOTS";
 
 export type DentalAgentTurn = {
   state: DentalAgentState;
@@ -102,8 +143,26 @@ export const initialDentalAgentState: DentalAgentState = {
   dataErasureRequested: false,
   bookingStatus: "IDLE",
   conversationStatus: "ACTIVE",
-  closureAcknowledged: false
+  closureAcknowledged: false,
+  lastQuestionKey: "",
+  bleedingDifferentialResolved: false,
+  lastAssistantAction: "",
+  appointmentHelpAccepted: false,
+  appointmentHelpDeclined: false
 };
+
+// Intents que exigen cribado clinico de seguridad antes de poder ofrecer
+// ayuda con la cita (Problema 1/3): el resto (administrativos, presupuesto,
+// primera visita sin sintomas...) sigue yendo directo a consentimiento como
+// hasta ahora, sin este paso intermedio.
+const CLINICAL_SAFETY_INTENTS: DentalIntentId[] = [
+  "urgent_pain",
+  "endodontics",
+  "wisdom_tooth",
+  "trauma",
+  "caries_restoration",
+  "periodontics"
+];
 
 export const intentProfiles: Record<DentalIntentId, IntentProfile> = {
   first_visit: {
@@ -302,6 +361,907 @@ const signalPatterns = [
   { label: "muela del juicio", pattern: /(muela del juicio|cordal|tercer molar|dolor atras|zona de atras)/ }
 ];
 
+// Hotfix dental-negation-context: fallo real en produccion - "no, nada de
+// eso" tras la pregunta de seguridad repetia la misma pregunta indefinidamente
+// (ningun patron de detectSafetyScreen reconoce una negacion generica sin
+// palabra clave), y "no he recibido ningun golpe" no coincidia con el listado
+// cerrado de isTraumaNegated ("sin golpe"/"no ha sido golpe"/...), asi que
+// "golpe" seguia detectandose como afirmado y el intent saltaba a trauma.
+// Estas funciones sustituyen las listas de frases cerradas por una deteccion
+// de negacion por clausula, genuinamente general.
+export type ClinicalSignalKey =
+  | "fever"
+  | "swelling"
+  | "pus"
+  | "swallowingDifficulty"
+  | "breathingDifficulty"
+  | "openingDifficulty"
+  | "bleedingUncontrolled"
+  | "trauma"
+  | "pain";
+
+// Solo las señales de "negacion simple" (no tengo/hay X => X ausente) usan el
+// algoritmo generico por clausula. tragar/respirar/abrir quedan fuera: su
+// forma AFIRMATIVA real ("no puedo respirar") contiene literalmente "no",
+// asi que un escaneo generico de negacion las cancelaria a si mismas (bug
+// real ya detectado antes en isNegatedLabel - ver DIFFICULTY_SIGNAL_RULES).
+const SIMPLE_NEGATION_SIGNAL_PATTERNS: Record<"fever" | "swelling" | "pus" | "bleedingUncontrolled" | "trauma" | "pain", RegExp> = {
+  fever: /fiebre|decimas|escalofrios/,
+  swelling: /hinchaz/,
+  pus: /\bpus\b|flemon|absceso/,
+  bleedingUncontrolled: /sangr/,
+  trauma: /golpe|traumatismo|me golpee|\baccidente\b|\bcaida\b/,
+  // PR #13 (Codex P2 - "Don't drop pain intents after unrelated denials"):
+  // "dolor"/"duele" necesitan la misma resolucion de polaridad por señal que
+  // fiebre/hinchazon/etc, para que inferIntent (mas abajo,
+  // mentionsUrgentAlarmWithoutNegation) deje de usar un negacion de clausula
+  // completa independiente que se contaminaba con un "no" de otra señal.
+  pain: /duele|dolor/
+};
+
+// tragar/respirar/abrir: "no puedo X" ES la afirmacion (hay dificultad real),
+// no una negacion - necesitan reglas dedicadas de afirmacion/via libre en vez
+// del escaneo generico de negacion de arriba.
+// Codex (P1, revision sobre 87ce2be - "capacidad normal con 'ningun' no es
+// dificultad"): "no tengo NINGUNA dificultad para abrir" no coincidia con
+// "no (tengo|hay) dificultad.*abrir" (exige "tengo"/"hay" pegado a
+// "dificultad", sin determinante entre medias), mientras que affirmed
+// ("dificultad.*abrir", sin ancla de negacion) SI coincidia igual -
+// afirmando dificultad en un mensaje que la niega explicitamente. Grupo
+// opcional reutilizable para tolerar el determinante ("ningun"/"alguna"/etc)
+// entre el verbo de negacion y "dificultad", sin dejar de exigir que la
+// negacion este presente.
+const CAPACITY_DETERMINER_GROUP = "(?:(?:ningun|algun)\\w*\\s+)?";
+const DIFFICULTY_SIGNAL_RULES: Record<
+  "breathingDifficulty" | "swallowingDifficulty" | "openingDifficulty",
+  { affirmed: RegExp; allClear: RegExp }
+> = {
+  breathingDifficulty: {
+    allClear: new RegExp(
+      `(?<!no )puedo respirar|sin ${CAPACITY_DETERMINER_GROUP}dificultad para respirar|respiro bien|no (tengo|hay) ${CAPACITY_DETERMINER_GROUP}dificultad.*respirar`
+    ),
+    affirmed: /no puedo respirar|dificultad.*respirar|me cuesta respirar|\bahogo\b|asfixia/
+  },
+  swallowingDifficulty: {
+    allClear: new RegExp(
+      `(?<!no )puedo tragar|trago bien|tragar bien|sin ${CAPACITY_DETERMINER_GROUP}dificultad.*tragar|tragar.*sin ${CAPACITY_DETERMINER_GROUP}dificultad|no me cuesta tragar|no (tengo|hay) ${CAPACITY_DETERMINER_GROUP}dificultad.*tragar`
+    ),
+    affirmed: /no puedo tragar|dificultad.*tragar|me cuesta tragar/
+  },
+  openingDifficulty: {
+    allClear: new RegExp(
+      `(?<!no )puedo abrir|abro bien|sin ${CAPACITY_DETERMINER_GROUP}dificultad.*abrir|abrir.*sin ${CAPACITY_DETERMINER_GROUP}dificultad|no me cuesta abrir|no (tengo|hay) ${CAPACITY_DETERMINER_GROUP}dificultad.*abrir`
+    ),
+    affirmed: /no puedo abrir|dificultad.*abrir|me cuesta abrir|mandibula bloqueada|trismus|cuesta abrir/
+  }
+};
+
+// Separa el mensaje en clausulas cortas (coma/punto/conjuncion "pero") para
+// que una negacion en una clausula ("no tengo fiebre") no contamine una
+// afirmacion real en otra clausula del mismo mensaje ("pero si tengo
+// hinchazon" ya queda en su propia clausula).
+const CLAUSE_SPLIT_PATTERN = /[.,;!¡¿?]+|\bpero\b/;
+
+// Bug real (PR #13, comentario P1 de Codex - "Do not negate red flags from
+// unrelated no"): tratar TODA la clausula como negada o afirmada de un tiron
+// (un solo booleano por clausula) hacia que "No tengo fiebre y tengo
+// hinchazon en el ojo" negara TAMBIEN hinchazon, solo por compartir clausula
+// con un "no" que en realidad solo gobierna a "fiebre". La negacion/
+// afirmacion tiene alcance LOCAL: se resuelve por el marcador (verbo u
+// operador) mas cercano a cada señal, no por toda la clausula.
+//
+// Los marcadores compuestos ("no tengo", "no hay") van ANTES que sus
+// homologos sueltos ("tengo", "hay") en la alternancia: si no, el escaneo
+// global encontraria "no" y "tengo" como dos marcadores SEPARADOS (uno
+// negado, otro afirmado) en vez de una sola unidad negada, y "tengo"
+// (mas cercano a la señal) ganaria por error deshaciendo el "no".
+// PR #13 (Codex P1/P2, revision sobre 6511e78): "con X" (afirmacion: "con
+// hinchazon") y "me duele X"/"no me duele X" (dolor dental) se suman a la
+// alternancia con el mismo cuidado de orden que "no tengo" vs "tengo": los
+// compuestos con "no " (no noto/no me duele/no me cuesta) van ANTES que su
+// version afirmativa suelta, para que el escaneo global los consuma como una
+// sola unidad negada en vez de partirlos en un "no" negado + un afirmativo
+// sin relacion que gane por estar mas cerca de la señal.
+const SIGNAL_SEGMENT_MARKER_PATTERN =
+  /\b(no tengo|no hay|no puedo|no noto|no me duele|no me cuesta|sin|ningun[oa]?|nada de|tampoco|nunca|ni|no|si tengo|tambien tengo|ademas tengo|me duele|me cuesta|tengo|hay|presento|noto|con)\b/g;
+
+const NEGATION_MARKER_WORDS = new Set([
+  "no tengo",
+  "no hay",
+  "no puedo",
+  "no noto",
+  "no me duele",
+  "no me cuesta",
+  "sin",
+  "ningun",
+  "nada de",
+  "tampoco",
+  "nunca",
+  "ni",
+  "no"
+]);
+
+type SignalMarker = { index: number; negated: boolean };
+
+function findSignalSegmentMarkers(clause: string): SignalMarker[] {
+  const markers: SignalMarker[] = [];
+  const pattern = new RegExp(SIGNAL_SEGMENT_MARKER_PATTERN.source, "g");
+  let match: RegExpExecArray | null;
+  while ((match = pattern.exec(clause))) {
+    const word = match[1].startsWith("ningun") ? "ningun" : match[1];
+    markers.push({ index: match.index, negated: NEGATION_MARKER_WORDS.has(word) });
+  }
+  return markers;
+}
+
+// El marcador que gobierna una señal es el mas cercano que la PRECEDE ("no
+// tengo fiebre" -> fiebre mira hacia atras y encuentra "no tengo"). Si la
+// señal aparece ANTES de cualquier marcador de la clausula (listas sin verbo
+// propio: "hinchazon ni pus"), hereda la polaridad del marcador que la SIGUE
+// (aqui, "ni" -> negada). Una clausula sin ningun marcador ("el sangrado es
+// abundante") no tiene nada que negarla: se asume afirmada.
+function resolveSignalPolarityAt(markers: SignalMarker[], signalIndex: number, clause: string): boolean {
+  let preceding: SignalMarker | null = null;
+  let following: SignalMarker | null = null;
+  for (const marker of markers) {
+    if (marker.index <= signalIndex) {
+      if (!preceding || marker.index > preceding.index) preceding = marker;
+    } else if (!following || marker.index < following.index) {
+      following = marker;
+    }
+  }
+  if (preceding) return preceding.negated;
+  if (following) {
+    // Codex (P1, revision sobre c7c9e1a - "Do not apply later-clause
+    // negation to an earlier symptom"): CLAUSE_SPLIT_PATTERN no separa por
+    // "y" a proposito (para no romper listas sin verbo como "hinchazon ni
+    // pus", que SI dependen de heredar el marcador que las sigue). Pero eso
+    // dejaba que una señal sin marcador propio ("Dolor de muela y no tengo
+    // fiebre") heredara la negacion de una clausula independiente al otro
+    // lado del "y" ("no tengo fiebre"), como si "no" tambien gobernara
+    // "dolor". Una "y" real entre la señal y el marcador que la sigue corta
+    // la herencia hacia delante; las listas sin verbo usan "ni"/"," como
+    // union, nunca "y", asi que no se ven afectadas por este corte.
+    const crossesYBoundary = /\by\b/.test(clause.slice(signalIndex, following.index));
+    if (!crossesYBoundary) return following.negated;
+  }
+  return false;
+}
+
+// PR #13 (Codex, revision sobre 6511e78 - "no mantengas un parser correcto
+// para red flags y otro regex independiente por clausula para inferIntent"):
+// unica fuente de verdad para resolver si UN termino clinico concreto
+// (cualquier RegExp, no solo las claves fijas de SIMPLE_NEGATION_SIGNAL_
+// PATTERNS) esta afirmado, negado o no mencionado en el mensaje - reutilizada
+// por extractAffirmedAndNegatedClinicalSignals (mas abajo) y por
+// mentionsUrgentAlarmWithoutNegation (inferIntent) para que ambas nunca
+// puedan divergir sobre la misma frase.
+type ClinicalTermPolarity = "affirmed" | "negated" | "unknown";
+
+function resolveClinicalTermPolarity(normalized: string, termPattern: RegExp): ClinicalTermPolarity {
+  const clauses = normalized
+    .split(CLAUSE_SPLIT_PATTERN)
+    .map(clause => clause.trim())
+    .filter(Boolean);
+  // Codex (revision PR #13 sobre a720519): comprobar solo la PRIMERA
+  // coincidencia de cada clausula perdia menciones repetidas dentro de la
+  // MISMA clausula ("No tenia hinchazon y ahora tengo hinchazon en el ojo"
+  // - una sola clausula, sin coma/punto/pero que la separe - solo miraba la
+  // primera "hinchazon", la del "no tenia", ignorando la segunda mencion
+  // afirmada). El patron se reconstruye con flag "g" para recorrer TODAS
+  // las apariciones de la señal en cada clausula, no solo la primera.
+  const globalTermPattern = new RegExp(termPattern.source, termPattern.flags.includes("g") ? termPattern.flags : `${termPattern.flags}g`);
+  // Codex (Bloqueante 3 - "la ultima mencion explicita gana, nunca la
+  // primera"): la version anterior devolvia "affirmed" en cuanto encontraba
+  // la PRIMERA mencion no negada, sin llegar a examinar el resto del mensaje
+  // - "Tenia fiebre, pero ahora no tengo fiebre" quedaba "affirmed" desde la
+  // primera clausula (sin marcador propio, se asume afirmada por defecto),
+  // sin nunca ver la negacion real de la clausula siguiente. Ahora se
+  // recorren TODAS las clausulas y TODAS las menciones en orden textual, y
+  // cada mencion resuelta SUSTITUYE al veredicto anterior - la ultima
+  // mencion explicita del mensaje es la que decide, nunca hay return
+  // temprano.
+  let lastPolarity: ClinicalTermPolarity = "unknown";
+  for (const clause of clauses) {
+    const markers = findSignalSegmentMarkers(clause);
+    globalTermPattern.lastIndex = 0;
+    let match: RegExpExecArray | null;
+    while ((match = globalTermPattern.exec(clause))) {
+      lastPolarity = resolveSignalPolarityAt(markers, match.index, clause) ? "negated" : "affirmed";
+      if (match[0].length === 0) globalTermPattern.lastIndex += 1;
+    }
+  }
+  return lastPolarity;
+}
+
+function isClinicalTermAffirmed(normalized: string, termPattern: RegExp): boolean {
+  return resolveClinicalTermPolarity(normalized, termPattern) === "affirmed";
+}
+
+export type ClinicalSignalExtraction = {
+  affirmed: ClinicalSignalKey[];
+  negated: ClinicalSignalKey[];
+  unknown: ClinicalSignalKey[];
+  // Subconjunto de `unknown`: la señal SI se menciono, pero junto a una OTRA
+  // señal en la misma clausula historica y una elipsis temporal ambigua
+  // despues ("Tenia fiebre e hinchazon, pero ahora ya no tengo" - regla 6,
+  // FINAL-DENTIA-CLOSEOUT) - nunca se resuelve por inferencia, y ademas
+  // suprime la confirmacion de red flag por el fallback de frase cerrada
+  // (isNegatedLabel) que de otro modo la confirmaria solo por mencionar la
+  // palabra en el mensaje. Vacio en el caso normal (unknown = "no mencionada
+  // en absoluto").
+  ambiguous: ClinicalSignalKey[];
+};
+
+// FINAL-DENTIA-CLOSEOUT: elipsis clinica temporal MUY limitada, dentro del
+// MISMO mensaje. "Tenia hinchazon, pero ahora ya no tengo" niega swelling
+// aunque la clausula posterior omita el sustantivo - resolveClinicalTermPolarity
+// no puede resolverlo por diseño porque el termino simplemente NO aparece en
+// la clausula que trae el marcador temporal (no es una cuestion de polaridad,
+// es que no hay nada que buscar ahi). Esta funcion rellena UNICAMENTE ese
+// hueco puntual, nunca sustituye ni contradice al motor compartido:
+// - Solo mira pares de clausulas ADYACENTES (i, i+1) del mismo mensaje -
+//   nunca cruza turnos (eso ya lo impide el hecho de operar sobre un unico
+//   `normalized` de un solo mensaje).
+// - Solo actua cuando la clausula anterior menciona EXACTAMENTE una señal
+//   candidata (si menciona 0 o >=2, no hace nada - caso ambiguo, se deja sin
+//   resolver a proposito en vez de adivinar).
+// - Solo actua cuando la clausula posterior es una elipsis "desnuda": trae un
+//   marcador temporal+negacion/afirmacion elidida (lista cerrada, no una
+//   regla generica de "cualquier no niega la ultima señal") Y no menciona
+//   ningun termino clinico explicito propio - si lo hace (misma señal u otra
+//   distinta, ej. "...pero ahora ya no tengo fiebre" tras hablar de
+//   hinchazon), esa mencion explicita gobierna su propia clausula y esta
+//   funcion no toca nada (la resuelve, como siempre, resolveClinicalTermPolarity).
+const ELLIPTICAL_TEMPORAL_NEGATION_PATTERN =
+  /\b(ahora ya no tengo|ahora no tengo|ya no tengo|actualmente no tengo|ahora ya no|ya no|actualmente no|ya se me ha pasado)\b/;
+const ELLIPTICAL_TEMPORAL_AFFIRMATION_PATTERN = /\b(ahora ya si|ahora si|actualmente si|ya si)\b/;
+
+// Deteccion de "la clausula anterior menciona la señal X" para efectos de
+// elipsis unicamente - reutiliza el mismo patron que SIMPLE_NEGATION_SIGNAL_
+// PATTERNS para 5 de las 6 señales. `pain` se amplia SOLO aqui (añade
+// "dolia", forma de imperfecto de "doler" que el patron principal no cubre)
+// porque tocar el patron compartido de pain rompia el caso ya existente
+// "Antes me dolia, pero ahora no me duele" (dolia pasaria a disparar el
+// "afirmado inmediato" de resolveClinicalTermPolarity en la propia clausula
+// historica, antes de llegar nunca a la negacion real de la clausula
+// siguiente). Ampliar solo la deteccion de MENCION (no la de polaridad) evita
+// esa regresion sin crear un tercer motor de polaridad.
+const ELLIPTICAL_CANDIDATE_MENTION_PATTERNS: Record<keyof typeof SIMPLE_NEGATION_SIGNAL_PATTERNS, RegExp> = {
+  ...SIMPLE_NEGATION_SIGNAL_PATTERNS,
+  pain: /duele|dolor|dolia/
+};
+
+type EllipticalTemporalResolution = {
+  resolutions: Map<ClinicalSignalKey, "affirmed" | "negated">;
+  // Regla 6: la clausula anterior menciona MAS de una señal candidata y la
+  // posterior es igualmente una elipsis temporal desnuda - no hay forma
+  // segura de saber CUAL de ellas cambio, asi que ninguna se resuelve por
+  // inferencia Y ademas se marcan como "ambiguas" (no solo "no tocadas") para
+  // que la confirmacion de red flag por frase cerrada (isNegatedLabel) tampoco
+  // las de por buenas solo por aparecer mencionadas en el texto.
+  ambiguous: Set<ClinicalSignalKey>;
+};
+
+function resolveEllipticalTemporalSignals(normalized: string): EllipticalTemporalResolution {
+  const resolutions = new Map<ClinicalSignalKey, "affirmed" | "negated">();
+  const ambiguous = new Set<ClinicalSignalKey>();
+  const clauses = normalized
+    .split(CLAUSE_SPLIT_PATTERN)
+    .map(clause => clause.trim())
+    .filter(Boolean);
+  const candidateKeys = Object.keys(ELLIPTICAL_CANDIDATE_MENTION_PATTERNS) as Array<
+    keyof typeof ELLIPTICAL_CANDIDATE_MENTION_PATTERNS
+  >;
+
+  for (let i = 0; i < clauses.length - 1; i += 1) {
+    const priorClause = clauses[i];
+    const laterClause = clauses[i + 1];
+
+    const mentionedInPrior = candidateKeys.filter(key => ELLIPTICAL_CANDIDATE_MENTION_PATTERNS[key].test(priorClause));
+    if (mentionedInPrior.length === 0) continue;
+
+    const laterMentionsOwnSignal = candidateKeys.some(key => ELLIPTICAL_CANDIDATE_MENTION_PATTERNS[key].test(laterClause));
+    if (laterMentionsOwnSignal) continue;
+
+    const laterIsBareTemporalEllipsis =
+      ELLIPTICAL_TEMPORAL_NEGATION_PATTERN.test(laterClause) || ELLIPTICAL_TEMPORAL_AFFIRMATION_PATTERN.test(laterClause);
+    if (!laterIsBareTemporalEllipsis) continue;
+
+    if (mentionedInPrior.length > 1) {
+      for (const key of mentionedInPrior) ambiguous.add(key);
+      continue;
+    }
+
+    const candidate = mentionedInPrior[0];
+    if (ELLIPTICAL_TEMPORAL_NEGATION_PATTERN.test(laterClause)) {
+      resolutions.set(candidate, "negated");
+    } else {
+      resolutions.set(candidate, "affirmed");
+    }
+  }
+
+  return { resolutions, ambiguous };
+}
+
+// Deteccion de señales clinicas afirmadas/negadas por clausula - reemplaza el
+// enfoque anterior de "la palabra aparece => la señal es real" (que ignoraba
+// cualquier negacion no prevista en una lista cerrada de frases).
+export function extractAffirmedAndNegatedClinicalSignals(message: string): ClinicalSignalExtraction {
+  const normalized = normalize(message);
+  const affirmed = new Set<ClinicalSignalKey>();
+  const negated = new Set<ClinicalSignalKey>();
+  const simpleKeys = Object.keys(SIMPLE_NEGATION_SIGNAL_PATTERNS) as Array<keyof typeof SIMPLE_NEGATION_SIGNAL_PATTERNS>;
+
+  for (const key of simpleKeys) {
+    const polarity = resolveClinicalTermPolarity(normalized, SIMPLE_NEGATION_SIGNAL_PATTERNS[key]);
+    if (polarity === "affirmed") affirmed.add(key);
+    else if (polarity === "negated") negated.add(key);
+  }
+
+  // tragar/respirar/abrir: reglas dedicadas por clausula (su via libre real,
+  // "puedo respirar", ya contiene la palabra sin negacion previa que el
+  // escaneo generico de marcadores pudiera reutilizar de forma fiable - por
+  // eso quedan fuera del motor de resolveClinicalTermPolarity). Codex
+  // (revision PR #13 sobre a720519): comprobar el mensaje ENTERO de un tiron
+  // (allClear primero, afirmado solo si allClear no matcheaba en ningun
+  // sitio) hacia que "Puedo respirar, pero ahora me cuesta respirar" se
+  // quedara en "sin dificultad" solo porque la primera clausula decia
+  // "puedo respirar" - la mencion mas reciente (afirmada) debe ganar sobre
+  // la historica. Se evalua clausula a clausula: afirmado en CUALQUIER
+  // clausula gana siempre, igual que el resto de señales.
+  const difficultyKeys = Object.keys(DIFFICULTY_SIGNAL_RULES) as Array<keyof typeof DIFFICULTY_SIGNAL_RULES>;
+  const clausesForDifficulty = normalized
+    .split(CLAUSE_SPLIT_PATTERN)
+    .map(clause => clause.trim())
+    .filter(Boolean);
+  for (const key of difficultyKeys) {
+    const rules = DIFFICULTY_SIGNAL_RULES[key];
+    // Codex (Bloqueante 3, auditoria - consistencia con resolveClinicalTermPolarity):
+    // la version anterior dejaba ganar a "sawAffirmedClause" sobre
+    // "sawAllClearClause" sin importar el ORDEN en que aparecian ("cualquier
+    // clausula afirmada, alguna vez, gana siempre") - solo funcionaba en los
+    // casos existentes porque la clausula afirmada resultaba ser, por
+    // casualidad, la ultima del mensaje. Se sustituye por la misma regla que
+    // el resto del motor de polaridad: la ULTIMA clausula resuelta (en orden
+    // textual) es la que decide, sin importar si es allClear o affirmed.
+    let lastPolarity: "affirmed" | "negated" | null = null;
+    for (const clause of clausesForDifficulty) {
+      // allClear se comprueba PRIMERO dentro de cada clausula: el patron
+      // "afirmado" es deliberadamente amplio ("dificultad.*respirar" no
+      // excluye el "no tengo" que lo precede) y depende de que allClear
+      // desambigue primero una clausula que en realidad es una negacion
+      // ("no tengo dificultad para respirar" NO debe leerse como afirmada
+      // solo porque contiene "dificultad...respirar").
+      if (rules.allClear.test(clause)) {
+        lastPolarity = "negated";
+      } else if (rules.affirmed.test(clause)) {
+        lastPolarity = "affirmed";
+      }
+    }
+    if (lastPolarity === "affirmed") affirmed.add(key);
+    else if (lastPolarity === "negated") negated.add(key);
+  }
+
+  // Elipsis clinica temporal (ver resolveEllipticalTemporalSignals arriba) -
+  // corrige el estado de una señal SOLO cuando la clausula inmediatamente
+  // posterior es una elipsis desnuda inequivoca; puede sobreescribir un
+  // "afirmado por defecto" (clausula sin marcador propio, ej. "tenia
+  // hinchazon" solo) o un "negado por defecto" segun corresponda - nunca una
+  // mencion explicita en OTRA clausula, porque esa mencion explicita ya
+  // habria hecho que la clausula posterior "mencione su propia señal" y el
+  // gate de arriba la descarta antes de llegar aqui.
+  const { resolutions: ellipticalResolutions, ambiguous: ellipticalAmbiguous } = resolveEllipticalTemporalSignals(normalized);
+  for (const [key, polarity] of ellipticalResolutions) {
+    affirmed.delete(key);
+    negated.delete(key);
+    if (polarity === "affirmed") affirmed.add(key);
+    else negated.add(key);
+  }
+  for (const key of ellipticalAmbiguous) {
+    affirmed.delete(key);
+    negated.delete(key);
+  }
+
+  const signalKeys = [...simpleKeys, ...difficultyKeys];
+  const unknown = signalKeys.filter(key => !affirmed.has(key) && !negated.has(key));
+  return { affirmed: [...affirmed], negated: [...negated], unknown, ambiguous: [...ellipticalAmbiguous] };
+}
+
+// "no, nada de eso" no menciona ninguna señal por su nombre: solo tiene
+// sentido en el contexto de la pregunta que se acaba de hacer. Un mensaje es
+// "negacion global" si, tras quitar puntuacion, todos sus tokens son
+// palabras de negacion/relleno (nunca contenido clinico real).
+const BARE_DENIAL_TOKENS = new Set([
+  "no",
+  "nada",
+  "ningun",
+  "ninguno",
+  "ninguna",
+  "tampoco",
+  "nunca",
+  "sin",
+  "de",
+  "eso",
+  "y",
+  "ni"
+]);
+
+function isBareDenial(normalized: string): boolean {
+  const tokens = normalized
+    .replace(/[^\wñ\s]/g, " ")
+    .split(/\s+/)
+    .filter(Boolean);
+  return tokens.length > 0 && tokens.every(token => BARE_DENIAL_TOKENS.has(token));
+}
+
+function resolveBleedingLevel(normalized: string): "leve" | "abundante" | null {
+  if (/(abundante|mucho|no para|no deja de sangrar|bastante)/.test(normalized)) return "abundante";
+  if (/(\bpoco\b|\bleve\b|un poco)/.test(normalized)) return "leve";
+  return null;
+}
+
+// Claves fijas de las preguntas clinicas/de seguridad deterministas que
+// nextStep (mas abajo) puede hacer, y que señales cubre cada una - unica
+// fuente de verdad para que resolveAnswerToLastClinicalQuestion sepa que
+// negar/afirmar ante una respuesta corta como "no, nada de eso".
+// Unica fuente de verdad para los valores validos - reusada por el enum Zod
+// de dentalAgentStateSchema (openai-dental-agent.ts) para que un valor
+// invalido persistido en el estado (ej. "valor-invalido") se normalice a ""
+// en el limite de la API en vez de llegar crudo al motor.
+export const LAST_QUESTION_KEY_VALUES = [
+  "safety_screen_general",
+  "trauma_initial",
+  "trauma_opening_only",
+  "trauma_swallowing_only",
+  // Codex (Bloqueante 2 - "una respuesta ambigua no es 'todo correcto'"):
+  // clave dedicada para la pregunta de aclaracion que sigue a un "No" aislado
+  // sobre trauma_initial ("Puedes abrir la boca y tragar bien?", compuesta) -
+  // nunca se reutiliza trauma_opening_only/trauma_swallowing_only porque esas
+  // dos asumen que ya se sabe CUAL capacidad se esta preguntando; esta
+  // pregunta pide al paciente que lo precise el mismo.
+  "trauma_capacity_clarification",
+  "bleeding_severity_or_impact",
+  ""
+] as const;
+
+export type LastQuestionKey = (typeof LAST_QUESTION_KEY_VALUES)[number];
+
+const QUESTION_SIGNAL_MAP: Record<Exclude<LastQuestionKey, "">, ClinicalSignalKey[]> = {
+  safety_screen_general: ["fever", "swelling", "pus", "swallowingDifficulty", "openingDifficulty"],
+  trauma_initial: ["trauma", "openingDifficulty", "swallowingDifficulty"],
+  trauma_opening_only: ["openingDifficulty"],
+  trauma_swallowing_only: ["swallowingDifficulty"],
+  trauma_capacity_clarification: ["openingDifficulty", "swallowingDifficulty"],
+  bleeding_severity_or_impact: ["bleedingUncontrolled", "trauma"]
+};
+
+// Codex (Bloqueante 2): texto exacto de la pregunta de aclaracion - unica
+// fuente de verdad, reusada por nextStep() (para mostrarla) y por los tests
+// (para verificar que se muestra literalmente).
+export const TRAUMA_CAPACITY_CLARIFICATION_QUESTION = "Para asegurarme: ¿te cuesta abrir la boca, tragar o ambas cosas?";
+
+export type ResolvedClinicalAnswer = {
+  affirmed: ClinicalSignalKey[];
+  negated: ClinicalSignalKey[];
+  // Ver ClinicalSignalExtraction.ambiguous - propagado tal cual para que
+  // runDentalSeniorTurn pueda suprimir la confirmacion de red flag por frase
+  // cerrada cuando la señal quedo deliberadamente sin resolver.
+  ambiguous: ClinicalSignalKey[];
+  resolvesSafetyScreen: boolean;
+  resolvesBleedingDifferential: boolean;
+  // Codex (revision sobre 77a41cc - "Promote contextual swallowing failures
+  // to red flags"): subconjunto de `affirmed` que se afirmo por una
+  // respuesta CORTA sin la palabra clave clinica (ej. "Si, no puedo" como
+  // respuesta a trauma_swallowing_only, o "Ambas cosas" a la aclaracion) -
+  // nunca incluye señales que el motor generico de extraccion ya afirmo por
+  // su propio texto. Unica fuente para forzar el red flag equivalente
+  // (promoteContextualDifficultyRedFlags) sin reabrir el bug de sobre-
+  // escalar una mencion generica compartida por una señal leve.
+  contextuallyAffirmed: ClinicalSignalKey[];
+};
+
+// Codex (Bloqueante 1): vocabulario de prioridad para respuestas CORTAS (sin
+// el verbo+sustantivo completo, ej. "abrir"/"tragar") a una pregunta de
+// capacidad - reusado por el escaneo no anclado de resolveAnswerToLastClinicalQuestion.
+// Orden de prioridad clinica (nunca alterar): incapacidad explicita >
+// dificultad explicita > capacidad explicita > acuse de recibo corto.
+const CAPACITY_INCAPACITY_PATTERN = /\b(no puedo|no consigo|me resulta imposible|soy incapaz)\b/;
+const CAPACITY_DIFFICULTY_PATTERN = /\b(me cuesta|con dificultad|apenas puedo|puedo muy poco)\b/;
+const CAPACITY_EXPLICIT_CAPACITY_PATTERN = /\b(puedo bien|sin problema|con normalidad|puedo)\b/;
+
+// Codex (P1, revision sobre c7c9e1a): vocabulario adicional para
+// trauma_capacity_clarification (pregunta COMPUESTA), que necesita cubrir
+// formas que CAPACITY_DIFFICULTY_PATTERN/CAPACITY_EXPLICIT_CAPACITY_PATTERN
+// no cubren por si solas: negacion compuesta de "problema"/"dificultad"
+// ("no tengo dificultad", "sin problema", "ningun problema"), conjugaciones
+// de "cuesta" ("cuestan"), y "dificultad"/"problema"/"bien"/"normalidad"
+// como palabras sueltas. Se comprueban DESPUES de los patrones compartidos
+// (mismo orden de prioridad clinica: incapacidad explicita > negacion
+// compuesta de dificultad > dificultad explicita > capacidad explicita).
+// Codex (P1, revision sobre 3814c73 - "'alguna dificultad' no es negacion"):
+// "algun\w*" se habia añadido como alternativa INDEPENDIENTE junto a
+// "ningun\w*" - correcto para "ningun problema" (esa palabra sola YA es una
+// negacion), pero "algun problema"/"alguna dificultad" NO es una negacion,
+// es justo lo contrario ("Tengo alguna dificultad para tragar" afirma la
+// dificultad). "algun/alguna" solo cuenta como determinante tolerado DENTRO
+// de una estructura que ya es negativa por si misma ("no tengo alguna
+// dificultad", "sin alguna dificultad") - nunca como disparador propio.
+const CAPACITY_NEGATED_NORMAL_PATTERN =
+  /\bno me cuesta\w*\b|\b(no tengo|no hay|sin|tampoco tengo)\s+(?:(?:ningun|algun)\w*\s+)?(dificultad\w*|problemas?)\b|\bningun\w*\s+(dificultad\w*|problemas?)\b/;
+const CAPACITY_BARE_DIFFICULTY_PATTERN = /\bcuesta\w*\b|\bdificultad\w*\b|\bproblemas?\b/;
+const CAPACITY_BARE_NORMAL_PATTERN = /\bnormalidad\b|\bbien\b/;
+
+function resolveCapacityClausePolarity(clause: string): "difficulty" | "normal" {
+  if (CAPACITY_INCAPACITY_PATTERN.test(clause)) return "difficulty";
+  if (CAPACITY_NEGATED_NORMAL_PATTERN.test(clause)) return "normal";
+  if (CAPACITY_DIFFICULTY_PATTERN.test(clause) || CAPACITY_BARE_DIFFICULTY_PATTERN.test(clause)) return "difficulty";
+  if (CAPACITY_EXPLICIT_CAPACITY_PATTERN.test(clause) || CAPACITY_BARE_NORMAL_PATTERN.test(clause)) return "normal";
+  return "difficulty";
+}
+
+// Fuente unica de verdad para interpretar una respuesta a la ULTIMA pregunta
+// clinica/de seguridad hecha (lastQuestionKey persistido en el estado). No
+// reconstruye señales por texto libre solamente: si la respuesta es una
+// negacion global ("no, nada de eso"), niega TODAS las señales que esa
+// pregunta concreta cubria, aunque el texto no las repita una a una.
+export function resolveAnswerToLastClinicalQuestion(input: {
+  patientMessage: string;
+  lastQuestionKey: LastQuestionKey;
+}): ResolvedClinicalAnswer {
+  const normalized = normalize(input.patientMessage);
+  const extraction = extractAffirmedAndNegatedClinicalSignals(input.patientMessage);
+  // Defensa en profundidad (P2, PR #13): lastQuestionKey viaja como string
+  // simple en DentalAgentState (no como enum en tiempo de ejecucion), asi que
+  // un valor corrupto o desconocido no puede asumirse valido solo porque es
+  // truthy - sin este chequeo, QUESTION_SIGNAL_MAP[valorDesconocido] es
+  // undefined y .every() de mas abajo lanzaba una excepcion no capturada.
+  const expectedSignals = Object.prototype.hasOwnProperty.call(QUESTION_SIGNAL_MAP, input.lastQuestionKey)
+    ? QUESTION_SIGNAL_MAP[input.lastQuestionKey as Exclude<LastQuestionKey, "">]
+    : [];
+
+  const negated = new Set(extraction.negated);
+  const affirmed = new Set(extraction.affirmed);
+  // Codex (revision sobre 77a41cc - "Promote contextual swallowing failures
+  // to red flags"): subconjunto de `affirmed` añadido por una respuesta
+  // CORTA sin la palabra clave clinica (nunca por extraction.affirmed, que
+  // ya viene del texto crudo) - unica fuente para forzar el red flag
+  // equivalente mas abajo en runDentalSeniorTurn.
+  const contextuallyAffirmed = new Set<ClinicalSignalKey>();
+
+  // Codex P1 (Bloqueante 4 - "'No' a preguntas de capacidad"):
+  // trauma_opening_only/trauma_swallowing_only estan formuladas en POSITIVO
+  // ("Puedes abrir/tragar bien?"), al reves que safety_screen_general (que
+  // pregunta "...o te cuesta abrir/tragar?"). El bare-denial generico de
+  // abajo (isBareDenial) NIEGA la señal - correcto para
+  // safety_screen_general, pero estas dos claves quedan excluidas: aqui un
+  // "no" desnudo contesta que NO puede, es decir CONFIRMA la dificultad.
+  const isTraumaCapacityQuestion =
+    input.lastQuestionKey === "trauma_opening_only" || input.lastQuestionKey === "trauma_swallowing_only";
+  // Codex (Bloqueante 2 - "una respuesta ambigua no es 'todo correcto'"):
+  // trauma_initial es una pregunta COMPUESTA ("Puedes abrir la boca y tragar
+  // bien?") - un "no" aislado no dice CUAL de las dos capacidades falla (ni
+  // si fallan ambas). Tambien queda excluida del bare-denial generico: nunca
+  // se adivina, se pide aclaracion explicita mas abajo.
+  const isTraumaInitialQuestion = input.lastQuestionKey === "trauma_initial";
+  const isTraumaCapacityClarification = input.lastQuestionKey === "trauma_capacity_clarification";
+
+  if (expectedSignals.length > 0 && isBareDenial(normalized) && !isTraumaCapacityQuestion && !isTraumaInitialQuestion) {
+    for (const key of expectedSignals) negated.add(key);
+  }
+
+  if (isTraumaCapacityQuestion) {
+    const capacitySignal: ClinicalSignalKey =
+      input.lastQuestionKey === "trauma_opening_only" ? "openingDifficulty" : "swallowingDifficulty";
+    // Solo si el motor generico (extractAffirmedAndNegatedClinicalSignals,
+    // via DIFFICULTY_SIGNAL_RULES) no resolvio ya la señal con el verbo
+    // explicito ("Si, puedo abrir bien" ya afirma via allClear) - una
+    // respuesta corta sin verbo propio ("No", "No puedo", "Me cuesta",
+    // "Si") solo tiene sentido en el contexto de esta pregunta concreta.
+    if (!affirmed.has(capacitySignal) && !negated.has(capacitySignal)) {
+      // Codex (Bloqueante 1 - "un prefijo conversacional nunca cancela
+      // contenido clinico posterior"): la version anterior anclaba ambos
+      // regex al INICIO del mensaje completo (/^(no|no puedo|me cuesta)\b/
+      // vs /^(si|vale|puedo)\b/), asi que "Si, no puedo" (empieza por "si")
+      // caia en la rama NEGADA antes de llegar nunca a ver el "no puedo"
+      // real mas adelante. Ahora se escanea el mensaje entero (sin anclar)
+      // en orden de prioridad clinica: incapacidad explicita > dificultad
+      // explicita > capacidad explicita > solo entonces, acuse de recibo
+      // corto sin contenido clinico propio (si/no/vale). Un prefijo
+      // conversacional (si/vale/de acuerdo) nunca decide por si solo si mas
+      // adelante hay contenido clinico explicito.
+      if (CAPACITY_INCAPACITY_PATTERN.test(normalized) || CAPACITY_DIFFICULTY_PATTERN.test(normalized)) {
+        affirmed.add(capacitySignal);
+        contextuallyAffirmed.add(capacitySignal);
+      } else if (CAPACITY_EXPLICIT_CAPACITY_PATTERN.test(normalized)) {
+        negated.add(capacitySignal);
+      } else {
+        const trimmed = normalized.trim();
+        if (/^no\b/.test(trimmed)) {
+          affirmed.add(capacitySignal);
+          contextuallyAffirmed.add(capacitySignal);
+        } else if (/^(si|vale|dale|ok|de acuerdo)\b/.test(trimmed)) {
+          negated.add(capacitySignal);
+        }
+      }
+    }
+  }
+
+  // Codex (Bloqueante 2): union mutable de "ambiguous" - devuelta al final
+  // junto con la de extractAffirmedAndNegatedClinicalSignals (elipsis
+  // temporal). Nunca se resta de aqui: una señal ambigua para esta pregunta
+  // nunca puede confirmarse por inferencia en otro sitio del mismo turno.
+  const ambiguous = new Set(extraction.ambiguous);
+
+  if (isTraumaInitialQuestion || isTraumaCapacityClarification) {
+    const capacityKeys: ClinicalSignalKey[] = ["openingDifficulty", "swallowingDifficulty"];
+    const unresolvedCapacityKeys = capacityKeys.filter(key => !affirmed.has(key) && !negated.has(key));
+
+    if (isTraumaInitialQuestion && isBareDenial(normalized) && unresolvedCapacityKeys.length > 0) {
+      // "No" aislado a la pregunta compuesta: NUNCA se interpreta como que
+      // ambas capacidades estan bien (regla D) - queda ambigua, sin marcar
+      // resolvesSafetyScreen, hasta que el paciente precise cual.
+      for (const key of unresolvedCapacityKeys) ambiguous.add(key);
+    }
+
+    if (isTraumaCapacityClarification && unresolvedCapacityKeys.length > 0) {
+      const mentionsExclusive = /\b(solo|solamente|unicamente)\b/.test(normalized);
+      // Codex (P1, revision sobre c7c9e1a, hardening solicitado tras un
+      // primer intento incompleto): la version anterior clasificaba la
+      // respuesta ENTERA como "ambas afirman" o "ambas niegan" en cuanto se
+      // mencionaban los dos topics, comparando el mensaje completo contra
+      // una lista fija de frases de negacion. Eso no distinguia capacidad de
+      // dificultad POR TOPIC real: "Tragar bien, pero abrir me cuesta" es
+      // una respuesta MIXTA (tragar normal, abrir con dificultad) que la
+      // version anterior habria tratado como "ambas afirman" solo por
+      // mencionar los dos topics en el mismo mensaje. Ahora cada CLAUSULA
+      // (separada por coma/punto/"pero" - reutilizando CLAUSE_SPLIT_PATTERN,
+      // nunca por "y", que aqui casi siempre coordina objetos de un mismo
+      // verbo: "puedo abrir y tragar") resuelve su propia polaridad de
+      // capacidad via resolveCapacityClausePolarity (mismo vocabulario
+      // compartido que la pregunta simple trauma_opening_only/
+      // trauma_swallowing_only: CAPACITY_INCAPACITY_PATTERN/
+      // CAPACITY_DIFFICULTY_PATTERN/CAPACITY_EXPLICIT_CAPACITY_PATTERN), y
+      // esa polaridad se aplica a cualquier topic que la clausula mencione.
+      // Una clausula colectiva ("ambas"/"las dos"/"los dos") sin marcador de
+      // capacidad/dificultad explicito hereda el default ya establecido en
+      // Bloqueante 1: nombrar el topic sin decir "estoy bien" es la
+      // respuesta afirmativa por defecto de esta pregunta.
+      const clauses = normalized
+        .split(CLAUSE_SPLIT_PATTERN)
+        .map(clause => clause.trim())
+        .filter(Boolean);
+
+      let openingVerdict: "difficulty" | "normal" | null = null;
+      let swallowingVerdict: "difficulty" | "normal" | null = null;
+
+      for (const clause of clauses) {
+        const mentionsOpeningTopic = /\babr\w*\b|\bboca\b/.test(clause);
+        const mentionsSwallowingTopic = /\btrag\w*\b/.test(clause);
+        const mentionsCollective = /\b(ambas|las dos|los dos)\b/.test(clause);
+        if (!mentionsOpeningTopic && !mentionsSwallowingTopic && !mentionsCollective) continue;
+
+        const polarity = resolveCapacityClausePolarity(clause);
+        if (mentionsOpeningTopic || mentionsCollective) openingVerdict = polarity;
+        if (mentionsSwallowingTopic || mentionsCollective) swallowingVerdict = polarity;
+
+        // "Solo"/"solamente"/"unicamente" + UN unico topic en la clausula
+        // (nunca colectivo) fuerza la negacion del topic no mencionado -
+        // precedente ya establecido (Bloqueante 1/2): "Solo abrir la boca"
+        // afirma opening y niega swallowing, nunca lo deja sin resolver.
+        if (mentionsExclusive && !mentionsCollective) {
+          if (mentionsOpeningTopic && !mentionsSwallowingTopic && swallowingVerdict === null) {
+            swallowingVerdict = "normal";
+          }
+          if (mentionsSwallowingTopic && !mentionsOpeningTopic && openingVerdict === null) {
+            openingVerdict = "normal";
+          }
+        }
+      }
+
+      if (openingVerdict && unresolvedCapacityKeys.includes("openingDifficulty")) {
+        if (openingVerdict === "normal") {
+          negated.add("openingDifficulty");
+        } else {
+          affirmed.add("openingDifficulty");
+          contextuallyAffirmed.add("openingDifficulty");
+        }
+      }
+      if (swallowingVerdict && unresolvedCapacityKeys.includes("swallowingDifficulty")) {
+        if (swallowingVerdict === "normal") {
+          negated.add("swallowingDifficulty");
+        } else {
+          affirmed.add("swallowingDifficulty");
+          contextuallyAffirmed.add("swallowingDifficulty");
+        }
+      }
+    }
+  }
+
+  if (input.lastQuestionKey === "bleeding_severity_or_impact") {
+    const bleedingLevel = resolveBleedingLevel(normalized);
+    if (bleedingLevel === "leve") negated.add("bleedingUncontrolled");
+    if (bleedingLevel === "abundante") affirmed.add("bleedingUncontrolled");
+    // PR #13 (Codex - "Treat contextual 'no' as answering the impact
+    // part"): esta pregunta es compuesta (intensidad + golpe). Un "no" al
+    // PRINCIPIO del mensaje junto con una intensidad valida responde a la
+    // parte del golpe ("no, es poco" = "no [hubo golpe], es poco"), aunque
+    // el texto nunca mencione la palabra "golpe" - el motor generico de
+    // señales no tiene nada que resolver ahi porque no hay ninguna palabra
+    // clave de trauma que negar. Sin intensidad valida, o sin el "no"
+    // inicial, trauma se queda sin resolver (nunca se inventa una negacion:
+    // "Es poco"/"Leve"/"Es abundante" solos NO activan esta regla). Gateado
+    // estrictamente a esta pregunta - no se aplica a ninguna otra.
+    if (bleedingLevel && /^no\b/.test(normalized.trim())) {
+      negated.add("trauma");
+    }
+  }
+
+  // Hotfix dental-negation-context (Problema 2): resolver sangrado leve/
+  // abundante + golpe si/no NO completa por si solo el cribado general de
+  // seguridad (fiebre/hinchazon/pus/dificultad abrir-tragar siguen sin
+  // preguntarse) - solo cierra su propia diferencial de sangrado
+  // (resolvesBleedingDifferential), nunca resolvesSafetyScreen.
+  const isBleedingQuestion = input.lastQuestionKey === "bleeding_severity_or_impact";
+  const resolvesSafetyScreen =
+    !isBleedingQuestion &&
+    expectedSignals.length > 0 &&
+    expectedSignals.every(key => negated.has(key) || affirmed.has(key));
+  const resolvesBleedingDifferential =
+    isBleedingQuestion && expectedSignals.every(key => negated.has(key) || affirmed.has(key));
+
+  return {
+    affirmed: [...affirmed],
+    negated: [...negated],
+    ambiguous: [...ambiguous],
+    resolvesSafetyScreen,
+    resolvesBleedingDifferential,
+    contextuallyAffirmed: [...contextuallyAffirmed]
+  };
+}
+
+// Determina que pregunta clinica/de seguridad fija hara nextStep ESTE turno
+// (para persistirla como lastQuestionKey y poder interpretar la respuesta del
+// paciente el turno siguiente). Replica las mismas condiciones que nextStep,
+// sin duplicar el texto de las preguntas.
+function identifyNextClinicalQuestionKey(
+  state: Pick<
+    DentalAgentState,
+    "intent" | "redFlags" | "safetyScreened" | "missingClinicalData" | "escalated" | "bleedingDifferentialResolved"
+  >,
+  latestPatientText: string,
+  // string (no LastQuestionKey): current.lastQuestionKey viaja como string
+  // simple en DentalAgentState (ver "Defensa en profundidad" en
+  // resolveAnswerToLastClinicalQuestion) - solo se compara con === contra
+  // literales fijos aqui, nunca se indexa, asi que un valor corrupto es
+  // inofensivo (simplemente no coincide con ninguno).
+  previousQuestionKey: string
+): LastQuestionKey {
+  if (state.intent === "trauma" && state.redFlags.length === 0 && !state.safetyScreened) {
+    const normalized = normalize(latestPatientText);
+    // Codex (Bloqueante 2 - "una respuesta ambigua no es 'todo correcto'"):
+    // si la pregunta anterior era la compuesta (o su propia aclaracion) y la
+    // respuesta es una negacion desnuda sin mencionar ninguna de las dos
+    // capacidades, no se adivina - se repite/mantiene la peticion de
+    // aclaracion explicita en vez de avanzar como si estuviera resuelto.
+    const wasAskedCapacityQuestion =
+      previousQuestionKey === "trauma_initial" || previousQuestionKey === "trauma_capacity_clarification";
+    const isAmbiguousBareAnswer =
+      wasAskedCapacityQuestion &&
+      isBareDenial(normalized) &&
+      !mentionsOpeningAnswer(normalized) &&
+      !mentionsSwallowingAnswer(normalized);
+    if (isAmbiguousBareAnswer) return "trauma_capacity_clarification";
+    // PR #13 (Codex - "Swap the trauma follow-up question keys"): la clave
+    // persistida debe describir la pregunta que nextStep VA A MOSTRAR este
+    // turno, no la que el paciente acaba de responder. Si ya contesto sobre
+    // tragar (y no sobre abrir), nextStep pregunta por ABRIR a continuacion
+    // - la clave debe ser trauma_opening_only, no trauma_swallowing_only (y
+    // viceversa). Las condiciones deben coincidir 1:1 con nextStep (mas
+    // abajo) para que ambas nunca diverjan.
+    if (mentionsSwallowingAnswer(normalized) && !mentionsOpeningAnswer(normalized)) return "trauma_opening_only";
+    if (mentionsOpeningAnswer(normalized) && !mentionsSwallowingAnswer(normalized)) return "trauma_swallowing_only";
+    return "trauma_initial";
+  }
+  if (
+    state.redFlags.length === 0 &&
+    !state.safetyScreened &&
+    ["urgent_pain", "endodontics", "wisdom_tooth", "trauma"].includes(state.intent ?? "")
+  ) {
+    return "safety_screen_general";
+  }
+  if (!state.escalated && state.missingClinicalData[0] === "El sangrado es leve o abundante, y ha empezado tras un golpe?") {
+    return "bleeding_severity_or_impact";
+  }
+  if (!state.escalated && state.intent === "caries_restoration" && state.redFlags.length === 0 && !state.safetyScreened) {
+    return "safety_screen_general";
+  }
+  // Hotfix dental-negation-context (Problema 2): tras resolver la diferencial
+  // de sangrado/golpe en periodoncia, todavia falta la pregunta general de
+  // fiebre/hinchazon/pus/dificultad antes de dar el cribado por completo.
+  if (
+    !state.escalated &&
+    state.intent === "periodontics" &&
+    state.redFlags.length === 0 &&
+    !state.safetyScreened &&
+    state.bleedingDifferentialResolved
+  ) {
+    return "safety_screen_general";
+  }
+  return "";
+}
+
+// PR #13 (Codex - "Persist clinical keys only for displayed questions" +
+// "Persist actions only after the shown reply is known"): identifyNextClinicalQuestionKey
+// e identifyLastAssistantAction (mas abajo) solo saben que pregunta/accion
+// TOCARIA hacer segun el estado, no si buildDentalReply realmente la mostro
+// este turno - una rama administrativa anterior en su cascada (direccion,
+// equipo, precio, tarjeta sanitaria, aparcamiento...) puede ganar y devolver
+// un texto totalmente distinto. Unica fuente de verdad para AMBOS campos:
+// el texto candidato (nextStep para todo excepto EMERGENCY, que usa su
+// propia constante fija ya que buildDentalReply nunca llama a nextStep en
+// ese caso) debe aparecer literalmente en la respuesta final. No se busca
+// solo un "?" ni palabras vagas como "si"/"cita" - se compara el texto
+// concreto que la rama correspondiente de buildDentalReply produciria.
+function asksToChooseLocation(reply: string): boolean {
+  const normalized = normalize(reply);
+  return /murcia o (a )?elche|elche o (a )?murcia/.test(normalized);
+}
+
+function deriveDisplayedTurnContext(params: {
+  finalReply: string;
+  nominalLastAssistantAction: LastAssistantAction;
+  nominalQuestionKey: LastQuestionKey;
+  candidateText: string;
+}): { lastAssistantAction: LastAssistantAction; lastQuestionKey: LastQuestionKey } {
+  if (params.finalReply.includes(params.candidateText)) {
+    return { lastAssistantAction: params.nominalLastAssistantAction, lastQuestionKey: params.nominalQuestionKey };
+  }
+  // La accion/pregunta nominal no se mostro de verdad este turno. Si en vez
+  // de eso gano una pregunta administrativa que pide elegir sede (Murcia/
+  // Elche - aparcamiento, reactivacion...), se refleja como ASK_LOCATION
+  // (misma semantica real: elegir sede) para que una respuesta corta
+  // posterior ("Si, en Murcia") se interprete como eleccion de sede y no
+  // como si se hubiera aceptado una oferta de cita nunca mostrada. Cualquier
+  // otra rama administrativa (direccion, equipo, precio, tarjeta
+  // sanitaria...) queda en un valor neutro y seguro: nunca conserva una
+  // accion clinica o de reserva que no se enseño.
+  if (asksToChooseLocation(params.finalReply)) {
+    return { lastAssistantAction: "ASK_LOCATION", lastQuestionKey: "" };
+  }
+  return { lastAssistantAction: "", lastQuestionKey: "" };
+}
+
+// Los labels de redFlagPatterns/signalPatterns que corresponden 1:1 a una
+// señal clinica ya cubierta por extractAffirmedAndNegatedClinicalSignals -
+// una negacion detectada alli nunca puede dejar pasar el label equivalente
+// aqui, aunque isNegatedLabel (mas abajo, frases cerradas) no la reconozca.
+const REDFLAG_LABEL_TO_SIGNAL_KEY: Record<string, ClinicalSignalKey> = {
+  "dificultad para respirar": "breathingDifficulty",
+  "dificultad para tragar o hablar": "swallowingDifficulty",
+  "hinchazon en cuello, boca u ojo": "swelling",
+  "sangrado no controlado": "bleedingUncontrolled",
+  "fiebre o mal estado general": "fever",
+  "dificultad para abrir la boca": "openingDifficulty"
+};
+
+const SIGNAL_LABEL_TO_SIGNAL_KEY: Record<string, ClinicalSignalKey> = {
+  inflamación: "swelling",
+  "sangrado de encias": "bleedingUncontrolled"
+};
+
+function filterOutNegatedLabels(
+  labels: string[],
+  negated: ClinicalSignalKey[],
+  labelMap: Record<string, ClinicalSignalKey>
+): string[] {
+  if (negated.length === 0) return labels;
+  return labels.filter(label => {
+    const key = labelMap[label];
+    return !key || !negated.includes(key);
+  });
+}
+
 // Transparencia obligatoria (AI Act): si preguntan directamente si es humana,
 // se responde siempre que no, sin ambiguedad. Esto se ANADE a la respuesta
 // que tocaria de todas formas: no sustituye el triaje. Si el mismo mensaje
@@ -326,15 +1286,46 @@ export function runDentalSeniorTurn(current: DentalAgentState, rawText: string, 
   // clasificacion de conversationIntent.
   const assistantOfferedSlotsLastTurn = Boolean(lastAssistantMessage && jumpsToBookingOptions(lastAssistantMessage));
 
-  const messageRedFlags = detectLabels(normalized, redFlagPatterns);
-  const messageSignals = detectLabels(normalized, signalPatterns);
+  // Hotfix dental-negation-context: interpreta ESTE mensaje en el contexto de
+  // la ultima pregunta clinica/de seguridad real (current.lastQuestionKey,
+  // persistida el turno anterior) antes de derivar cualquier señal por texto
+  // suelto - "no, nada de eso" no repite ninguna palabra clave, solo tiene
+  // sentido sabiendo que se pregunto.
+  const clinicalAnswer = resolveAnswerToLastClinicalQuestion({
+    patientMessage: text,
+    lastQuestionKey: (current.lastQuestionKey || "") as LastQuestionKey
+  });
+  const affirmedClinicalSignals = new Set(clinicalAnswer.affirmed);
+  // FINAL-DENTIA-CLOSEOUT (elipsis clinica temporal, regla 6): una señal
+  // marcada "ambigua" (mencionada junto a otra en una clausula historica
+  // seguida de una elipsis temporal desnuda - "Tenia fiebre e hinchazon,
+  // pero ahora ya no tengo") nunca debe confirmarse como red flag solo por
+  // el fallback de frase cerrada de detectLabels (isNegatedLabel), que de
+  // otro modo la daria por buena con solo ver la palabra en el mensaje.
+  const ambiguousClinicalSignals = new Set(clinicalAnswer.ambiguous);
+  const messageRedFlags = promoteContextualDifficultyRedFlags(
+    filterOutNegatedLabels(
+      detectLabels(normalized, redFlagPatterns, affirmedClinicalSignals, ambiguousClinicalSignals, REDFLAG_LABEL_TO_SIGNAL_KEY),
+      clinicalAnswer.negated,
+      REDFLAG_LABEL_TO_SIGNAL_KEY
+    ),
+    clinicalAnswer.contextuallyAffirmed
+  );
+  const messageSignals = filterOutNegatedLabels(
+    detectLabels(normalized, signalPatterns, affirmedClinicalSignals, ambiguousClinicalSignals, SIGNAL_LABEL_TO_SIGNAL_KEY),
+    clinicalAnswer.negated,
+    SIGNAL_LABEL_TO_SIGNAL_KEY
+  );
   let redFlags = unique([...current.redFlags, ...messageRedFlags]);
   let detectedSignals = unique([...current.detectedSignals, ...messageSignals]);
   // La clasificación de intención usa SOLO las señales/alarmas de ESTE
   // mensaje, no el historial acumulado: si no, un "dolor intenso" mencionado
   // hace varios turnos seguia forzando urgent_pain en cualquier mensaje
   // posterior sin relación (incluso una simple negación de síntomas).
-  const intent = inferIntent(current.intent, normalized, messageSignals, messageRedFlags);
+  // Hotfix dental-negation-context: una señal de golpe NEGADA ("no he
+  // recibido ningun golpe") nunca puede activar el intent trauma, aunque la
+  // palabra "golpe" este presente en el mensaje.
+  const intent = inferIntent(current.intent, normalized, messageSignals, messageRedFlags, clinicalAnswer.negated.includes("trauma"));
   // Cambio de tema: los síntomas y alarmas del motivo anterior no deben
   // arrastrar la urgencia a una consulta nueva distinta (p.ej. de un dolor ya
   // resuelto a una consulta de ortodoncia días después).
@@ -384,17 +1375,58 @@ export function runDentalSeniorTurn(current: DentalAgentState, rawText: string, 
   // esperar a la semana que viene" no se reconocia; Clara repetia la misma
   // pregunta de seguridad tal cual, ignorando que el paciente se retracto.
   const patientDeescalates = redFlags.length === 0 && patientDeescalatesUrgency(normalized);
+  // Hotfix dental-negation-context: fallo real - "no, nada de eso" tras la
+  // pregunta de seguridad no coincidia con ninguna frase de
+  // detectSafetyScreen (que exige mencionar la palabra clave), asi que
+  // safetyScreened se quedaba false para siempre y Clara repetia la misma
+  // pregunta indefinidamente. clinicalAnswer.resolvesSafetyScreen cubre
+  // exactamente esta negacion generica, sin palabra clave.
+  // Hotfix dental-negation-context (Problema 2): el fallback generico de
+  // detectSafetyScreen (palabras sueltas como "leve"/"sin golpe") no puede
+  // completar el cribado GENERAL cuando lo que en realidad se esta
+  // respondiendo es la pregunta ESTRECHA de sangrado/golpe - si no, "leve,
+  // sin golpe" cerraba de un tiron todo el cribado sin haber preguntado
+  // nunca fiebre/hinchazon/pus/dificultad.
+  const isAnsweringBleedingQuestion = current.lastQuestionKey === "bleeding_severity_or_impact";
+  // PR #13 (Codex P2, revision sobre 6511e78): el antiguo fallback de
+  // detectSafetyScreen consideraba el cribado GENERAL completo con que
+  // apareciera CUALQUIER UNA de muchas frases sueltas ("no tengo fiebre",
+  // "leve", "puedo respirar"...), aunque solo cubriera una fraccion minima
+  // del cribado real. "Me duele una muela y no tengo fiebre" (solo niega
+  // fiebre, nada de hinchazon/pus/dificultad) marcaba safetyScreened=true de
+  // un tiron y diagnosticaba en el mismo turno. Sustituido por el mismo
+  // motor de polaridad por señal que el resto del archivo: fiebre e
+  // hinchazon (los dos primeros puntos de la pregunta real) deben estar
+  // ambos genuinamente resueltos (afirmados o negados) en el mensaje, no
+  // solo mencionados de pasada - "no tengo fiebre ni hinchazon" (ambos)
+  // sigue completando el cribado sin haber preguntado antes; "no tengo
+  // fiebre" (solo uno) ya no.
+  // Codex (revision PR #13 sobre a720519): fiebre+hinchazon resueltas NO
+  // bastan - la pregunta real cubre fiebre, hinchazon, pus, dificultad para
+  // abrir Y dificultad para tragar. "Me duele una muela y no tengo fiebre ni
+  // hinchazon" negaba solo dos de las cinco y ya marcaba el cribado como
+  // completo, saltandose pus/abrir/tragar. Debe exigir las CINCO señales de
+  // safety_screen_general genuinamente resueltas (afirmadas o negadas),
+  // reusando la misma lista que QUESTION_SIGNAL_MAP para no duplicarla.
+  const hasAllSafetyScreenEvidence = QUESTION_SIGNAL_MAP.safety_screen_general.every(
+    key => clinicalAnswer.affirmed.includes(key) || clinicalAnswer.negated.includes(key)
+  );
   const safetyScreened =
     current.safetyScreened ||
-    (intent === "trauma"
-      ? detectTraumaSafetyScreen(normalized, redFlags)
-      : detectSafetyScreen(normalized, redFlags)) ||
+    clinicalAnswer.resolvesSafetyScreen ||
+    redFlags.length > 0 ||
+    (!isAnsweringBleedingQuestion &&
+      (intent === "trauma" ? detectTraumaSafetyScreen(normalized, redFlags) : hasAllSafetyScreenEvidence)) ||
     patientDeescalates;
+  // Hotfix dental-negation-context (Problema 2): sangrado leve/abundante +
+  // golpe si/no resuelto es un requisito PREVIO al cribado general, nunca lo
+  // sustituye - ver comentario en resolveAnswerToLastClinicalQuestion.
+  const bleedingDifferentialResolved = current.bleedingDifferentialResolved || clinicalAnswer.resolvesBleedingDifferential;
   let triageLevel = getTriageLevel(intent, redFlags, detectedSignals);
   if (patientDeescalates && (triageLevel === "URGENT_24H" || triageLevel === "PRIORITY_72H")) {
     triageLevel = "ROUTINE";
   }
-  const missingClinicalData = getMissingClinicalData(intent, detectedSignals, safetyScreened);
+  const missingClinicalData = getMissingClinicalData(intent, detectedSignals, safetyScreened, bleedingDifferentialResolved);
   // Bug real detectado en pruebas de estres: un menor que dice su edad y pide
   // cita "sin mis padres" recibia el mismo guion de consentimiento/reserva que
   // un adulto. Una vez detectado, se pide tutor en todos los turnos
@@ -410,6 +1442,54 @@ export function runDentalSeniorTurn(current: DentalAgentState, rawText: string, 
   // que se entendio, avisar con honestidad y escalar para que un humano
   // contacte en su idioma.
   const needsHumanForLanguage = !intent && detectsNonSpanishLanguage(text);
+  const escalated =
+    triageLevel === "EMERGENCY" ||
+    triageLevel === "URGENT_24H" ||
+    Boolean(profile && profile.defaultTriage === "URGENT_24H" && redFlags.length > 0) ||
+    dataErasureRequested ||
+    needsHumanForLanguage;
+  // Hotfix dental-negation-context: que pregunta hara nextStep (mas abajo)
+  // ESTE turno, para poder interpretar la respuesta del paciente el turno
+  // siguiente con resolveAnswerToLastClinicalQuestion.
+  const lastQuestionKey = identifyNextClinicalQuestionKey(
+    { intent, redFlags, safetyScreened, missingClinicalData, escalated, bleedingDifferentialResolved },
+    text,
+    current.lastQuestionKey
+  );
+  // Hotfix dental-negation-context (Problema 1): interpreta "si"/"no, gracias"
+  // segun si Clara ACABA de ofrecer ayuda para pedir cita (current.lastAssistantAction),
+  // no por texto suelto sin contexto - sticky una vez aceptado o declinado.
+  const offeredAppointmentHelpLastTurn = current.lastAssistantAction === "OFFER_APPOINTMENT_HELP";
+  // Codex (Bloqueantes 3/4/5): fuente unica resolveOrderedAppointmentDecision
+  // para la respuesta inmediata a la oferta Y la reconsideracion posterior -
+  // si el rechazo ya quedo fijado en un turno anterior (lastAssistantAction
+  // ya no es OFFER_APPOINTMENT_HELP), solo el modo "reconsideration" puede
+  // revertirlo con una peticion explicita posterior.
+  const appointmentHelpDecision = offeredAppointmentHelpLastTurn
+    ? resolveOrderedAppointmentDecision(text, { mode: "initial_offer" })
+    : current.appointmentHelpDeclined
+      ? resolveOrderedAppointmentDecision(text, { mode: "reconsideration", currentState: current })
+      : "UNKNOWN";
+  const appointmentHelpAccepted = current.appointmentHelpAccepted || appointmentHelpDecision === "ACCEPTED";
+  const appointmentHelpDeclined =
+    !appointmentHelpAccepted && (current.appointmentHelpDeclined || appointmentHelpDecision === "DECLINED");
+  const lastAssistantAction = identifyLastAssistantAction({
+    intent,
+    redFlags,
+    safetyScreened,
+    missingClinicalData,
+    escalated,
+    bleedingDifferentialResolved,
+    consent,
+    name,
+    email,
+    phone,
+    location,
+    availability,
+    appointmentHelpAccepted,
+    appointmentHelpDeclined,
+    triageLevel
+  });
 
   let nextState = completeDentalState({
     ...current,
@@ -428,17 +1508,17 @@ export function runDentalSeniorTurn(current: DentalAgentState, rawText: string, 
     detectedSignals,
     triageLevel,
     triageLabel: triageLabel(triageLevel),
-    escalated:
-      triageLevel === "EMERGENCY" ||
-      triageLevel === "URGENT_24H" ||
-      Boolean(profile && profile.defaultTriage === "URGENT_24H" && redFlags.length > 0) ||
-      dataErasureRequested ||
-      needsHumanForLanguage,
+    escalated,
     requiresGuardian,
     dataErasureRequested,
     confidence: getConfidence(intent, detectedSignals, redFlags),
     missingClinicalData,
     safetyScreened,
+    lastQuestionKey,
+    bleedingDifferentialResolved,
+    lastAssistantAction,
+    appointmentHelpAccepted,
+    appointmentHelpDeclined,
     consent,
     name,
     phone,
@@ -486,6 +1566,34 @@ export function runDentalSeniorTurn(current: DentalAgentState, rawText: string, 
   };
 
   const reply = buildDentalReply(nextState, current, text);
+  // PR #13 (Codex - "Persist clinical keys only for displayed questions" +
+  // "Persist actions only after the shown reply is known"): lastQuestionKey
+  // y lastAssistantAction se calcularon arriba a partir del flujo NOMINAL
+  // (identifyNextClinicalQuestionKey / identifyLastAssistantAction), ANTES
+  // de saber si buildDentalReply realmente iba a mostrar esa pregunta/accion
+  // este turno - una rama administrativa anterior en la cascada (direccion,
+  // equipo, precio, tarjeta sanitaria, aparcamiento, gestion de citas...)
+  // puede ganar y devolver un texto totalmente distinto ("Me duele una
+  // muela, donde estais?" solo muestra la direccion; una pregunta sobre
+  // aparcamiento puede ganar sobre una oferta de ayuda con la cita ya
+  // calculada). Si el texto candidato (nextStep, misma logica que ambas
+  // funciones de identificacion; o la constante fija de EMERGENCY, que
+  // buildDentalReply nunca pasa por nextStep) no aparece literalmente en la
+  // respuesta final, ninguno de los dos campos se persiste como si se
+  // hubiera mostrado.
+  const nominalCandidateText =
+    lastAssistantAction === "EMERGENCY_GUIDANCE"
+      ? EMERGENCY_GUIDANCE_REPLY
+      : nextStep(nextState, text, current.lastQuestionKey);
+  const displayed = deriveDisplayedTurnContext({
+    finalReply: reply,
+    nominalLastAssistantAction: lastAssistantAction,
+    nominalQuestionKey: lastQuestionKey,
+    candidateText: nominalCandidateText
+  });
+  if (displayed.lastAssistantAction !== nextState.lastAssistantAction || displayed.lastQuestionKey !== nextState.lastQuestionKey) {
+    nextState = { ...nextState, lastAssistantAction: displayed.lastAssistantAction, lastQuestionKey: displayed.lastQuestionKey };
+  }
   return {
     state: nextState,
     reply: asksIdentity ? `${IDENTITY_DISCLOSURE} ${reply}`.trim() : reply
@@ -531,6 +1639,13 @@ const PRICE_FORWARD_INTENTS: DentalIntentId[] = ["implant_price", "whitening", "
 
 // El paciente pidio presupuesto pero aun no sabemos de que tratamiento.
 const BUDGET_PENDING_INTENT = "PRESUPUESTO_PENDIENTE";
+
+// Extraido a constante (antes literal inline) para que
+// deriveDisplayedTurnContext pueda comprobar si esta respuesta exacta es la
+// que realmente se mostro, igual que hace con el texto candidato de
+// nextStep para el resto de acciones/preguntas.
+const EMERGENCY_GUIDANCE_REPLY =
+  "Esto no puede esperar: acude a urgencias ahora mismo. Si notas dificultad para respirar o tragar, o la hinchazón empeora, no esperes y ve directamente a un servicio de urgencias.";
 
 function buildDentalReply(state: DentalAgentState, previous: DentalAgentState, latestPatientText: string) {
   const paymentSafetyReply = buildPaymentSafetyReply(latestPatientText);
@@ -606,24 +1721,17 @@ function buildDentalReply(state: DentalAgentState, previous: DentalAgentState, l
   const isNewIntent = previous.intent !== state.intent;
   const first = firstName(state.name);
 
+  // PR #13 (Codex - short-circuit obligatorio para EMERGENCY): antes se
+  // mezclaba la instruccion de urgencia con peticion de consentimiento/datos
+  // en el mismo turno, y turnos siguientes progresaban nombre -> telefono ->
+  // "alerta enviada" como si fuera un flujo de reserva mas. EMERGENCY corta
+  // el flujo por completo: SIEMPRE la misma indicacion de seguridad, nunca
+  // pide consentimiento, nombre, telefono, email, ni ofrece cita/huecos. Si
+  // el paciente los menciona igualmente por su cuenta, quedan capturados en
+  // el estado (para que recepcion los vea), pero la respuesta visible nunca
+  // los solicita ni los confirma.
   if (state.triageLevel === "EMERGENCY") {
-    if (!state.consent) {
-      return `${pickVariant(EMPATHY_PAIN, latestPatientText)}\n\nEsto no debería esperar: si te cuesta respirar o tragar, o la hinchazón avanza, acude a urgencias ya. Mientras, ¿aceptas que guardemos tus datos para priorizarte?`;
-    }
-    if (!state.name) {
-      return pickVariant(
-        [
-          "Lo marco como prioridad máxima. Como te llamas?",
-          "Queda marcado como prioritario. Me dices tu nombre y apellidos?",
-          "Lo gestiono como urgencia ya. Dime tu nombre, por favor."
-        ],
-        latestPatientText
-      );
-    }
-    if (!state.phone) {
-      return `${first}, dime un teléfono y te llamamos ya.`;
-    }
-    return `${first}, alerta enviada: te llamamos ahora al ${state.phone}. Si notas que empeora, no esperes nuestra llamada y acude a urgencias.`;
+    return EMERGENCY_GUIDANCE_REPLY;
   }
 
   if (state.ready) {
@@ -681,7 +1789,7 @@ function buildDentalReply(state: DentalAgentState, previous: DentalAgentState, l
   const intro = isNewIntent
     ? buildIntro(state, profile, latestPatientText, cameFromBudget)
     : [detectSuitabilityAnswer(normalize(latestPatientText)), buildAck(state, previous)].filter(Boolean).join(" ");
-  const question = intro.trim().endsWith("?") ? "" : nextStep(state, latestPatientText);
+  const question = intro.trim().endsWith("?") ? "" : nextStep(state, latestPatientText, previous.lastQuestionKey);
   const reply = [intro, question].filter(Boolean).join("\n\n").trim();
   return reply || "Cuentame un poco mas para orientarte bien.";
 }
@@ -919,6 +2027,13 @@ function buildIntro(state: DentalAgentState, profile: IntentProfile, latestPatie
 }
 
 function buildAck(state: DentalAgentState, previous: DentalAgentState) {
+  // Hotfix dental-negation-context (Problema 1): el paciente declino la
+  // oferta de ayuda con la cita - cierre breve, sin pedir consentimiento ni
+  // iniciar la reserva (ver nextStep, que en este mismo turno ya no pregunta
+  // nada mas).
+  if (state.appointmentHelpDeclined && !previous.appointmentHelpDeclined) {
+    return "De acuerdo, no pasa nada. Si cambias de opinión o necesitas algo más, aquí estoy.";
+  }
   // Bug real (pruebas de estres): un paciente que bajaba de "10/10, no
   // aguanto" a "puede esperar a la semana que viene" recibia la misma
   // pregunta de seguridad tal cual, como si no hubiera dicho nada.
@@ -960,12 +2075,27 @@ function pendingSafetyScreenQuestion(state: DentalAgentState): boolean {
   if (state.redFlags.length === 0 && ["urgent_pain", "endodontics", "wisdom_tooth", "trauma"].includes(state.intent ?? "")) {
     return true;
   }
-  return state.intent === "caries_restoration" && state.redFlags.length === 0;
+  if (state.intent === "caries_restoration" && state.redFlags.length === 0) return true;
+  // Hotfix dental-negation-context (Problema 2): tras resolver sangrado/golpe
+  // en periodoncia, la pregunta general de fiebre/hinchazon/pus/dificultad
+  // sigue pendiente - no diagnosticar todavia en ese turno intermedio.
+  return state.intent === "periodontics" && state.redFlags.length === 0 && state.bleedingDifferentialResolved;
 }
 
-function nextStep(state: DentalAgentState, latestPatientText: string) {
+function nextStep(state: DentalAgentState, latestPatientText: string, previousQuestionKey: string) {
   if (state.intent === "trauma" && state.redFlags.length === 0 && !state.safetyScreened) {
     const normalized = normalize(latestPatientText);
+    // Codex (Bloqueante 2): misma condicion 1:1 que identifyNextClinicalQuestionKey
+    // (ver comentario alli) - un "no" desnudo tras la pregunta compuesta (o su
+    // propia aclaracion) pide precision, nunca avanza como si estuviera resuelto.
+    const wasAskedCapacityQuestion =
+      previousQuestionKey === "trauma_initial" || previousQuestionKey === "trauma_capacity_clarification";
+    const isAmbiguousBareAnswer =
+      wasAskedCapacityQuestion &&
+      isBareDenial(normalized) &&
+      !mentionsOpeningAnswer(normalized) &&
+      !mentionsSwallowingAnswer(normalized);
+    if (isAmbiguousBareAnswer) return TRAUMA_CAPACITY_CLARIFICATION_QUESTION;
     if (mentionsSwallowingAnswer(normalized) && !mentionsOpeningAnswer(normalized)) {
       return "Y puedes abrir la boca bien?";
     }
@@ -990,11 +2120,23 @@ function nextStep(state: DentalAgentState, latestPatientText: string) {
   // un primer mensaje de caries simple), pero una vez resuelta la diferencial
   // (missingClinicalData ya vacio) sigue haciendo falta descartar
   // absceso/infeccion antes de pasar a diagnostico + consentimiento.
-  // (periodontics no necesita este mismo parche: sus missingClinicalData de
-  // sangrado/movilidad estan atados a safetyScreened por diseno y nunca
-  // quedan vacios sin que safetyScreened ya sea true; ver getMissingClinicalData).
+  // periodontics: su missingClinicalData de sangrado/movilidad se cierra con
+  // bleedingDifferentialResolved (ver getMissingClinicalData), no con
+  // safetyScreened - todavia falta la pregunta general de abajo.
   if (!state.escalated && state.intent === "caries_restoration" && state.redFlags.length === 0 && !state.safetyScreened) {
     return "Antes de nada: hay fiebre, hinchazon, pus o te cuesta abrir la boca o tragar?";
+  }
+  // Hotfix dental-negation-context (Problema 2): resolver sangrado leve/
+  // abundante + golpe si/no NO completa el cribado - todavia falta descartar
+  // fiebre/hinchazon/pus/dificultad para abrir o tragar en una pregunta aparte.
+  if (
+    !state.escalated &&
+    state.intent === "periodontics" &&
+    state.redFlags.length === 0 &&
+    !state.safetyScreened &&
+    state.bleedingDifferentialResolved
+  ) {
+    return "Gracias. ¿Tienes también fiebre, hinchazón, pus o dificultad para abrir la boca o tragar?";
   }
   // Fix real (CASO 1): una peticion administrativa de cita (limpieza, sin
   // sintomas) no debe pedir consentimiento como primer dato - la sede no es
@@ -1003,6 +2145,36 @@ function nextStep(state: DentalAgentState, latestPatientText: string) {
   // disponibilidad).
   if (!state.escalated && state.intent === "reactivation" && !state.consent && !state.location) {
     return `Te viene mejor ${demoKnowledge.clinic.locations.join(" o ")}?`;
+  }
+  // Hotfix dental-negation-context (Problema 1/3): tras completar el triaje
+  // clinico de seguridad, Clara ofrece ayuda para la cita ANTES de pedir
+  // consentimiento - nunca ambas cosas en el mismo turno. Solo aplica a
+  // conversaciones que de verdad pasaron por un cribado clinico (sintoma
+  // real); las peticiones administrativas (limpieza, presupuesto...) siguen
+  // yendo directas a consentimiento como hasta ahora.
+  if (
+    !state.escalated &&
+    !state.consent &&
+    !state.appointmentHelpAccepted &&
+    !state.appointmentHelpDeclined &&
+    state.intent &&
+    CLINICAL_SAFETY_INTENTS.includes(state.intent) &&
+    state.safetyScreened
+  ) {
+    return "De acuerdo. No aparecen señales de alarma inmediatas, pero conviene que un dentista valore la zona. ¿Quieres que te ayude a solicitar una cita?";
+  }
+  // El paciente declino la oferta de ayuda: no se pide consentimiento ni se
+  // recogen datos. buildAck ya emitio el cierre breve este mismo turno (ver
+  // mas arriba); aqui no hay nada mas pendiente que preguntar.
+  if (!state.escalated && !state.consent && state.appointmentHelpDeclined) {
+    return "";
+  }
+  // PR #13 (comentario de Codex): tras aceptar la oferta de ayuda con la
+  // cita, repetir "te preparo/dejo la cita" en la pregunta de consentimiento
+  // es redundante (el paciente YA acepto esa ayuda en el turno anterior).
+  // Este turno debe pedir UNICAMENTE el consentimiento.
+  if (!state.escalated && !state.consent && state.appointmentHelpAccepted) {
+    return "Para gestionar la cita necesitamos utilizar tus datos de contacto. ¿Aceptas que los usemos únicamente para organizar tu atención?";
   }
   if (!state.consent) {
     return state.escalated
@@ -1229,6 +2401,12 @@ export function hasSlotOfferPrerequisites(state: DentalAgentState): boolean {
 // solo aplica CONFIRMED/CANCELLED encima cuando hay una señal real del
 // Appointment (nunca se infiere CONFIRMED de una cadena de disponibilidad).
 export function computeBookingStatus(state: DentalAgentState): BookingStatus {
+  // PR #13 (Codex): EMERGENCY nunca avanza por el pipeline normal de reserva
+  // (COLLECTING_CONSENT/COLLECTING_PATIENT_DATA/...) aunque el paciente ya
+  // haya dado consentimiento/nombre/telefono por su cuenta - la conversacion
+  // queda marcada como escalada (conversationStatus, ver dental-agent-router.ts),
+  // no como un flujo de cita en curso.
+  if (state.triageLevel === "EMERGENCY") return "IDLE";
   if (state.ready && hasConcreteAvailability(state.availability)) return "PREBOOKED";
   if (state.availability) return "SLOT_SELECTED";
   if (state.offeredAvailabilityOptions.length > 0) return "SLOTS_OFFERED";
@@ -1393,13 +2571,42 @@ function completeDentalState(state: DentalAgentState): DentalAgentState {
   return { ...state, ready };
 }
 
-function inferIntent(current: DentalIntentId | undefined, normalized: string, signals: string[], redFlags: string[]): DentalIntentId | undefined {
+// Hotfix dental-negation-context: traumaNegated ya viene de
+// extractAffirmedAndNegatedClinicalSignals (deteccion de negacion por
+// clausula, no una lista cerrada de frases) - sustituye a la vieja
+// isTraumaNegated, que no reconocia frases como "no he recibido ningun
+// golpe".
+// PR #13 (Codex P2, revision sobre 6511e78 - "Don't drop pain intents after
+// unrelated denials"): la version anterior de esta funcion trataba TODA la
+// clausula como negada si contenia CUALQUIER "no/sin/ningun", igual que el
+// bug P1 ya corregido para red flags - "no tengo fiebre y me duele una
+// muela" quedaba con el dolor anulado solo por compartir clausula con la
+// negacion de fiebre, que no lo gobierna. Ahora reutiliza el mismo motor de
+// polaridad LOCAL por termino (resolveClinicalTermPolarity) que
+// extractAffirmedAndNegatedClinicalSignals, en vez de un regex de negacion
+// de clausula completa independiente.
+const URGENT_ALARM_TERM_PATTERN = /hinchad|inflamad|pus|flemon|urgencia/;
+
+function mentionsUrgentAlarmWithoutNegation(normalized: string): boolean {
+  return (
+    isClinicalTermAffirmed(normalized, SIMPLE_NEGATION_SIGNAL_PATTERNS.pain) ||
+    isClinicalTermAffirmed(normalized, URGENT_ALARM_TERM_PATTERN)
+  );
+}
+
+function inferIntent(
+  current: DentalIntentId | undefined,
+  normalized: string,
+  signals: string[],
+  redFlags: string[],
+  traumaNegated: boolean
+): DentalIntentId | undefined {
   if (asksAppointmentManagement(normalized)) {
     return current;
   }
   const mentionsWisdomTooth = /(muela del juicio|cordal|tercer molar|dolor atras|zona de atras)/.test(normalized);
   if (redFlags.length > 0) {
-    if (/(golpe|trauma|accidente|caida|roto)/.test(normalized) && !isTraumaNegated(normalized)) {
+    if (/(golpe|trauma|accidente|caida|roto)/.test(normalized) && !traumaNegated) {
       return "trauma";
     }
     if (mentionsWisdomTooth) {
@@ -1407,8 +2614,8 @@ function inferIntent(current: DentalIntentId | undefined, normalized: string, si
     }
     return "urgent_pain";
   }
-  if (/(golpe|trauma|accidente|caida|se ha salido|diente fuera)/.test(normalized) && !isTraumaNegated(normalized)) return "trauma";
-  if (current === "trauma" && looksLikeTraumaFollowUp(normalized)) return "trauma";
+  if (/(golpe|trauma|accidente|caida|se ha salido|diente fuera)/.test(normalized) && !traumaNegated) return "trauma";
+  if (current === "trauma" && looksLikeTraumaFollowUp(normalized) && !traumaNegated) return "trauma";
   if (mentionsWisdomTooth) return "wisdom_tooth";
   if (/(implante|me falta|perdi una pieza|sin muela|sin diente)/.test(normalized)) return "implant_price";
   if (/(ortodoncia|alineador|invisible|invisalign|brackets|aparato|retenedor|retencion|apin|mordida)/.test(normalized)) return "orthodontics";
@@ -1424,7 +2631,7 @@ function inferIntent(current: DentalIntentId | undefined, normalized: string, si
   if (/(bruxismo|aprieto|rechino|chasquido|mandibula|atm|dolor de cabeza)/.test(normalized)) return "tmj_bruxism";
   if (/(late|pulsatil|por la noche|me despierta|calor|dolor espontaneo|nervio)/.test(normalized)) return "endodontics";
   if (/(frio|dulce|agujero|mancha|caries|empaste|sensibilidad|al morder)/.test(normalized)) return "caries_restoration";
-  if ((/(dolor|duele|hinchad|inflamad|pus|flemon|urgencia)/.test(normalized) && !isPainNegated(normalized)) || signals.includes("dolor intenso")) return "urgent_pain";
+  if (mentionsUrgentAlarmWithoutNegation(normalized) || signals.includes("dolor intenso")) return "urgent_pain";
   if (/(limpieza|limpiar|higiene|quitar sarro|sarro)/.test(normalized)) return "reactivation";
   if (/(revision|revisar|primera visita|cita|valoracion)/.test(normalized)) return current ?? "first_visit";
   return current;
@@ -1457,7 +2664,12 @@ function getTriageLevel(intent: DentalIntentId | undefined, redFlags: string[], 
   return "ROUTINE";
 }
 
-function getMissingClinicalData(intent: DentalIntentId | undefined, signals: string[], safetyScreened: boolean) {
+function getMissingClinicalData(
+  intent: DentalIntentId | undefined,
+  signals: string[],
+  safetyScreened: boolean,
+  bleedingDifferentialResolved: boolean
+) {
   const missing: string[] = [];
   if (!intent) return missing;
   if (["urgent_pain", "endodontics", "caries_restoration"].includes(intent) && !safetyScreened) {
@@ -1471,10 +2683,18 @@ function getMissingClinicalData(intent: DentalIntentId | undefined, signals: str
   if (["urgent_pain", "endodontics", "wisdom_tooth"].includes(intent) && !safetyScreened) {
     missing.push("Desde cuando ocurre y que intensidad tiene del 0 al 10?");
   }
-  if (intent === "periodontics" && signals.includes("sangrado de encias") && !safetyScreened) {
+  // Hotfix dental-negation-context (Problema 2): esta pregunta se cierra con
+  // su propio flag (bleedingDifferentialResolved) ademas de safetyScreened -
+  // asi no se repite una vez respondida especificamente, pero resolverla
+  // tampoco da por completo el cribado general (fiebre/hinchazon/pus/
+  // dificultad siguen pendientes hasta que safetyScreened tambien sea true).
+  if (intent === "periodontics" && signals.includes("sangrado de encias") && !bleedingDifferentialResolved && !safetyScreened) {
     missing.push("El sangrado es leve o abundante, y ha empezado tras un golpe?");
   }
-  if (intent === "periodontics" && signals.includes("movilidad dental") && !safetyScreened) {
+  // bleedingDifferentialResolved tambien cierra esta pregunta cuando ambas
+  // señales (sangrado + movilidad) coinciden en la misma conversación: pregunta
+  // por el mismo trauma/sangrado de fondo, resolverlo una vez basta.
+  if (intent === "periodontics" && signals.includes("movilidad dental") && !safetyScreened && !bleedingDifferentialResolved) {
     missing.push("Te duele, notas inflamación, sangrado o ha sido por un golpe?");
   }
   if (intent === "periodontics" && !signals.some(signal => ["sangrado de encias", "movilidad dental"].includes(signal))) {
@@ -1537,15 +2757,62 @@ export function triageLabel(level: TriageLevel) {
   }
 }
 
-function detectLabels(normalized: string, rules: Array<{ label: string; pattern: RegExp }>) {
+// Codex (revision PR #13 sobre a720519, blocker 3): isNegatedLabel (mas abajo)
+// es un regex de UNA sola coincidencia sobre el mensaje COMPLETO - en
+// "Puedo respirar, pero ahora me cuesta respirar" reconocia la mencion
+// historica ("puedo respirar") como negacion y descartaba la etiqueta antes
+// de que filterOutNegatedLabels (que si usa el motor por clausula, ya
+// corregido) pudiera actuar - esa funcion solo puede QUITAR etiquetas ya
+// presentes, nunca recuperar una que detectLabels descarto primero. Si el
+// motor correcto (extractAffirmedAndNegatedClinicalSignals, via
+// clinicalAnswer.affirmed) ya determino que la señal esta afirmada, esa
+// conclusion gana siempre sobre el regex de frase cerrada.
+// FINAL-DENTIA-CLOSEOUT (elipsis clinica temporal, regla 6): ambiguousSignals
+// son señales que el motor de elipsis marco explicitamente como "no se puede
+// saber cual de varias cambio" (ver resolveEllipticalTemporalSignals) -  esa
+// duda gana sobre el fallback de frase cerrada igual que affirmedSignals gana
+// para confirmar: ninguna de las dos deja que isNegatedLabel decida por su
+// cuenta cuando ya hay una conclusion mejor informada.
+function detectLabels(
+  normalized: string,
+  rules: Array<{ label: string; pattern: RegExp }>,
+  affirmedSignals: Set<ClinicalSignalKey>,
+  ambiguousSignals: Set<ClinicalSignalKey>,
+  labelToSignalKey: Record<string, ClinicalSignalKey>
+) {
   return rules
-    .filter(rule => rule.pattern.test(normalized) && !isNegatedLabel(rule.label, normalized))
+    .filter(rule => {
+      if (!rule.pattern.test(normalized)) return false;
+      const signalKey = labelToSignalKey[rule.label];
+      if (signalKey && affirmedSignals.has(signalKey)) return true;
+      if (signalKey && ambiguousSignals.has(signalKey)) return false;
+      return !isNegatedLabel(rule.label, normalized);
+    })
     .map(rule => rule.label);
 }
 
-function detectSafetyScreen(normalized: string, redFlags: string[]) {
-  if (redFlags.length > 0) return true;
-  return /(no tengo fiebre|sin fiebre|no hay fiebre|no esta hinchad|sin hinchazon|no tengo hinchazon|noto inflamacion|tengo inflamacion|hay inflamacion|puedo tragar|puedo respirar|no sangra|sangrado leve|sangra poco|leve|no hay pus|sin golpe|no ha sido golpe|dolor [0-7])/.test(normalized);
+// Codex (revision sobre 77a41cc - "Promote contextual swallowing failures to
+// red flags"): fuerza la etiqueta de red flag correspondiente a una señal de
+// dificultad (respirar/tragar/abrir) SOLO cuando se afirmo por la via
+// CONTEXTUAL (una respuesta corta sin la palabra clave - "Si, no puedo",
+// "Ambas cosas" - resuelta por prioridad en resolveAnswerToLastClinicalQuestion),
+// nunca por el motor generico de extraccion (extractAffirmedAndNegatedClinicalSignals),
+// que ya tiene su propia severidad por señal (DIFFICULTY_SIGNAL_RULES) y no
+// debe forzarse via detectLabels - eso reabriria el bug ya corregido en
+// PR #13 de sobre-escalar por una mencion generica compartida entre una
+// señal leve (ej. bleedingUncontrolled via "sangra un poco") y su red flag
+// homonima mas estricta ("sangrado no controlado").
+const DIFFICULTY_TO_RED_FLAG_LABEL: Partial<Record<ClinicalSignalKey, string>> = {
+  breathingDifficulty: "dificultad para respirar",
+  swallowingDifficulty: "dificultad para tragar o hablar",
+  openingDifficulty: "dificultad para abrir la boca"
+};
+
+function promoteContextualDifficultyRedFlags(redFlags: string[], contextuallyAffirmed: ClinicalSignalKey[]): string[] {
+  const additions = contextuallyAffirmed
+    .map(key => DIFFICULTY_TO_RED_FLAG_LABEL[key])
+    .filter((label): label is string => Boolean(label) && !redFlags.includes(label as string));
+  return additions.length === 0 ? redFlags : unique([...redFlags, ...additions]);
 }
 
 function detectTraumaSafetyScreen(normalized: string, redFlags: string[]) {
@@ -1570,10 +2837,6 @@ function mentionsSwallowingAnswer(normalized: string) {
 
 function isPainNegated(normalized: string) {
   return /(no hay dolor|no tengo dolor|sin dolor|no me duele|no duele|no es dolor)/.test(normalized);
-}
-
-function isTraumaNegated(normalized: string) {
-  return /(sin golpe|no ha sido golpe|no fue golpe|no me he golpeado|no me di golpe|no hubo golpe)/.test(normalized);
 }
 
 function isNegatedLabel(label: string, normalized: string) {
@@ -1688,8 +2951,10 @@ function wasAskedForName(state: DentalAgentState): boolean {
   if (!state.intent || !state.consent || state.name) {
     return false;
   }
+  // PR #13 (Codex): EMERGENCY ya no pide nombre nunca (short-circuit de
+  // seguridad) - una respuesta suelta no puede interpretarse como el nombre.
   if (state.triageLevel === "EMERGENCY") {
-    return true;
+    return false;
   }
   const safetyPending =
     state.redFlags.length === 0 &&
@@ -1708,8 +2973,11 @@ function wasAskedForConsent(state: DentalAgentState): boolean {
   if (!state.intent || state.consent) {
     return false;
   }
+  // PR #13 (Codex): EMERGENCY ya no pide consentimiento nunca (short-circuit
+  // de seguridad) - un "si" suelto tras la indicacion de urgencia no puede
+  // interpretarse como aceptacion de guardar datos.
   if (state.triageLevel === "EMERGENCY") {
-    return true;
+    return false;
   }
   const safetyPending =
     state.redFlags.length === 0 &&
@@ -1728,6 +2996,32 @@ function wasAskedForConsent(state: DentalAgentState): boolean {
   // acceptsConsent() (que reconoce "vale"/"si" sueltos) marcaria consent=true
   // por error antes de haber preguntado por los datos.
   if (state.intent === "reactivation" && !state.location) {
+    return false;
+  }
+  // Hotfix dental-negation-context (Problema 1): mientras la oferta de ayuda
+  // con la cita siga pendiente de resolver, un "si"/"vale" suelto responde a
+  // ESA oferta, no es una aceptacion de guardar datos - sin esto,
+  // acceptsConsent() marcaria consent=true por error en el mismo turno que
+  // debia limitarse a aceptar (o declinar) la oferta.
+  if (
+    !state.escalated &&
+    !state.appointmentHelpAccepted &&
+    !state.appointmentHelpDeclined &&
+    CLINICAL_SAFETY_INTENTS.includes(state.intent) &&
+    state.safetyScreened
+  ) {
+    return false;
+  }
+  // Codex P1 (Bloqueante 1 - "No confundir reapertura de cita con
+  // consentimiento"): mientras appointmentHelpDeclined siga true, nextStep
+  // no pregunta NADA (ver mas arriba: "return ''" cuando declined y sin
+  // consentimiento) - asi que un "vale"/"si"/"de acuerdo" en ese turno (que
+  // puede estar reabriendo la ayuda con la cita via
+  // resolveOrderedAppointmentDecision en modo "reconsideration") nunca esta contestando una
+  // pregunta de privacidad que Clara jamas mostro. Sin esto,
+  // acceptsConsent() marcaria consent=true en el MISMO turno que reabre la
+  // oferta, saltandose la pregunta de privacidad real.
+  if (!state.escalated && state.appointmentHelpDeclined) {
     return false;
   }
   return true;
@@ -1843,6 +3137,218 @@ function acceptsConsent(normalized: string) {
 
 function acceptsExplicitConsent(normalized: string) {
   return /\b(acepto|autorizo|consiento)\b.{0,50}\b(datos|guardar|guarde|gestionarla|gestionarlo|cita)\b/.test(normalized);
+}
+
+// Codex (Bloqueantes 3/4/5 - fuente unica de decision de cita): antes existian
+// DOS parsers distintos - uno para la respuesta INMEDIATA a "Quieres que te
+// ayude a solicitar una cita?" (con return prematuro en la primera clausula,
+// "No, si ya llamare yo" -> DECLINED sin mirar el resto) y otro para la
+// RECONSIDERACION varios turnos despues (ya con recorrido completo de
+// clausulas). Ambos se sustituyen por resolveOrderedAppointmentDecision:
+// misma logica de "clausula a clausula, la ultima inequivoca gana",
+// parametrizada por `mode` solo donde el contexto realmente cambia el
+// significado de un acuse de recibo desnudo (un "si"/"ayudame" sueltos SI
+// contestan la oferta que Clara ACABA de hacer; en una reconsideracion sin
+// oferta activa exigen mencionar cita/reserva explicitamente - Bloqueante 2).
+// Codex (revision sobre 77a41cc - "Scope appointment negation to the
+// appointment phrase"): sin separar en "y", una negacion COMPLETA y ya
+// cerrada sobre otra cosa ("no tengo mi agenda") y una aceptacion explicita
+// unida por conjuncion ("y quiero reservar una cita") caian en la MISMA
+// clausula - la regla "negacion + palabra clave en la misma clausula" leia
+// el "no" de la primera mitad como si gobernara la cita de la segunda,
+// declinando por error una peticion explicita de reserva. "y" tambien separa
+// clausulas independientes, igual que "pero"/"aunque".
+const APPOINTMENT_DECISION_CLAUSE_SPLIT_PATTERN = /[.,;:!¡¿?]+|\bpero\b|\baunque\b|\by\b/;
+
+// Idiomas de rechazo fijos cuyo significado no depende del contexto ni de la
+// clausula en que caigan. Bloqueante 4: "\bahora no\b" se retira de aqui -
+// "ahora no" DENTRO de una condicion mas larga ("ahora no puedo esta
+// semana"/"ahora no puedo hablar") no es un rechazo de la cita, solo indica
+// disponibilidad; el rechazo real de "ahora no" desnudo (nada mas en la
+// clausula) lo cubre APPOINTMENT_BARE_DECLINE_PATTERN mas abajo.
+const APPOINTMENT_EXPLICIT_DECLINE_PHRASES =
+  /(prefiero que no|no necesito (que me )?ayud\w*|no quiero (una |la )?cita|no,? gracias|ahora no,? gracias|no me hace falta|no hace falta,? gracias|\bmejor no\b|sigo sin querer)/;
+
+// Clausula que es un rechazo desnudo completo (nada mas en la clausula) -
+// "No, si ya llamare yo" -> la clausula "si ya llamare yo" NO es un acuse de
+// recibo (tiene mas palabras detras de "si"), asi que solo "no"/"ahora no"
+// EXACTOS deciden aqui; cualquier condicion con mas contenido ("ahora no
+// puedo esta semana") se trata como neutra, nunca como rechazo.
+const APPOINTMENT_BARE_DECLINE_PATTERN = /^(no|ahora no)$/;
+
+// Intencion explicita de pedir/reservar cita o de que Clara ayude con ella -
+// exige que "ayud*" aparezca pegado (hasta 25 caracteres) a una palabra de
+// cita/reserva/agenda, o una frase fija de pedir/reservar/solicitar/gestionar
+// cita. Deliberadamente NO incluye "quiero"/"si" sueltos (ver casos "quiero
+// saber el precio", "si, en Murcia") para no reabrir por una respuesta
+// puramente administrativa. Compartido por los dos modos.
+const APPOINTMENT_CONTEXT_KEYWORD_PATTERN =
+  /(quiero (una |la )?cita\b|pedir (una |la )?cita\b|solicitar (una |la )?cita\b|reservar (una |la )?cita\b|necesito (una |la )?cita\b|quiero reservar\b|gestion\w*.{0,15}\bcita\b|ayud\w*.{0,25}\b(cita|reserva\w*|agendar|hora)\b|\b(cita|reserva\w*|agendar|hora)\b.{0,25}ayud\w*)/;
+
+// Solo validos cuando el mensaje contesta la oferta que Clara ACABA de
+// hacer (mode="initial_offer"): un acuse de recibo desnudo ("Si"/"Vale"/
+// "Ahora si") o "ayud*" en cualquier parte de la clausula ya contestan esa
+// pregunta concreta sin necesidad de repetir "cita". EXACTO (no solo
+// prefijo) para que "si ya llamare yo" (clausula con mas contenido detras de
+// "si") no se confunda con un acuse de recibo real.
+const APPOINTMENT_BARE_ACK_PATTERN = /^(si|vale|dale|ok|de acuerdo|ahora si)$/;
+const APPOINTMENT_BARE_AYUDA_PATTERN = /\bayud\w*\b/;
+
+export type AppointmentDecisionMode = "initial_offer" | "reconsideration";
+export type AppointmentDecision = "ACCEPTED" | "DECLINED" | "UNKNOWN";
+
+function classifyAppointmentClause(clause: string, mode: AppointmentDecisionMode): AppointmentDecision | null {
+  if (APPOINTMENT_BARE_DECLINE_PATTERN.test(clause)) return "DECLINED";
+  if (APPOINTMENT_EXPLICIT_DECLINE_PHRASES.test(clause)) return "DECLINED";
+  const hasContextKeyword = APPOINTMENT_CONTEXT_KEYWORD_PATTERN.test(clause);
+  // Codex (revision sobre 77a41cc - efecto secundario del split en "y"):
+  // "tampoco"/"nunca"/"ni"/"sin"/"nada" son negaciones tan validas como "no"
+  // desnudo - antes de separar en "y", una clausula como "no quiero cita y
+  // tampoco quiero que me ayudeis" quedaba UNIDA y "no quiero cita" ya
+  // aportaba el "no" que hacia caer todo en la rama de rechazo; al separar
+  // en clausulas independientes, "tampoco quiero que me ayudeis" (sin la
+  // palabra "no") caia mas abajo en el heuristico de acuse de recibo
+  // "ayud\w*" y se leia como ACEPTACION por error. Mismo vocabulario de
+  // negacion que NEGATION_MARKER_WORDS (motor de polaridad clinica).
+  const hasNegation = /\b(no|tampoco|nunca|ni|sin|nada)\b/.test(clause);
+  // "no" + intencion explicita de cita en la MISMA clausula ("no quiero
+  // cita", "no necesito que me ayudes con la reserva") - rechazo final.
+  if (hasNegation && hasContextKeyword) return "DECLINED";
+  if (hasContextKeyword) return "ACCEPTED";
+  // "no" sin mencion de cita/reserva ("no puedo esta semana", "no puedo
+  // hablar ahora") es una condicion aparte (disponibilidad, horario), nunca
+  // un rechazo ni una aceptacion - neutra, no toca el veredicto.
+  if (hasNegation) return null;
+  if (mode === "initial_offer") {
+    if (APPOINTMENT_BARE_ACK_PATTERN.test(clause)) return "ACCEPTED";
+    if (APPOINTMENT_BARE_AYUDA_PATTERN.test(clause)) return "ACCEPTED";
+  }
+  return null;
+}
+
+// Fuente unica de verdad para decisiones de cita: respuesta inmediata a la
+// oferta ("Quieres que te ayude a solicitar una cita?"), reconsideracion tras
+// un rechazo previo, o reapertura varios turnos despues - las tres pasan por
+// aqui. Recorre las clausulas en ORDEN TEXTUAL; cada clausula inequivoca
+// (aceptacion o rechazo) SUSTITUYE al veredicto anterior - la ultima
+// clausula inequivoca del mensaje gana siempre (Bloqueante 3/5). Nunca
+// devuelve en la primera coincidencia.
+export function resolveOrderedAppointmentDecision(
+  message: string,
+  context:
+    | { mode: "initial_offer" }
+    | { mode: "reconsideration"; currentState: Pick<DentalAgentState, "appointmentHelpDeclined"> }
+): AppointmentDecision {
+  if (context.mode === "reconsideration" && !context.currentState.appointmentHelpDeclined) {
+    return "UNKNOWN";
+  }
+  const normalized = normalize(message).trim();
+  if (!normalized) return "UNKNOWN";
+
+  const clauses = normalized
+    .split(APPOINTMENT_DECISION_CLAUSE_SPLIT_PATTERN)
+    .map(clause => clause.trim())
+    .filter(Boolean);
+
+  let lastVerdict: AppointmentDecision | null = null;
+  for (const clause of clauses) {
+    const verdict = classifyAppointmentClause(clause, context.mode);
+    if (verdict) lastVerdict = verdict;
+  }
+  return lastVerdict ?? "UNKNOWN";
+}
+
+// Hotfix dental-negation-context (Problema 3): replica la secuencia completa
+// de nextStep() para identificar, en terminos semanticos, que pregunta u
+// oferta hara ESTE turno - se persiste para poder interpretar correctamente
+// una respuesta corta ("si"/"no, gracias") el turno siguiente segun el
+// contexto real, no solo por texto suelto.
+function identifyLastAssistantAction(
+  state: Pick<
+    DentalAgentState,
+    | "intent"
+    | "redFlags"
+    | "safetyScreened"
+    | "missingClinicalData"
+    | "escalated"
+    | "bleedingDifferentialResolved"
+    | "consent"
+    | "name"
+    | "email"
+    | "phone"
+    | "location"
+    | "availability"
+    | "appointmentHelpAccepted"
+    | "appointmentHelpDeclined"
+    | "triageLevel"
+  >
+): LastAssistantAction {
+  // PR #13 (Codex): EMERGENCY corta el flujo antes que cualquier otra cosa -
+  // ni siquiera la pregunta de seguridad clinica normal aplica aqui.
+  if (state.triageLevel === "EMERGENCY") {
+    return "EMERGENCY_GUIDANCE";
+  }
+  if (state.intent === "trauma" && state.redFlags.length === 0 && !state.safetyScreened) {
+    return "ASK_CLINICAL_SAFETY";
+  }
+  if (
+    state.redFlags.length === 0 &&
+    !state.safetyScreened &&
+    ["urgent_pain", "endodontics", "wisdom_tooth", "trauma"].includes(state.intent ?? "")
+  ) {
+    return "ASK_CLINICAL_SAFETY";
+  }
+  if (!state.escalated && state.missingClinicalData[0]) {
+    return "ASK_CLINICAL_SAFETY";
+  }
+  if (!state.escalated && state.intent === "caries_restoration" && state.redFlags.length === 0 && !state.safetyScreened) {
+    return "ASK_CLINICAL_SAFETY";
+  }
+  if (
+    !state.escalated &&
+    state.intent === "periodontics" &&
+    state.redFlags.length === 0 &&
+    !state.safetyScreened &&
+    state.bleedingDifferentialResolved
+  ) {
+    return "ASK_CLINICAL_SAFETY";
+  }
+  if (!state.escalated && state.intent === "reactivation" && !state.consent && !state.location) {
+    return "ASK_LOCATION";
+  }
+  if (
+    !state.escalated &&
+    !state.consent &&
+    !state.appointmentHelpAccepted &&
+    !state.appointmentHelpDeclined &&
+    state.intent &&
+    CLINICAL_SAFETY_INTENTS.includes(state.intent) &&
+    state.safetyScreened
+  ) {
+    return "OFFER_APPOINTMENT_HELP";
+  }
+  if (!state.escalated && !state.consent && state.appointmentHelpDeclined) {
+    return "";
+  }
+  if (!state.consent) {
+    return "ASK_PRIVACY_CONSENT";
+  }
+  if (!state.name || !hasFullName(state.name)) {
+    return "ASK_NAME";
+  }
+  if (!state.escalated && !state.email) {
+    return "ASK_EMAIL";
+  }
+  if (!state.phone) {
+    return "ASK_PHONE";
+  }
+  if (!state.location) {
+    return "ASK_LOCATION";
+  }
+  if (!state.availability) {
+    return "OFFER_SLOTS";
+  }
+  return "";
 }
 
 function unique(values: string[]) {

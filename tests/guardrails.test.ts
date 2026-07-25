@@ -7,6 +7,8 @@ import {
   isSimpleGreeting,
   jumpsToBookingOptions,
   mentionsHealthCard,
+  mentionsUnauthorizedTraumaHypothesis,
+  mentionsUrgentCareGuidance,
   preparePatientReply,
   promisesSpecificProvider
 } from "@/lib/agent/guardrails";
@@ -163,5 +165,225 @@ describe("guardrail predicates", () => {
   it("asksGenericSymptomMenu detects the generic symptom menu wording", () => {
     expect(asksGenericSymptomMenu("cuentame que necesitas o que te preocupa")).toBe(true);
     expect(asksGenericSymptomMenu("tu pre-reserva queda anotada")).toBe(false);
+  });
+
+  it("mentionsUnauthorizedTraumaHypothesis detects fractura/luxacion/traumatismo hypotheses", () => {
+    expect(mentionsUnauthorizedTraumaHypothesis("Podria ser una fractura o luxacion.")).toBe(true);
+    expect(mentionsUnauthorizedTraumaHypothesis("Puede ser caries o filtracion de empaste.")).toBe(false);
+  });
+
+  it("CASO 6 (hotfix dental-negation-context): bloquea la hipotesis de fractura/luxacion de la IA cuando el motor local no considera trauma", () => {
+    const state = runDentalSeniorTurn(initialDentalAgentState, "No, ningun golpe.").state;
+    const localReply = runDentalSeniorTurn(initialDentalAgentState, "No, ningun golpe.").reply;
+    expect(localReply.toLowerCase()).not.toContain("golpe");
+
+    const result = preparePatientReply("Podria ser una fractura o luxacion.", state, localReply, "No, ningun golpe.");
+    expect(result).not.toContain("fractura");
+    expect(result).not.toContain("luxacion");
+    expect(result).toBe(localReply);
+  });
+});
+
+// PR #13 (Codex): short-circuit obligatorio para EMERGENCY - cualquier
+// aiReply que pida consentimiento/datos u ofrezca cita/huecos se descarta
+// integramente a favor de la respuesta determinista de emergencia.
+describe("preparePatientReply - EMERGENCY short-circuit", () => {
+  function emergencyTurn() {
+    return runDentalSeniorTurn(initialDentalAgentState, "Tengo la cara muy hinchada y me cuesta respirar");
+  }
+
+  it("descarta un aiReply que pide consentimiento durante EMERGENCY - gana localReply sin consentimiento", () => {
+    const { state, reply: localReply } = emergencyTurn();
+    expect(state.triageLevel).toBe("EMERGENCY");
+
+    const result = preparePatientReply(
+      "Acude a urgencias. ¿Aceptas que guardemos tus datos para priorizarte?",
+      state,
+      localReply,
+      "Tengo la cara muy hinchada y me cuesta respirar"
+    );
+    expect(result).toBe(localReply);
+    expect(result.toLowerCase()).not.toContain("aceptas");
+  });
+
+  it("bloquea un aiReply que intenta ofrecer cita/disponibilidad durante EMERGENCY", () => {
+    const { state, reply: localReply } = emergencyTurn();
+
+    const result = preparePatientReply(
+      "Te propongo estos huecos:\n\n1. jueves, 10:00\n2. viernes, 11:00",
+      state,
+      localReply,
+      "Tengo la cara muy hinchada y me cuesta respirar"
+    );
+    expect(result).toBe(localReply);
+    expect(result.toLowerCase()).not.toContain("huecos");
+  });
+
+  it("no bloquea un aiReply normal (parafraseado) durante EMERGENCY que no pide datos ni ofrece cita", () => {
+    const { state, reply: localReply } = emergencyTurn();
+
+    const result = preparePatientReply(
+      "Esto es serio, ve a urgencias sin esperar.",
+      state,
+      localReply,
+      "Tengo la cara muy hinchada y me cuesta respirar"
+    );
+    expect(result).toContain("urgencias");
+  });
+
+  // Codex (revision sobre 77a41cc - "Require urgent guidance in every
+  // emergency reply"): un aiReply que ni pide datos ni ofrece cita PERO
+  // tampoco dice explicitamente que acudir a urgencias tambien debe
+  // descartarse - reconocer la gravedad sin decir que hacer no es
+  // suficiente en EMERGENCY.
+  it("descarta un aiReply EMERGENCY benigno que no menciona la indicacion obligatoria de urgencias", () => {
+    const { state, reply: localReply } = emergencyTurn();
+
+    const result = preparePatientReply(
+      "Entiendo. Descansa y observa cómo evolucionas.",
+      state,
+      localReply,
+      "Tengo la cara muy hinchada y me cuesta respirar"
+    );
+    expect(result).toBe(localReply);
+    expect(result.toLowerCase()).toContain("urgencias");
+  });
+
+  // Codex (P1, revision sobre c7c9e1a - "Reject negated emergency
+  // guidance"): la palabra suelta "urgencias" no bastaba - un aiReply que
+  // dice explicitamente NO acudir tambien pasaba el guardrail.
+  it("descarta un aiReply EMERGENCY que niega explicitamente la indicacion de acudir a urgencias", () => {
+    const { state, reply: localReply } = emergencyTurn();
+
+    const result = preparePatientReply(
+      "No acudas a urgencias; descansa y observa.",
+      state,
+      localReply,
+      "Tengo la cara muy hinchada y me cuesta respirar"
+    );
+    expect(result).toBe(localReply);
+  });
+
+  // Codex (P1, revision sobre c7c9e1a, hardening solicitado): matriz
+  // completa - la funcion debe resolver POLARIDAD (instruccion afirmativa
+  // e inmediata), no solo detectar la palabra suelta "urgencias".
+  it.each([
+    ["Acude a urgencias ahora mismo.", true],
+    ["Ve a un servicio de urgencias.", true],
+    ["Busca atención urgente inmediatamente.", true],
+    ["Llama al 112.", true],
+    ["Contacta con emergencias.", true],
+    ["No esperes y ve a urgencias.", true],
+    ["No acudas a urgencias.", false],
+    ["No hace falta ir a urgencias.", false],
+    ["No es necesario acudir a urgencias.", false],
+    ["Evita las urgencias.", false],
+    ["Puedes esperar antes de ir a urgencias.", false],
+    ["Descansa y observa cómo evolucionas.", false],
+    ["Consulta urgencias solo si empeora.", false]
+  ])("mentionsUrgentCareGuidance('%s') -> %s", (reply, expected) => {
+    expect(mentionsUrgentCareGuidance(reply)).toBe(expected);
+  });
+
+  it("no rompe el caso ya cubierto: el texto canonico de EMERGENCY (con 'no esperes' lejos de 'urgencias') sigue reconociendose como indicacion valida", () => {
+    const { reply: localReply } = emergencyTurn();
+    expect(mentionsUrgentCareGuidance(localReply)).toBe(true);
+  });
+
+  it("no rompe el caso ya cubierto: 've a urgencias sin esperar' sigue reconociendose como indicacion valida", () => {
+    expect(mentionsUrgentCareGuidance("Esto es serio, ve a urgencias sin esperar.")).toBe(true);
+  });
+
+  it("no rompe el caso ya cubierto: 'No esperes; descansa y observa.' sigue sin considerarse guia valida (nunca menciona urgencias/112/emergencias)", () => {
+    expect(mentionsUrgentCareGuidance("No esperes; descansa y observa.")).toBe(false);
+  });
+
+  // Codex (P1, revision sobre 87ce2be, "'tampoco' debe conservar la
+  // negacion de urgencias"): matriz completa.
+  it.each([
+    ["No llames al 112 y tampoco acudas a urgencias.", false],
+    ["Tampoco acudas a urgencias.", false],
+    ["No vayas a urgencias.", false],
+    ["Nunca llames a emergencias.", false],
+    ["Ni llames al 112 ni acudas a urgencias.", false],
+    ["No es necesario acudir a urgencias.", false],
+    ["Evita ir a urgencias.", false],
+    ["Puedes esperar antes de ir a urgencias.", false],
+    ["Acude a urgencias solo si mañana empeoras.", false],
+    ["Acude a urgencias ahora mismo.", true],
+    ["Ve directamente a urgencias.", true],
+    ["Llama al 112.", true],
+    ["Contacta con emergencias inmediatamente.", true],
+    ["No esperes y acude a urgencias.", true],
+    ["Busca atención urgente ahora.", true]
+  ])("mentionsUrgentCareGuidance('%s') -> %s", (reply, expected) => {
+    expect(mentionsUrgentCareGuidance(reply)).toBe(expected);
+  });
+
+  it("no rompe el caso ya cubierto: 'No acudas a urgencias.' sigue descartandose", () => {
+    expect(mentionsUrgentCareGuidance("No acudas a urgencias.")).toBe(false);
+  });
+
+  // Casos de integracion del Bloque 2 (preparePatientReply completo).
+  it.each([
+    ["No llames al 112 y tampoco acudas a urgencias.", false],
+    ["Tampoco acudas a urgencias.", false],
+    ["Ni llames al 112 ni acudas a urgencias.", false]
+  ])("preparePatientReply descarta aiReply EMERGENCY negado con 'tampoco'/'ni': '%s'", aiReply => {
+    const { state, reply: localReply } = emergencyTurn();
+    const result = preparePatientReply(aiReply, state, localReply, "Tengo la cara muy hinchada y me cuesta respirar");
+    expect(result).toBe(localReply);
+  });
+
+  it.each([["Acude a urgencias ahora mismo.", true], ["No esperes y acude a urgencias.", true]])(
+    "preparePatientReply conserva aiReply EMERGENCY afirmativo: '%s'",
+    aiReply => {
+      const { state, reply: localReply } = emergencyTurn();
+      const result = preparePatientReply(aiReply, state, localReply, "Tengo la cara muy hinchada y me cuesta respirar");
+      expect(result).toContain("urgencias");
+    }
+  );
+
+  it("preparePatientReply descarta aiReply EMERGENCY condicional: 'Acude a urgencias solo si mañana empeoras.'", () => {
+    const { state, reply: localReply } = emergencyTurn();
+    const result = preparePatientReply(
+      "Acude a urgencias solo si mañana empeoras.",
+      state,
+      localReply,
+      "Tengo la cara muy hinchada y me cuesta respirar"
+    );
+    expect(result).toBe(localReply);
+  });
+
+  // Casos de integracion del P1 (preparePatientReply completo, no solo la
+  // funcion unitaria).
+  it.each([
+    ["No acudas a urgencias; descansa.", false],
+    ["No es necesario acudir a urgencias.", false],
+    ["Consulta urgencias si mañana empeoras.", false]
+  ])("preparePatientReply descarta aiReply EMERGENCY no afirmativo: '%s'", aiReply => {
+    const { state, reply: localReply } = emergencyTurn();
+    const result = preparePatientReply(aiReply, state, localReply, "Tengo la cara muy hinchada y me cuesta respirar");
+    expect(result).toBe(localReply);
+  });
+
+  it("preparePatientReply conserva un aiReply EMERGENCY afirmativo si cumple el resto de guardrails", () => {
+    const { state, reply: localReply } = emergencyTurn();
+    const result = preparePatientReply(
+      "Acude a urgencias ahora mismo.",
+      state,
+      localReply,
+      "Tengo la cara muy hinchada y me cuesta respirar"
+    );
+    expect(result).toContain("urgencias");
+  });
+
+  it("un caso ROUTINE tras completar el triaje sigue ofreciendo ayuda para la cita - el guardrail de emergencia no lo bloquea", () => {
+    const t1 = runDentalSeniorTurn(initialDentalAgentState, "Me duele al morder.");
+    const t2 = runDentalSeniorTurn(t1.state, "No, nada de eso.");
+    expect(t2.state.triageLevel).not.toBe("EMERGENCY");
+
+    const result = preparePatientReply(t2.reply, t2.state, t2.reply, "No, nada de eso.");
+    expect(result).toContain("Quieres que te ayude a solicitar una cita");
   });
 });

@@ -52,7 +52,12 @@ export function printReport(result: ClaraEvaluationResult, label = "Clara evalua
   }
 }
 
-export function writeMarkdownReport(result: ClaraEvaluationResult, path: string, title = "Evaluacion automatica de Clara") {
+export function writeMarkdownReport(
+  result: ClaraEvaluationResult,
+  path: string,
+  title = "Evaluacion automatica de Clara",
+  options?: { prelude?: string[] }
+) {
   const failed = result.conversations.filter(conversation => conversation.failed.length > 0);
   const categories = byCategory(result);
 
@@ -61,6 +66,7 @@ export function writeMarkdownReport(result: ClaraEvaluationResult, path: string,
     "",
     `Fecha: ${new Date().toISOString()}`,
     "",
+    ...(options?.prelude ? [...options.prelude, ""] : []),
     "## Resultado",
     "",
     `- Puntuacion: ${result.score}/100`,

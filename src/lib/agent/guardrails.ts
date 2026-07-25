@@ -25,6 +25,32 @@ export function preparePatientReply(
   if (state.requiresGuardian || state.dataErasureRequested || mentionsPaymentCredentials(latestPatientMessage)) {
     return formatReplyForChat(localReply);
   }
+  // PR #13 (Codex - short-circuit obligatorio para EMERGENCY): el motor
+  // local ya corta el flujo (buildDentalReply en dental-senior-agent.ts
+  // devuelve SIEMPRE la misma indicacion de seguridad para EMERGENCY, nunca
+  // pide consentimiento/datos ni ofrece cita). Esta proteccion es la
+  // contraparte para la IA: si el estado determinista es EMERGENCY, CUALQUIER
+  // aiReply que pida datos de contacto/consentimiento o mencione cita/huecos/
+  // disponibilidad/reserva se descarta integramente a favor de localReply -
+  // sin excepciones, y por igual para OpenAI, Gemini y el fallback local (los
+  // tres pasan por preparePatientReply).
+  // Codex (revision sobre 77a41cc - "Require urgent guidance in every
+  // emergency reply"): las comprobaciones anteriores solo descartaban un
+  // aiReply EMERGENCY si pedia datos/cita - un texto benigno como "Entiendo.
+  // Descansa y observa como evolucionas." pasaba intacto porque no pedia
+  // nada de eso, aunque tampoco dijera "acude a urgencias". Con
+  // triageLevel=EMERGENCY, la ausencia de la indicacion obligatoria de
+  // urgencias tambien descarta el reply, no solo la presencia de contenido
+  // administrativo.
+  if (
+    state.triageLevel === "EMERGENCY" &&
+    (asksForPersonalData(aiReply) ||
+      jumpsToBookingOptions(aiReply) ||
+      /(disponibilidad|reserva)/.test(normalize(aiReply)) ||
+      !mentionsUrgentCareGuidance(aiReply))
+  ) {
+    return formatReplyForChat(localReply);
+  }
   if (!state.intent && isSimpleGreeting(latestPatientMessage)) {
     return formatReplyForChat("Hola.\n\nPara poder orientarte, cuentame qué necesitas o qué te preocupa.");
   }
@@ -40,6 +66,18 @@ export function preparePatientReply(
   // deterministico decidio que TOCA preguntar seguridad ahora (localReply
   // es esa pregunta) y la IA no la toca, se descarta el reply de la IA.
   if (!state.safetyScreened && isMandatorySafetyScreenQuestion(localReply) && !isMandatorySafetyScreenQuestion(aiReply)) {
+    return formatReplyForChat(localReply);
+  }
+  // Hotfix dental-negation-context (fallo confirmado en produccion): "es
+  // poco y no he recibido ningun golpe" seguia generando "Podria ser
+  // fractura dental o luxacion..." - la IA hipotetizaba traumatismo aunque
+  // el paciente lo hubiera negado explicitamente. No se usa state.intent
+  // como guarda (la IA podria haberlo sobrescrito en su propia respuesta
+  // JSON, ver mergeAiState) sino localReply: si el motor deterministico ni
+  // siquiera menciona "golpe" en su respuesta de este turno (no considera
+  // que sea un caso de traumatismo), cualquier hipotesis de fractura/
+  // luxacion/traumatismo de la IA se descarta.
+  if (!normalize(localReply).includes("golpe") && mentionsUnauthorizedTraumaHypothesis(aiReply)) {
     return formatReplyForChat(localReply);
   }
   // Bug real (produccion): con "me duele una muela y sangra" el motor local
@@ -150,6 +188,15 @@ export function isMandatorySafetyScreenQuestion(reply: string): boolean {
   return SAFETY_SCREEN_KEYWORDS.test(normalize(reply));
 }
 
+// Hotfix dental-negation-context: hipotesis de traumatismo que la IA no
+// puede formular sin que el motor local (localReply) este realmente
+// discutiendo un golpe este turno.
+const UNAUTHORIZED_TRAUMA_HYPOTHESIS_PATTERN = /(fractura|luxacion|traumatismo|golpe recibido)/;
+
+export function mentionsUnauthorizedTraumaHypothesis(reply: string): boolean {
+  return UNAUTHORIZED_TRAUMA_HYPOTHESIS_PATTERN.test(normalize(reply));
+}
+
 export function skipsMandatoryClinicalQuestion(reply: string, missingQuestion: string): boolean {
   const keywordPattern = CLINICAL_QUESTION_KEYWORDS[missingQuestion];
   if (!keywordPattern) return false;
@@ -159,6 +206,68 @@ export function skipsMandatoryClinicalQuestion(reply: string, missingQuestion: s
 export function asksForPersonalData(reply: string): boolean {
   const normalized = normalize(reply);
   return /(nombre|email|e-mail|correo|telefono|contacto|apellidos|sede|murcia|elche|consentimiento|guardar|datos|informacion|registrar|cita)/.test(normalized);
+}
+
+// Codex (P1, revision sobre c7c9e1a - hardening solicitado tras un primer
+// intento incompleto): una lista de frases prohibidas contra una lista de
+// frases permitidas dejaba huecos reales sin ningun "no" pegado al verbo de
+// instruccion: "Puedes esperar antes de ir a urgencias.", "Evita las
+// urgencias." y "Consulta urgencias solo si empeora." (condicional, no
+// inmediata) seguian leyendose como guia valida. La funcion ahora resuelve
+// la POLARIDAD de la instruccion por clausula en vez de buscar una palabra
+// suelta: se separa el reply en clausulas independientes (misma idea que
+// APPOINTMENT_DECISION_CLAUSE_SPLIT_PATTERN en dental-senior-agent.ts - una
+// "y"/"pero"/"aunque" real separa dos instrucciones distintas, para que un
+// "no esperes" en una clausula no contamine la clausula siguiente), y cada
+// clausula debe superar dos filtros antes de contar como guia valida:
+//   1. no ser condicional/permisiva/de espera ("solo si empeora", "puedes
+//      esperar", "no hace falta", "evita"...), aunque mencione urgencias;
+//   2. no negar explicitamente el verbo de instruccion ("no acudas", "no
+//      llames"...).
+// Solo entonces se comprueba si la clausula contiene una instruccion
+// afirmativa real de acudir/ir/llamar/contactar/buscar atencion urgente.
+const URGENT_CARE_CLAUSE_SPLIT_PATTERN = /[.,;:!¡¿?]+|\by\b|\bpero\b|\baunque\b/;
+
+const URGENT_CARE_CONDITIONAL_OR_PERMISSIVE_PATTERN =
+  /(solo si|\bsi\b[^,]{0,25}(empeor\w*|persist\w*|se agrava|sigue|acaso)|puedes esperar|mejor esperar|espera (a ver|un poco)|no hace falta|no es necesario|no necesitas|no tienes que|\bevita\b|mejor no)/;
+
+// Codex (P1, revision sobre 87ce2be - "'tampoco' debe conservar la negacion
+// de urgencias"): solo "no" disparaba la negacion del verbo de instruccion.
+// "No llames al 112 y tampoco acudas a urgencias." se separa (por el propio
+// split en "y") en una clausula "tampoco acudas a urgencias" sin ningun
+// "no" literal - "tampoco" no tiene ninguna "n"+"o" que haga match con
+// \bno\b, asi que esa clausula pasaba el filtro de negacion y llegaba
+// intacta al patron afirmativo. Mismo vocabulario de negacion que
+// NEGATION_MARKER_WORDS en dental-senior-agent.ts (tampoco/nunca/ni junto a
+// "no").
+const URGENT_CARE_NEGATED_INSTRUCTION_PATTERN =
+  /\b(no|tampoco|nunca|ni)\b[^,]*\b(acud\w*|vayas|vay\w*|llam\w*|contact\w*|busqu\w*|busca\w*|dirij\w*)\b/;
+
+// Codex (P1, revision sobre 87ce2be): "ve a"/"llama\w*" no cubrian formas
+// reales - "Ve directamente a urgencias." no contiene el bigrama exacto
+// "ve a" (hay "directamente" en medio), y "llama\w*" no matchea "llames"/
+// "llame" (la raiz literal es "llama", no un prefijo de esas conjugaciones).
+// "ve" ahora es un verbo suelto (like acud\w*/llam\w*) en vez de un bigrama
+// fijo, y "llam\w*" cubre todas las conjugaciones. "no esperes" deja de ser
+// una alternativa independiente sin objetivo (que la hacia contar como guia
+// valida aunque el mensaje entero nunca mencionara urgencias/112/
+// emergencias) y pasa a exigir el mismo objetivo que el resto de verbos.
+const URGENT_CARE_AFFIRMATIVE_INSTRUCTION_PATTERN =
+  /\b(acud\w*|ve|vete\w*|dirigete\w*|llam\w*|contacta\w*|busca\w*|no esperes)\b.*(urgencias|emergencias|112|atencion urgente|atencion inmediata)/;
+
+function isUrgentCareInstructionClause(clause: string): boolean {
+  if (URGENT_CARE_CONDITIONAL_OR_PERMISSIVE_PATTERN.test(clause)) return false;
+  if (URGENT_CARE_NEGATED_INSTRUCTION_PATTERN.test(clause)) return false;
+  return URGENT_CARE_AFFIRMATIVE_INSTRUCTION_PATTERN.test(clause);
+}
+
+export function mentionsUrgentCareGuidance(reply: string): boolean {
+  const normalized = normalize(reply);
+  const clauses = normalized
+    .split(URGENT_CARE_CLAUSE_SPLIT_PATTERN)
+    .map(clause => clause.trim())
+    .filter(Boolean);
+  return clauses.some(isUrgentCareInstructionClause);
 }
 
 export function mentionsHealthCard(reply: string): boolean {
