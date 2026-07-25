@@ -34,9 +34,20 @@ export function preparePatientReply(
   // disponibilidad/reserva se descarta integramente a favor de localReply -
   // sin excepciones, y por igual para OpenAI, Gemini y el fallback local (los
   // tres pasan por preparePatientReply).
+  // Codex (revision sobre 77a41cc - "Require urgent guidance in every
+  // emergency reply"): las comprobaciones anteriores solo descartaban un
+  // aiReply EMERGENCY si pedia datos/cita - un texto benigno como "Entiendo.
+  // Descansa y observa como evolucionas." pasaba intacto porque no pedia
+  // nada de eso, aunque tampoco dijera "acude a urgencias". Con
+  // triageLevel=EMERGENCY, la ausencia de la indicacion obligatoria de
+  // urgencias tambien descarta el reply, no solo la presencia de contenido
+  // administrativo.
   if (
     state.triageLevel === "EMERGENCY" &&
-    (asksForPersonalData(aiReply) || jumpsToBookingOptions(aiReply) || /(disponibilidad|reserva)/.test(normalize(aiReply)))
+    (asksForPersonalData(aiReply) ||
+      jumpsToBookingOptions(aiReply) ||
+      /(disponibilidad|reserva)/.test(normalize(aiReply)) ||
+      !mentionsUrgentCareGuidance(aiReply))
   ) {
     return formatReplyForChat(localReply);
   }
@@ -195,6 +206,16 @@ export function skipsMandatoryClinicalQuestion(reply: string, missingQuestion: s
 export function asksForPersonalData(reply: string): boolean {
   const normalized = normalize(reply);
   return /(nombre|email|e-mail|correo|telefono|contacto|apellidos|sede|murcia|elche|consentimiento|guardar|datos|informacion|registrar|cita)/.test(normalized);
+}
+
+// Codex (revision sobre 77a41cc): frases minimas que demuestran que el reply
+// realmente indica al paciente acudir a un servicio de urgencias YA, no solo
+// que reconoce la gravedad ("entiendo", "es serio") sin decir que hacer.
+const URGENT_CARE_GUIDANCE_PATTERN =
+  /(urgencias|servicio de urgencias|emergencias|acude (ahora|de inmediato|inmediatamente|ya)|ve (ahora|de inmediato|directamente)|no esperes|llama al 112|acudir de inmediato)/;
+
+export function mentionsUrgentCareGuidance(reply: string): boolean {
+  return URGENT_CARE_GUIDANCE_PATTERN.test(normalize(reply));
 }
 
 export function mentionsHealthCard(reply: string): boolean {

@@ -230,6 +230,24 @@ describe("preparePatientReply - EMERGENCY short-circuit", () => {
     expect(result).toContain("urgencias");
   });
 
+  // Codex (revision sobre 77a41cc - "Require urgent guidance in every
+  // emergency reply"): un aiReply que ni pide datos ni ofrece cita PERO
+  // tampoco dice explicitamente que acudir a urgencias tambien debe
+  // descartarse - reconocer la gravedad sin decir que hacer no es
+  // suficiente en EMERGENCY.
+  it("descarta un aiReply EMERGENCY benigno que no menciona la indicacion obligatoria de urgencias", () => {
+    const { state, reply: localReply } = emergencyTurn();
+
+    const result = preparePatientReply(
+      "Entiendo. Descansa y observa cómo evolucionas.",
+      state,
+      localReply,
+      "Tengo la cara muy hinchada y me cuesta respirar"
+    );
+    expect(result).toBe(localReply);
+    expect(result.toLowerCase()).toContain("urgencias");
+  });
+
   it("un caso ROUTINE tras completar el triaje sigue ofreciendo ayuda para la cita - el guardrail de emergencia no lo bloquea", () => {
     const t1 = runDentalSeniorTurn(initialDentalAgentState, "Me duele al morder.");
     const t2 = runDentalSeniorTurn(t1.state, "No, nada de eso.");

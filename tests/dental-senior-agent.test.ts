@@ -1647,9 +1647,16 @@ describe("Codex P1 (Bloqueante 4): 'No' a preguntas de capacidad (abrir/tragar) 
     const answer = resolveAnswerToLastClinicalQuestion({ patientMessage: "No", lastQuestionKey: "trauma_swallowing_only" });
     expect(answer.affirmed).toContain("swallowingDifficulty");
     expect(answer.negated).not.toContain("swallowingDifficulty");
+    expect(answer.contextuallyAffirmed).toContain("swallowingDifficulty");
 
+    // Codex (revision sobre 77a41cc - "Promote contextual swallowing
+    // failures to red flags"): una dificultad para tragar confirmada por
+    // contexto (sin repetir la palabra "tragar") debe materializar el red
+    // flag "dificultad para tragar o hablar" y escalar a EMERGENCY, igual
+    // que si el paciente hubiera usado la palabra exacta.
     const third = runDentalSeniorTurn(second.state, "No");
-    expect(third.state.triageLevel).toBe("URGENT_24H");
+    expect(third.state.redFlags).toContain("dificultad para tragar o hablar");
+    expect(third.state.triageLevel).toBe("EMERGENCY");
   });
 
   it("no afecta safety_screen_general: 'No, nada de eso' sigue negando las 5 señales (incluye opening/swallowing)", () => {
@@ -1994,21 +2001,21 @@ describe("Codex (ronda de cierre, Bloqueante 1): prefijo conversacional no cance
     }
   });
 
-  it("swallowingDifficulty=true via 'Sí, no puedo' cierra el cribado, escala con prioridad y corta el flujo administrativo normal", () => {
+  it("swallowingDifficulty=true via 'Sí, no puedo' cierra el cribado y escala a EMERGENCY (red flag contextual)", () => {
     const first = runDentalSeniorTurn(initialDentalAgentState, "Me di un golpe en el diente");
     expect(first.state.lastQuestionKey).toBe("trauma_initial");
     const second = runDentalSeniorTurn(first.state, "Puedo abrir bien");
     expect(second.state.lastQuestionKey).toBe("trauma_swallowing_only");
     const third = runDentalSeniorTurn(second.state, "Sí, no puedo");
-    // "Si, no puedo" no repite la palabra "tragar" en el mensaje, asi que no
-    // dispara el detector de red flags basado en frase literal (arquitectura
-    // preexistente, fuera del alcance de Bloqueante 1) - pero SI cierra el
-    // cribado correctamente (no se queda preguntando de nuevo) y escala con
-    // prioridad en vez de ofrecer el flujo administrativo normal de cita.
+    // Codex (revision sobre 77a41cc - "Promote contextual swallowing
+    // failures to red flags"): "Si, no puedo" no repite la palabra "tragar",
+    // pero swallowingDifficulty se afirma por contexto - eso materializa el
+    // red flag "dificultad para tragar o hablar" igual que si el mensaje
+    // hubiera dicho la palabra exacta, y escala a EMERGENCY.
     expect(third.state.safetyScreened).toBe(true);
     expect(third.state.escalated).toBe(true);
-    expect(third.state.triageLevel).toBe("URGENT_24H");
-    expect(third.reply.toLowerCase()).toContain("prioridad");
+    expect(third.state.redFlags).toContain("dificultad para tragar o hablar");
+    expect(third.state.triageLevel).toBe("EMERGENCY");
     expect(third.reply.toLowerCase()).not.toContain("quieres que te ayude a solicitar una cita");
   });
 });
@@ -2166,5 +2173,67 @@ describe("Codex (ronda de cierre, Bloqueante 4/5): 'ahora no' no es un rechazo g
     expect(resolveOrderedAppointmentDecision(message, { mode: "reconsideration", currentState: declinedState })).toBe(
       expected
     );
+  });
+});
+
+// Codex (revision sobre 77a41cc): 4 findings nuevos sobre el commit anterior.
+describe("Codex (revision sobre 77a41cc): 'Ambas cosas' desnudo afirma ambas dificultades", () => {
+  it.each([
+    ["Ambas cosas", ["openingDifficulty", "swallowingDifficulty"]],
+    ["Las dos", ["openingDifficulty", "swallowingDifficulty"]],
+    ["Abrir y tragar", ["openingDifficulty", "swallowingDifficulty"]]
+  ])("trauma_capacity_clarification: '%s' afirma ambas", (message, expectedKeys) => {
+    const result = resolveAnswerToLastClinicalQuestion({
+      patientMessage: message,
+      lastQuestionKey: "trauma_capacity_clarification"
+    });
+    for (const key of expectedKeys) expect(result.affirmed).toContain(key);
+  });
+
+  it("no rompe el caso ya cubierto de negacion: 'No, puedo hacer ambas cosas bien' sigue negando ambas", () => {
+    const result = resolveAnswerToLastClinicalQuestion({
+      patientMessage: "No, puedo hacer ambas cosas bien",
+      lastQuestionKey: "trauma_capacity_clarification"
+    });
+    expect(result.negated).toContain("openingDifficulty");
+    expect(result.negated).toContain("swallowingDifficulty");
+  });
+
+  it("no reintroduce un falso positivo: 'Ambas cosas están bien' sigue negando ambas (no afirma solo por mencionar el topic)", () => {
+    const result = resolveAnswerToLastClinicalQuestion({
+      patientMessage: "Ambas cosas están bien",
+      lastQuestionKey: "trauma_capacity_clarification"
+    });
+    expect(result.negated).toContain("openingDifficulty");
+    expect(result.negated).toContain("swallowingDifficulty");
+  });
+
+  it("end-to-end: 'Ambas cosas' tras la aclaracion cierra el cribado con red flag de tragar y EMERGENCY", () => {
+    const first = runDentalSeniorTurn(initialDentalAgentState, "Me di un golpe en el diente");
+    const second = runDentalSeniorTurn(first.state, "No");
+    expect(second.state.lastQuestionKey).toBe("trauma_capacity_clarification");
+    const third = runDentalSeniorTurn(second.state, "Ambas cosas");
+    expect(third.state.safetyScreened).toBe(true);
+    expect(third.state.redFlags).toContain("dificultad para tragar o hablar");
+    expect(third.state.triageLevel).toBe("EMERGENCY");
+  });
+});
+
+describe("Codex (revision sobre 77a41cc): 'y' separa clausulas independientes en la decision de cita", () => {
+  it.each([
+    ["No tengo mi agenda y quiero reservar una cita", "ACCEPTED"],
+    ["No puedo esta semana y quiero una cita para la próxima", "ACCEPTED"]
+  ])("initial_offer: '%s' -> %s", (message, expected) => {
+    expect(resolveOrderedAppointmentDecision(message, { mode: "initial_offer" })).toBe(expected);
+  });
+
+  it("no rompe el caso ya cubierto: 'No quiero cita y tampoco quiero que me ayudéis' sigue DECLINED", () => {
+    expect(resolveOrderedAppointmentDecision("No quiero cita y tampoco quiero que me ayudéis", { mode: "initial_offer" })).toBe(
+      "DECLINED"
+    );
+  });
+
+  it("no rompe el caso ya cubierto: 'No, si ya llamaré yo' sigue DECLINED (sin 'y' independiente)", () => {
+    expect(resolveOrderedAppointmentDecision("No, si ya llamaré yo", { mode: "initial_offer" })).toBe("DECLINED");
   });
 });

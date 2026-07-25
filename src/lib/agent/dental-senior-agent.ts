@@ -823,6 +823,15 @@ export type ResolvedClinicalAnswer = {
   ambiguous: ClinicalSignalKey[];
   resolvesSafetyScreen: boolean;
   resolvesBleedingDifferential: boolean;
+  // Codex (revision sobre 77a41cc - "Promote contextual swallowing failures
+  // to red flags"): subconjunto de `affirmed` que se afirmo por una
+  // respuesta CORTA sin la palabra clave clinica (ej. "Si, no puedo" como
+  // respuesta a trauma_swallowing_only, o "Ambas cosas" a la aclaracion) -
+  // nunca incluye señales que el motor generico de extraccion ya afirmo por
+  // su propio texto. Unica fuente para forzar el red flag equivalente
+  // (promoteContextualDifficultyRedFlags) sin reabrir el bug de sobre-
+  // escalar una mencion generica compartida por una señal leve.
+  contextuallyAffirmed: ClinicalSignalKey[];
 };
 
 // Codex (Bloqueante 1): vocabulario de prioridad para respuestas CORTAS (sin
@@ -856,6 +865,12 @@ export function resolveAnswerToLastClinicalQuestion(input: {
 
   const negated = new Set(extraction.negated);
   const affirmed = new Set(extraction.affirmed);
+  // Codex (revision sobre 77a41cc - "Promote contextual swallowing failures
+  // to red flags"): subconjunto de `affirmed` añadido por una respuesta
+  // CORTA sin la palabra clave clinica (nunca por extraction.affirmed, que
+  // ya viene del texto crudo) - unica fuente para forzar el red flag
+  // equivalente mas abajo en runDentalSeniorTurn.
+  const contextuallyAffirmed = new Set<ClinicalSignalKey>();
 
   // Codex P1 (Bloqueante 4 - "'No' a preguntas de capacidad"):
   // trauma_opening_only/trauma_swallowing_only estan formuladas en POSITIVO
@@ -900,12 +915,14 @@ export function resolveAnswerToLastClinicalQuestion(input: {
       // adelante hay contenido clinico explicito.
       if (CAPACITY_INCAPACITY_PATTERN.test(normalized) || CAPACITY_DIFFICULTY_PATTERN.test(normalized)) {
         affirmed.add(capacitySignal);
+        contextuallyAffirmed.add(capacitySignal);
       } else if (CAPACITY_EXPLICIT_CAPACITY_PATTERN.test(normalized)) {
         negated.add(capacitySignal);
       } else {
         const trimmed = normalized.trim();
         if (/^no\b/.test(trimmed)) {
           affirmed.add(capacitySignal);
+          contextuallyAffirmed.add(capacitySignal);
         } else if (/^(si|vale|dale|ok|de acuerdo)\b/.test(trimmed)) {
           negated.add(capacitySignal);
         }
@@ -936,21 +953,41 @@ export function resolveAnswerToLastClinicalQuestion(input: {
       const mentionsBothWord = /\b(ambas cosas|las dos|los dos)\b/.test(normalized);
       const mentionsExclusive = /\b(solo|solamente|unicamente)\b/.test(normalized);
       const deniesBothProblem =
-        /(no tengo ningun problema|sin ningun problema|ningun problema|puedo hacer (ambas cosas|las dos|los dos)|puedo con (ambas cosas|las dos|los dos))/.test(
+        /(no tengo ningun problema|sin ningun problema|ningun problema|puedo hacer (ambas cosas|las dos|los dos)|puedo con (ambas cosas|las dos|los dos)|(ambas cosas|las dos|los dos) (estan|esta) bien|(ambas cosas|las dos|los dos) van bien|todo bien)/.test(
           normalized
         );
 
+      // Codex (revision sobre 77a41cc - "Treat 'ambas cosas' as affirming
+      // both difficulties"): la version anterior solo actuaba cuando
+      // deniesBothProblem coincidia ("puedo hacer ambas cosas bien"/"ningun
+      // problema...") - una respuesta AFIRMATIVA desnuda ("Ambas cosas",
+      // "Las dos", "Abrir y tragar") a la pregunta "¿te cuesta abrir la
+      // boca, tragar o ambas cosas?" no tocaba ninguna señal, dejando el
+      // cribado sin resolver y perdiendo una posible dificultad real para
+      // tragar. Mencionar ambos topics SIN una frase de "estoy bien" es la
+      // respuesta afirmativa por defecto de esta pregunta concreta.
       if (mentionsBothWord || (mentionsOpeningTopic && mentionsSwallowingTopic)) {
         if (deniesBothProblem) {
           for (const key of unresolvedCapacityKeys) negated.add(key);
+        } else {
+          for (const key of unresolvedCapacityKeys) {
+            affirmed.add(key);
+            contextuallyAffirmed.add(key);
+          }
         }
       } else if (mentionsOpeningTopic && !mentionsSwallowingTopic) {
-        if (unresolvedCapacityKeys.includes("openingDifficulty")) affirmed.add("openingDifficulty");
+        if (unresolvedCapacityKeys.includes("openingDifficulty")) {
+          affirmed.add("openingDifficulty");
+          contextuallyAffirmed.add("openingDifficulty");
+        }
         if (mentionsExclusive && unresolvedCapacityKeys.includes("swallowingDifficulty")) {
           negated.add("swallowingDifficulty");
         }
       } else if (mentionsSwallowingTopic && !mentionsOpeningTopic) {
-        if (unresolvedCapacityKeys.includes("swallowingDifficulty")) affirmed.add("swallowingDifficulty");
+        if (unresolvedCapacityKeys.includes("swallowingDifficulty")) {
+          affirmed.add("swallowingDifficulty");
+          contextuallyAffirmed.add("swallowingDifficulty");
+        }
         if (mentionsExclusive && unresolvedCapacityKeys.includes("openingDifficulty")) {
           negated.add("openingDifficulty");
         }
@@ -995,7 +1032,8 @@ export function resolveAnswerToLastClinicalQuestion(input: {
     negated: [...negated],
     ambiguous: [...ambiguous],
     resolvesSafetyScreen,
-    resolvesBleedingDifferential
+    resolvesBleedingDifferential,
+    contextuallyAffirmed: [...contextuallyAffirmed]
   };
 }
 
@@ -1182,10 +1220,13 @@ export function runDentalSeniorTurn(current: DentalAgentState, rawText: string, 
   // el fallback de frase cerrada de detectLabels (isNegatedLabel), que de
   // otro modo la daria por buena con solo ver la palabra en el mensaje.
   const ambiguousClinicalSignals = new Set(clinicalAnswer.ambiguous);
-  const messageRedFlags = filterOutNegatedLabels(
-    detectLabels(normalized, redFlagPatterns, affirmedClinicalSignals, ambiguousClinicalSignals, REDFLAG_LABEL_TO_SIGNAL_KEY),
-    clinicalAnswer.negated,
-    REDFLAG_LABEL_TO_SIGNAL_KEY
+  const messageRedFlags = promoteContextualDifficultyRedFlags(
+    filterOutNegatedLabels(
+      detectLabels(normalized, redFlagPatterns, affirmedClinicalSignals, ambiguousClinicalSignals, REDFLAG_LABEL_TO_SIGNAL_KEY),
+      clinicalAnswer.negated,
+      REDFLAG_LABEL_TO_SIGNAL_KEY
+    ),
+    clinicalAnswer.contextuallyAffirmed
   );
   const messageSignals = filterOutNegatedLabels(
     detectLabels(normalized, signalPatterns, affirmedClinicalSignals, ambiguousClinicalSignals, SIGNAL_LABEL_TO_SIGNAL_KEY),
@@ -2667,6 +2708,30 @@ function detectLabels(
     .map(rule => rule.label);
 }
 
+// Codex (revision sobre 77a41cc - "Promote contextual swallowing failures to
+// red flags"): fuerza la etiqueta de red flag correspondiente a una señal de
+// dificultad (respirar/tragar/abrir) SOLO cuando se afirmo por la via
+// CONTEXTUAL (una respuesta corta sin la palabra clave - "Si, no puedo",
+// "Ambas cosas" - resuelta por prioridad en resolveAnswerToLastClinicalQuestion),
+// nunca por el motor generico de extraccion (extractAffirmedAndNegatedClinicalSignals),
+// que ya tiene su propia severidad por señal (DIFFICULTY_SIGNAL_RULES) y no
+// debe forzarse via detectLabels - eso reabriria el bug ya corregido en
+// PR #13 de sobre-escalar por una mencion generica compartida entre una
+// señal leve (ej. bleedingUncontrolled via "sangra un poco") y su red flag
+// homonima mas estricta ("sangrado no controlado").
+const DIFFICULTY_TO_RED_FLAG_LABEL: Partial<Record<ClinicalSignalKey, string>> = {
+  breathingDifficulty: "dificultad para respirar",
+  swallowingDifficulty: "dificultad para tragar o hablar",
+  openingDifficulty: "dificultad para abrir la boca"
+};
+
+function promoteContextualDifficultyRedFlags(redFlags: string[], contextuallyAffirmed: ClinicalSignalKey[]): string[] {
+  const additions = contextuallyAffirmed
+    .map(key => DIFFICULTY_TO_RED_FLAG_LABEL[key])
+    .filter((label): label is string => Boolean(label) && !redFlags.includes(label as string));
+  return additions.length === 0 ? redFlags : unique([...redFlags, ...additions]);
+}
+
 function detectTraumaSafetyScreen(normalized: string, redFlags: string[]) {
   if (redFlags.length > 0) return true;
   return (
@@ -3002,7 +3067,15 @@ function acceptsExplicitConsent(normalized: string) {
 // significado de un acuse de recibo desnudo (un "si"/"ayudame" sueltos SI
 // contestan la oferta que Clara ACABA de hacer; en una reconsideracion sin
 // oferta activa exigen mencionar cita/reserva explicitamente - Bloqueante 2).
-const APPOINTMENT_DECISION_CLAUSE_SPLIT_PATTERN = /[.,;:!¡¿?]+|\bpero\b|\baunque\b/;
+// Codex (revision sobre 77a41cc - "Scope appointment negation to the
+// appointment phrase"): sin separar en "y", una negacion COMPLETA y ya
+// cerrada sobre otra cosa ("no tengo mi agenda") y una aceptacion explicita
+// unida por conjuncion ("y quiero reservar una cita") caian en la MISMA
+// clausula - la regla "negacion + palabra clave en la misma clausula" leia
+// el "no" de la primera mitad como si gobernara la cita de la segunda,
+// declinando por error una peticion explicita de reserva. "y" tambien separa
+// clausulas independientes, igual que "pero"/"aunque".
+const APPOINTMENT_DECISION_CLAUSE_SPLIT_PATTERN = /[.,;:!¡¿?]+|\bpero\b|\baunque\b|\by\b/;
 
 // Idiomas de rechazo fijos cuyo significado no depende del contexto ni de la
 // clausula en que caigan. Bloqueante 4: "\bahora no\b" se retira de aqui -
@@ -3045,7 +3118,16 @@ function classifyAppointmentClause(clause: string, mode: AppointmentDecisionMode
   if (APPOINTMENT_BARE_DECLINE_PATTERN.test(clause)) return "DECLINED";
   if (APPOINTMENT_EXPLICIT_DECLINE_PHRASES.test(clause)) return "DECLINED";
   const hasContextKeyword = APPOINTMENT_CONTEXT_KEYWORD_PATTERN.test(clause);
-  const hasNegation = /\bno\b/.test(clause);
+  // Codex (revision sobre 77a41cc - efecto secundario del split en "y"):
+  // "tampoco"/"nunca"/"ni"/"sin"/"nada" son negaciones tan validas como "no"
+  // desnudo - antes de separar en "y", una clausula como "no quiero cita y
+  // tampoco quiero que me ayudeis" quedaba UNIDA y "no quiero cita" ya
+  // aportaba el "no" que hacia caer todo en la rama de rechazo; al separar
+  // en clausulas independientes, "tampoco quiero que me ayudeis" (sin la
+  // palabra "no") caia mas abajo en el heuristico de acuse de recibo
+  // "ayud\w*" y se leia como ACEPTACION por error. Mismo vocabulario de
+  // negacion que NEGATION_MARKER_WORDS (motor de polaridad clinica).
+  const hasNegation = /\b(no|tampoco|nunca|ni|sin|nada)\b/.test(clause);
   // "no" + intencion explicita de cita en la MISMA clausula ("no quiero
   // cita", "no necesito que me ayudes con la reserva") - rechazo final.
   if (hasNegation && hasContextKeyword) return "DECLINED";
