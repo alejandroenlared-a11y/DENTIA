@@ -309,7 +309,7 @@ async function runOpenAiDentalAgentTurnInternal(input: {
 
     if (!response.ok) {
       const errorText = await response.text().catch(() => "");
-      console.error("runOpenAiDentalAgentTurn OpenAI error", response.status, errorText.slice(0, 500));
+      logProviderError("runOpenAiDentalAgentTurn OpenAI error", response.status, errorText);
       return buildLocalFallback(localTurn, model, `OpenAI API ${response.status}`, input.latestPatientMessage);
     }
 
@@ -390,7 +390,7 @@ async function runGeminiDentalAgentTurnInternal(input: {
       };
     }
 
-    console.error("runGeminiDentalAgentTurn Gemini error", primaryResult.status, primaryResult.errorText.slice(0, 500));
+    logProviderError("runGeminiDentalAgentTurn Gemini error", primaryResult.status, primaryResult.errorText);
 
     if (
       primaryResult.status &&
@@ -422,7 +422,7 @@ async function runGeminiDentalAgentTurnInternal(input: {
           model: `${fallbackModel} (texto libre fallback)`
         };
       }
-      console.error("runGeminiDentalAgentTurn Gemini fallback error", secondaryResult.status, secondaryResult.errorText.slice(0, 500));
+      logProviderError("runGeminiDentalAgentTurn Gemini fallback error", secondaryResult.status, secondaryResult.errorText);
       return buildLocalFallback(
         localTurn,
         model,
@@ -527,6 +527,26 @@ async function requestGeminiTurn(input: {
 
 function resolveProvider(): LlmProvider {
   return process.env.LLM_PROVIDER === "gemini" ? "gemini" : "openai";
+}
+
+function logProviderError(label: string, status: number | undefined, errorText: string) {
+  console.error(label, {
+    status,
+    message: summarizeProviderError(errorText)
+  });
+}
+
+function summarizeProviderError(errorText: string) {
+  if (!errorText.trim()) return "(sin detalle)";
+  try {
+    const payload = JSON.parse(errorText) as { error?: { status?: string; message?: string } };
+    const status = payload.error?.status ? `${payload.error.status}: ` : "";
+    const message = payload.error?.message?.split("\n")[0]?.trim();
+    if (message) return `${status}${message}`.slice(0, 220);
+  } catch {
+    // No-op: algunos proveedores devuelven texto plano o HTML.
+  }
+  return errorText.split("\n")[0]?.trim().slice(0, 220) || "(sin detalle)";
 }
 
 export function buildDentalSystemPrompt(extraContext?: string) {
@@ -1177,4 +1197,3 @@ function computeReady(state: DentalAgentState) {
     !state.dataErasureRequested
   );
 }
-

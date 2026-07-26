@@ -12,6 +12,7 @@
     "eval:clara": "tsx scripts/evaluate-clara.ts",
     "eval:clara:llm": "tsx scripts/evaluate-clara-llm.ts",
     "eval:clara:gemini:live": "LLM_PROVIDER=gemini REQUIRE_REAL_LLM=1 tsx scripts/evaluate-clara-llm.ts",
+    "eval:clara:gemini:smoke": "LLM_PROVIDER=gemini REQUIRE_REAL_LLM=1 CLARA_GEMINI_SMOKE=1 tsx scripts/evaluate-clara-llm.ts",
     "quality:clara": "npm run eval:clara && npm test -- --run tests/clara-evaluation.test.ts",
     "quality:release": "npm run eval:clara && npm run lint && npm run typecheck && npm test -- --run && npm run build",
     "typecheck": "tsc --noEmit",

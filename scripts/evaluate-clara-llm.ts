@@ -1,5 +1,6 @@
-import { mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
+import { config as loadEnv } from "dotenv";
 import { evaluateClaraConversationsWithRunner, type ClaraTurnRunner } from "../src/lib/agent/clara-evaluation";
 import { runDentalAgentTurn, type DentalChatMessage } from "../src/lib/agent/openai-dental-agent";
 import { loadFixtures, printReport, writeMarkdownReport } from "./lib/clara-report";
@@ -24,6 +25,20 @@ import {
 // si el fallback local supera el umbral (MAX_FALLBACK_PERCENTAGE, 0 por
 // defecto - una ejecucion "limpia" no debe caer a fallback nunca).
 const observations: LlmTurnObservation[] = [];
+const GEMINI_SMOKE_FIXTURE_IDS = [
+  "emergency-breathing",
+  "negated-breathing",
+  "trauma-context-preserved",
+  "moving-tooth-safety-first",
+  "normal-booking-step-by-step",
+  "availability-option-selection",
+  "implant-price-direct",
+  "prompt-injection-system-prompt",
+  "gdpr-data-erasure-stops-booking",
+  "non-spanish-language-honest-fallback"
+];
+
+loadLocalEnvForCli();
 
 const runTurn: ClaraTurnRunner = async (state, message, historySoFar) => {
   const history: DentalChatMessage[] = historySoFar.flatMap(turn => [
@@ -57,9 +72,10 @@ async function main() {
   const maxFallbackPercentage = percentageResult.valid ? percentageResult.value : 0;
 
   const fixtureDir = resolve(process.cwd(), "tests/fixtures");
-  const reportPath = resolve(process.cwd(), "reports/clara-evaluation-llm.md");
-  const jsonReportPath = resolve(process.cwd(), "reports/clara-evaluation-llm.json");
-  const fixtures = loadFixtures(fixtureDir);
+  const reportBaseName = resolveReportBaseName();
+  const reportPath = resolve(process.cwd(), `reports/${reportBaseName}.md`);
+  const jsonReportPath = resolve(process.cwd(), `reports/${reportBaseName}.json`);
+  const fixtures = selectFixtures(loadFixtures(fixtureDir));
 
   const result = await evaluateClaraConversationsWithRunner(fixtures, runTurn);
 
@@ -76,7 +92,15 @@ async function main() {
   for (const line of buildLlmSummaryMarkdown(summary)) console.log(line);
 
   writeMarkdownReport(result, reportPath, "Evaluacion del LLM real de Clara", {
-    prelude: buildLlmSummaryMarkdown(summary)
+    prelude: [
+      ...buildLlmSummaryMarkdown(summary),
+      "",
+      "## Seleccion de fixtures",
+      "",
+      `- Modo smoke Gemini: ${process.env.CLARA_GEMINI_SMOKE === "1" ? "si" : "no"}`,
+      `- Fixtures ejecutados: ${fixtures.length}`,
+      `- IDs: ${fixtures.map(fixture => fixture.id).join(", ")}`
+    ]
   });
   mkdirSync(dirname(jsonReportPath), { recursive: true });
   writeFileSync(jsonReportPath, `${JSON.stringify({ summary, ...result }, null, 2)}\n`);
@@ -103,6 +127,56 @@ async function main() {
 
   if (result.score < 95 || result.criticalFailures > 0 || result.conversations.some(conversation => conversation.failed.length > 0)) {
     process.exitCode = 1;
+  }
+}
+
+function selectFixtures(fixtures: ReturnType<typeof loadFixtures>) {
+  const requestedIds = parseFixtureIds(process.env.CLARA_FIXTURE_IDS);
+  const selectedIds = process.env.CLARA_GEMINI_SMOKE === "1" ? GEMINI_SMOKE_FIXTURE_IDS : requestedIds;
+  if (!selectedIds.length) return fixtures;
+
+  const fixtureById = new Map(fixtures.map(fixture => [fixture.id, fixture]));
+  const missing = selectedIds.filter(id => !fixtureById.has(id));
+  if (missing.length > 0) {
+    throw new Error(`CLARA_FIXTURE_IDS contiene fixture(s) inexistente(s): ${missing.join(", ")}`);
+  }
+
+  return selectedIds.map(id => fixtureById.get(id)!);
+}
+
+function parseFixtureIds(rawValue: string | undefined) {
+  if (!rawValue?.trim()) return [];
+  return rawValue
+    .split(",")
+    .map(id => id.trim())
+    .filter(Boolean);
+}
+
+function resolveReportBaseName() {
+  const configured = process.env.CLARA_LLM_REPORT_BASENAME?.trim();
+  if (configured) return configured.replace(/[^a-z0-9._-]/gi, "-");
+  if (process.env.CLARA_GEMINI_SMOKE === "1") return "clara-evaluation-llm-smoke";
+  return "clara-evaluation-llm";
+}
+
+function loadLocalEnvForCli() {
+  const explicitPath = process.env.DOTENV_CONFIG_PATH;
+  const fallbackPath = resolve(process.cwd(), ".env.local");
+  const envPath = explicitPath || (existsSync(fallbackPath) ? fallbackPath : undefined);
+  if (!envPath) return;
+
+  loadEnv({ path: envPath, override: false });
+
+  if (
+    process.env.CLARA_GEMINI_SMOKE === "1" &&
+    process.env.LLM_PROVIDER === "gemini" &&
+    !process.env.GEMINI_FALLBACK_MODEL &&
+    process.env.GEMINI_MODEL
+  ) {
+    // En smoke queremos una senal rapida sobre el modelo configurado para la demo.
+    // Si ese modelo esta sin cuota, probar un fallback por defecto puede sumar
+    // timeouts y ocultar el problema operativo real.
+    process.env.GEMINI_FALLBACK_MODEL = process.env.GEMINI_MODEL;
   }
 }
 
