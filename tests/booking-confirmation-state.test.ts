@@ -64,7 +64,7 @@ describe("buildConfirmedBookingState", () => {
 
   it("keeps the exact selected slot - never swaps it for another option", () => {
     const previousState = offeredState();
-    const startsAt = new Date("2026-07-27T10:00:00");
+    const startsAt = new Date("2031-07-27T10:00:00");
 
     const confirmedState = buildConfirmedBookingState(previousState, startsAt);
 

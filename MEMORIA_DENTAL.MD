@@ -1729,3 +1729,45 @@ Criterio para seguir:
   - `npm test -- --run`: 156 tests OK.
   - Playwright autenticado en `http://localhost:3000`: Murcia y Elche separan pacientes y medicos; medicos `BOTH` aparecen en ambas; Agenda no muestra accion superior duplicada.
 - Para despliegue inmediato, el build actual ejecuta `prisma db push && prisma generate && next build`, por lo que Vercel aplicara el esquema al desplegar. Antes de uso serio con datos reales conviene volver a migraciones Prisma versionadas.
+
+## Actualizacion 26 julio 2026 - Clara antes de presentacion oficial
+
+Contexto:
+
+- Presentacion oficial con cliente prevista para el martes 28 de julio de 2026.
+- Rama activa de trabajo: `hotfix/dental-negation-context`.
+- No tocar `main`, no mergear, no desplegar produccion y no ejecutar `npm run build` en esta rama sin revisar, porque el script actual incluye `prisma db push`.
+
+Norma tecnica de Clara:
+
+- El motor determinista es la autoridad para intencion clinica, triaje, urgencias, negaciones, estado de reserva, cierre, consentimiento, sede y siguiente accion.
+- Gemini/OpenAI solo redactan dentro de limites; no pueden decidir transiciones criticas ni persistir estado por su cuenta.
+- Si el proveedor falla, Clara debe responder por fallback local determinista sin dejar al paciente colgado.
+
+Cambios realizados:
+
+- El evaluador LLM `scripts/evaluate-clara-llm.ts` carga `.env.local` o `DOTENV_CONFIG_PATH` de forma explicita para que las pruebas CLI usen las credenciales locales igual que la app.
+- Se crea comando `npm run eval:clara:gemini:smoke` con 10 fixtures criticos para validar rapido Gemini real sin lanzar las 133 conversaciones completas.
+- El smoke escribe en `reports/clara-evaluation-llm-smoke.md` y `.json`, separado del informe LLM largo.
+- En modo smoke, si no hay fallback Gemini explicito, se evita probar un modelo fallback por defecto para no sumar timeouts cuando el modelo de demo ya esta sin cuota.
+- El evaluador permite seleccionar fixtures concretos con `CLARA_FIXTURE_IDS`.
+- Los errores de proveedor externo se registran como resumen corto de status/mensaje, sin volcar cuerpos largos de error.
+- ESLint ignora `.claude/**` para no escanear builds generados en worktrees internos.
+
+Estado de validacion local:
+
+- `npm run lint`: OK.
+- `npm run typecheck`: OK.
+- `npm test -- --run`: OK, 32 archivos y 642 tests.
+- `npm run eval:clara`: OK, 100/100, 709/709, 133 conversaciones, 0 fallos criticos.
+- `npx next build`: OK. Se uso este comando seguro en vez de `npm run build` para evitar `prisma db push`.
+- Smoke LLM local/fallback de 10 casos criticos: OK en criterios funcionales, 100/100.
+
+Estado de Gemini:
+
+- `.env.local` contiene `GEMINI_API_KEY`, `GEMINI_MODEL` y `LLM_PROVIDER=gemini`.
+- La clave se carga correctamente desde CLI tras el ajuste del evaluador.
+- La prueba real con Gemini llega a Google, pero falla por cuota `429 RESOURCE_EXHAUSTED` en `gemini-2.5-pro`.
+- Smoke real final: 10 conversaciones, 24 turnos, 100/100 funcional por fallback local, 0 turnos Gemini reales, 24 fallbacks por `Gemini API 429`, 0 timeouts.
+- Por tanto, a 26 de julio de 2026 no se puede afirmar que Gemini real pase la puerta estricta desde esta maquina hasta resolver cuota/modelo/billing.
+- Clara sigue pasando por fallback determinista, pero para demo comercial conviene resolver la cuota de Gemini o configurar un modelo con cuota disponible antes de ensenar el agente como LLM real.

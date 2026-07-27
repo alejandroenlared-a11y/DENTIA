@@ -36,7 +36,6 @@ import {
   runAgentDemoAction,
   saveInteractiveDemoAction,
   toggleAssistantAction,
-  updatePatientStatusAction,
   updatePatientIntakeStatusAction,
   updateInvoiceElectronicStatusAction,
   updateSettingsAction
@@ -1051,26 +1050,6 @@ function PatientRecordPanel({
         </div>
       </div>
     </aside>
-  );
-}
-
-function PatientStatusButton({
-  patientId,
-  status,
-  label,
-  danger = false
-}: {
-  patientId: string;
-  status: PatientStatus;
-  label: string;
-  danger?: boolean;
-}) {
-  return (
-    <form action={updatePatientStatusAction}>
-      <input type="hidden" name="patientId" value={patientId} />
-      <input type="hidden" name="status" value={status} />
-      <button className={`button ${danger ? "danger" : "ghost"}`} type="submit">{label}</button>
-    </form>
   );
 }
 

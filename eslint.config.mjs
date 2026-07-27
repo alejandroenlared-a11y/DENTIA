@@ -3,7 +3,7 @@ import nextTs from "eslint-config-next/typescript";
 
 const config = [
   {
-    ignores: ["legacy/**", ".next/**", "node_modules/**"]
+    ignores: ["legacy/**", ".next/**", ".claude/**", "node_modules/**"]
   },
   ...nextVitals,
   ...nextTs,
