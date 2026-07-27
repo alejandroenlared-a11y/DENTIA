@@ -633,6 +633,36 @@ describe("runDentalSeniorTurn", () => {
     expect(invalidEmail.state.ready).toBe(false);
   });
 
+  it("offers three options in an urgent flow without repeating the generic date question or auto-booking", () => {
+    let state = initialDentalAgentState;
+    for (const message of ["Me duele una muela", "Fiebre", "Sí", "Alejandro Martí", "654718663"]) {
+      state = runDentalSeniorTurn(state, message).state;
+    }
+
+    const located = runDentalSeniorTurn(state, "Murcia");
+    expect(located.state.triageLevel).toBe("URGENT_24H");
+    expect(located.state.escalated).toBe(true);
+    expect(located.state.email).toBe("");
+    expect(located.state.offeredAvailabilityOptions).toHaveLength(3);
+    expect(located.state.ready).toBe(false);
+    expect(located.state.bookingStatus).toBe("SLOTS_OFFERED");
+    expect(located.reply).toContain("Te puedo proponer estos huecos");
+    expect(located.reply).toContain("1.");
+    expect(located.reply).toContain("2.");
+    expect(located.reply).toContain("3.");
+    expect(located.reply).toContain("Responde con 1, 2 o 3");
+    expect(located.reply).not.toContain("Que día y hora");
+    expect(located.reply.toLowerCase()).not.toContain("reservado un hueco");
+
+    const requested = runDentalSeniorTurn(located.state, "Dame opciones");
+    expect(requested.reply).toContain("Te puedo proponer estos huecos");
+    expect(requested.reply).toContain("1.");
+    expect(requested.reply).toContain("2.");
+    expect(requested.reply).toContain("3.");
+    expect(requested.reply).not.toContain("Que día y hora");
+    expect(requested.reply.toLowerCase()).not.toContain("reservado un hueco");
+  });
+
   it("captures uppercase name separated from phone with a dash", () => {
     const waitingForContact = {
       ...initialDentalAgentState,
@@ -931,7 +961,7 @@ describe("hasSlotOfferPrerequisites / computeBookingStatus", () => {
     expect(computeBookingStatus(withOnlyLocation)).toBe("COLLECTING_CONSENT");
   });
 
-  it("tampoco esta listo si falta solo un dato administrativo (nombre, telefono o email)", () => {
+  it("tampoco esta listo si falta solo un dato administrativo en flujo normal (nombre, telefono o email)", () => {
     const missingName = { ...withOnlyLocation, consent: true, phone: "611222333", email: "juan@example.com" };
     expect(hasSlotOfferPrerequisites(missingName)).toBe(false);
     expect(computeBookingStatus(missingName)).toBe("COLLECTING_PATIENT_DATA");
@@ -945,7 +975,7 @@ describe("hasSlotOfferPrerequisites / computeBookingStatus", () => {
     expect(computeBookingStatus(missingEmail)).toBe("COLLECTING_PATIENT_DATA");
   });
 
-  it("esta listo para ofrecer huecos solo con consent + nombre completo + telefono + email + sede", () => {
+  it("esta listo para ofrecer huecos en flujo normal solo con consent + nombre completo + telefono + email + sede", () => {
     const complete: DentalAgentState = {
       ...withOnlyLocation,
       consent: true,
@@ -955,6 +985,22 @@ describe("hasSlotOfferPrerequisites / computeBookingStatus", () => {
     };
     expect(hasSlotOfferPrerequisites(complete)).toBe(true);
     expect(computeBookingStatus(complete)).toBe("READY_TO_OFFER_SLOTS");
+  });
+
+  it("en urgencia escalada no exige email para ofrecer tres huecos", () => {
+    const urgentWithoutEmail: DentalAgentState = {
+      ...withOnlyLocation,
+      intent: "urgent_pain",
+      triageLevel: "URGENT_24H",
+      escalated: true,
+      consent: true,
+      name: "Juan Perez",
+      phone: "611222333",
+      email: ""
+    };
+
+    expect(hasSlotOfferPrerequisites(urgentWithoutEmail)).toBe(true);
+    expect(computeBookingStatus(urgentWithoutEmail)).toBe("READY_TO_OFFER_SLOTS");
   });
 });
 

@@ -299,7 +299,7 @@ export async function processInboundMessage(
     conversationId: conversation.id,
     channel: payload.channel,
     dentalTurn,
-    autoBook: !bookingProposal
+    autoBook: !bookingProposal && !availabilityOptionsProposal
   });
   await ensurePatientIntakeFromDentalState({
     tenantId: tenant.id,
@@ -328,11 +328,10 @@ export async function processInboundMessage(
   }
 
   let urgentBooking: UrgentBooking | null = null;
-  // Regla conversacional: en una urgencia primero se hace la pregunta de
-  // seguridad (fiebre, hinchazon, dificultad para tragar...) y se espera la
-  // respuesta del paciente. Solo entonces se reserva y se habla de la cita.
-  const safetyKnown = dentalTurn.state.safetyScreened || dentalTurn.state.redFlags.length > 0;
-  if (escalated && safetyKnown && dentalTurn.state.ready) {
+  // Regla de producto para Clara: ninguna urgencia crea una cita cerrada sin
+  // que el paciente elija uno de los 3 huecos. URGENT_24H propone opciones; una
+  // EMERGENCY mantiene la indicacion de urgencias y avisa a recepcion.
+  if (shouldCreateImmediateUrgentBooking(dentalTurn.state)) {
     urgentBooking = await bookUrgentSlot({
       tenantId: tenant.id,
       patientId: patient.id,
@@ -1339,7 +1338,7 @@ function inferPreferredStart(availability: string, now = new Date()) {
   return start;
 }
 
-function getRequestedAvailabilityOptionsPeriod(body: string) {
+export function getRequestedAvailabilityOptionsPeriod(body: string) {
   const normalized = normalize(body);
   const asksForOptions = /(que dias|que dia|que huecos|que horas|tienes|teneis|disponible|disponibilidad|opciones|hueco|huecos)/.test(normalized);
   if (!asksForOptions) {
@@ -1351,19 +1350,34 @@ function getRequestedAvailabilityOptionsPeriod(body: string) {
   if (/\b(manana|mananas|por la manana|por las mananas)\b/.test(normalized)) {
     return "manana";
   }
-  return "";
+  return "manana";
 }
 
-function canOfferAvailabilityOptions(state: DentalAgentState) {
+export function canOfferAvailabilityOptions(state: DentalAgentState) {
+  const hasContactData = state.escalated
+    ? Boolean(state.consent && hasFullNameForBooking(state.name) && state.phone && state.location && !state.availability)
+    : Boolean(
+        state.consent &&
+        hasFullNameForBooking(state.name) &&
+        state.phone &&
+        state.email &&
+        state.location &&
+        !state.availability
+      );
   return Boolean(
     state.intent &&
-    state.consent &&
-    state.name.trim().split(/\s+/).filter(Boolean).length >= 2 &&
-    state.phone &&
-    state.email &&
-    state.location &&
-    !state.availability
+    hasContactData &&
+    state.triageLevel !== "EMERGENCY"
   );
+}
+
+function hasFullNameForBooking(name: string) {
+  return name.trim().split(/\s+/).filter(Boolean).length >= 2;
+}
+
+export function shouldCreateImmediateUrgentBooking(_state: DentalAgentState) {
+  void _state;
+  return false;
 }
 
 function asRecord(value: unknown): Record<string, unknown> {

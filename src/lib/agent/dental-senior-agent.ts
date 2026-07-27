@@ -1622,7 +1622,7 @@ export function buildDentalSummary(state: DentalAgentState) {
 const EMPATHY_PAIN = [
   "Entiendo, es molesto.",
   "Vale, vamos con calma.",
-  "Gracias por contarlo."
+  "Lo revisamos paso a paso."
 ];
 
 const PAIN_INTENTS: DentalIntentId[] = [
@@ -2041,19 +2041,19 @@ function buildAck(state: DentalAgentState, previous: DentalAgentState) {
     return "Vale, lo dejamos como revisión normal entonces.";
   }
   if (state.name && !previous.name) {
-    return `Encantada, ${firstName(state.name)}.`;
+    return `Perfecto, ${firstName(state.name)}.`;
   }
   if (state.consent && !previous.consent) {
-    return "Genial, gracias.";
+    return "De acuerdo.";
   }
   if (state.phone && !previous.phone) {
-    return "Apuntado.";
+    return "Perfecto.";
   }
   if (state.redFlags.length > previous.redFlags.length) {
-    return "Gracias por decirmelo, eso es importante.";
+    return "Lo tengo en cuenta.";
   }
   if (state.detectedSignals.length > previous.detectedSignals.length) {
-    return "Vale, eso me ayuda a orientarte.";
+    return "Entendido.";
   }
   return "";
 }
@@ -2136,7 +2136,7 @@ function nextStep(state: DentalAgentState, latestPatientText: string, previousQu
     !state.safetyScreened &&
     state.bleedingDifferentialResolved
   ) {
-    return "Gracias. ¿Tienes también fiebre, hinchazón, pus o dificultad para abrir la boca o tragar?";
+    return "De acuerdo. ¿Tienes también fiebre, hinchazón, pus o dificultad para abrir la boca o tragar?";
   }
   // Fix real (CASO 1): una peticion administrativa de cita (limpieza, sin
   // sintomas) no debe pedir consentimiento como primer dato - la sede no es
@@ -2185,7 +2185,7 @@ function nextStep(state: DentalAgentState, latestPatientText: string, previousQu
     return "Y tu nombre y apellidos?";
   }
   if (!hasFullName(state.name)) {
-    return `Gracias, ${firstName(state.name)}. Me faltan tus apellidos.`;
+    return `${firstName(state.name)}, me faltan tus apellidos.`;
   }
   if (!state.escalated && !state.email) {
     if (looksLikeInvalidEmail(latestPatientText)) {
@@ -2375,11 +2375,12 @@ export function hasConcreteAvailability(availability: string) {
 }
 
 // Unica fuente de verdad para "estan todos los datos administrativos listos
-// para ofrecer huecos" (consent + nombre completo + telefono + email + sede).
+// para ofrecer huecos". En flujo normal exige email; en urgencia escalada no,
+// porque recepcion llama con prioridad y no debe bloquearse la propuesta.
 // Bug real (revision PR #11, "Keep location-only states in data collection"):
 // computeBookingStatus devolvia READY_TO_OFFER_SLOTS solo porque existia
-// state.location, aunque siguieran faltando consentimiento/nombre/email/
-// telefono - el estado persistido decia "listo para ofrecer huecos" cuando el
+// state.location, aunque siguieran faltando consentimiento/nombre/telefono
+// o, en flujo normal, email - el estado persistido decia "listo para ofrecer huecos" cuando el
 // siguiente paso real seguia siendo pedir esos datos. Funcion unica, reusada
 // tambien por canOfferAvailabilityOptions, para que ambos sitios nunca puedan
 // desincronizarse.
@@ -2389,7 +2390,7 @@ export function hasSlotOfferPrerequisites(state: DentalAgentState): boolean {
     state.consent &&
     hasFullName(state.name) &&
     state.phone &&
-    state.email &&
+    (state.escalated || state.email) &&
     state.location
   );
 }
@@ -2456,7 +2457,7 @@ function requestedSlotOptionsPeriod(text: string) {
   if (/\b(manana|mananas|por la manana|por las mananas)\b/.test(normalized)) {
     return "manana";
   }
-  return "";
+  return "manana";
 }
 
 function buildGuidedAvailabilityReply(location: string, period: string, offeredOptions: string[] = []) {

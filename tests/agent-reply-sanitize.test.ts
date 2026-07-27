@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { formatPendingBookingConfirmation, sanitizeReceptionCallbackAfterNormalBooking } from "@/lib/agent";
+import {
+  canOfferAvailabilityOptions,
+  formatPendingBookingConfirmation,
+  getRequestedAvailabilityOptionsPeriod,
+  sanitizeReceptionCallbackAfterNormalBooking,
+  shouldCreateImmediateUrgentBooking
+} from "@/lib/agent";
+import { initialDentalAgentState, type DentalAgentState } from "@/lib/agent/dental-senior-agent";
 
 describe("sanitizeReceptionCallbackAfterNormalBooking", () => {
   it("removes reception callback promises after a normal appointment is created", () => {
@@ -58,5 +65,42 @@ describe("formatPendingBookingConfirmation", () => {
     expect(reply).toContain("La clínica revisará la solicitud y se pondrá en contacto contigo para confirmarla.");
     expect(reply).toContain("Gracias por confiar en nosotros.");
     expect(reply).toContain("Que tengas un buen día.");
+  });
+});
+
+describe("webhook guided booking rules", () => {
+  const urgentReadyForSlots: DentalAgentState = {
+    ...initialDentalAgentState,
+    intent: "urgent_pain",
+    intentCode: "URGENCIA_DOLOR",
+    treatmentNeed: "Dolor dental urgente",
+    triageLevel: "URGENT_24H",
+    escalated: true,
+    consent: true,
+    name: "Alejandro Marti",
+    phone: "654718663",
+    location: "Murcia centro",
+    email: "",
+    availability: "",
+    ready: false
+  };
+
+  it("treats 'Dame opciones' as a request for morning slot options", () => {
+    expect(getRequestedAvailabilityOptionsPeriod("Dame opciones")).toBe("manana");
+    expect(getRequestedAvailabilityOptionsPeriod("Dame opciones por la tarde")).toBe("tarde");
+  });
+
+  it("allows urgent slot options without email but blocks immediate urgent auto-booking", () => {
+    expect(canOfferAvailabilityOptions(urgentReadyForSlots)).toBe(true);
+    expect(shouldCreateImmediateUrgentBooking(urgentReadyForSlots)).toBe(false);
+  });
+
+  it("never offers appointment options for a true emergency state", () => {
+    expect(
+      canOfferAvailabilityOptions({
+        ...urgentReadyForSlots,
+        triageLevel: "EMERGENCY"
+      })
+    ).toBe(false);
   });
 });
